@@ -1,0 +1,10 @@
+
+
+# 기본: 공통 파일은 dev 팀이 리뷰
+* @Chorongs/dev
+
+# 프론트엔드 코드
+/frontend/ @Chorongs/fe-review
+
+# 백엔드 코드
+/backend/ @Chorongs/be-review
