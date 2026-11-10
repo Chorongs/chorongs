@@ -17,9 +17,9 @@
 | 맞춤 추천 | 용도, 금액, 신용 구간 등을 단계별로 입력하면 맞는 대출 상품과 추천 근거를 보여 줌 |
 | 상품 찾기 | 키워드 간편 검색, 조건 상세 검색 |
 | 상품 비교 | 두 상품을 골라 카드와 비교표로 나란히 비교 |
-| 랭킹 | 조회순, 금리순 대출 상품 순위 |
-| 계산기 | 대출 이자 계산 |
-| 신용 셀프 진단 | 문항 선택으로 신용 점수 구간 진단 (학습 모델) |
+| 랭킹 | 금리, 한도, 기간, 인기순 대출 상품 순위 |
+| 계산기 | 대출 이자, 갈아타기, DSR, 내 집 대출한도, 상환능력 기반 대출 |
+| 신용 셀프 진단 | 문항 선택으로 신용 점수 구간 진단 (학습으로 만든 보기별 점수표) |
 | 소비 습관 | 상황별 소비 습관 추천 |
 | 도움말 | 대출 용어, FAQ, 금융 팁 |
 | 회원 (MY) | 카카오, 네이버 소셜 로그인 / 찜, 최근 본 상품, 검색, 비교, 추천, 계산 기록 |
@@ -33,7 +33,7 @@
 | 구분 | 사용 |
 | --- | --- |
 | Frontend | React (Vite), JavaScript, react-router-dom, zustand, axios, styled-components |
-| Backend | Java 17, Spring Boot 4, Spring Data JPA, Spring Security, Maven |
+| Backend | Java 17, Spring Boot 4, Spring Data JPA, Spring Security, OAuth2 Client(카카오, 네이버), Validation, Maven |
 | Data / Model | Python 3.11, FastAPI, pandas, scikit-learn |
 | DB | Oracle 21c XE |
 | 협업 | Git, GitHub, Jira, Discord |
@@ -44,14 +44,16 @@
 
 ```
 chorongs/
-├─ .github/                 PR 템플릿, Code Owners
-├─ db/                      표 만들기 SQL
+├─ .github/                 Code Owners
+├─ db/                      테이블 생성 SQL
+│   └─ help/                도움말 원본 엑셀, CSV, 적재 SQL
 ├─ ml/
-│   ├─ app/                 FastAPI (상품 정제, 신용 진단 점수 API)
+│   ├─ requirements.txt     파이썬 라이브러리 목록
+│   ├─ app/                 FastAPI (상품 수집, 정제, 검증 + 신용 진단 점수 API, 보기별 점수표)
 │   └─ data/
 │       ├─ csv/             원본, 학습용 CSV (GitHub에 안 올림)
 │       ├─ ipynb/           정제 검증, 모델 학습 노트북
-│       └─ model/           학습 모델 파일 (GitHub에 안 올림)
+│       └─ model/           진단 모델 학습 결과 (점수표는 ml/app/, GitHub에 안 올림)
 ├─ backend/                 Spring Boot
 │   └─ src/main/java/chorong/
 │       ├─ common/          config, dto, exception, interceptor, util, client
@@ -90,3 +92,17 @@ backend 기능 폴더 안 모양
 ├─ repository/   (search, ranking은 없음)
 └─ service/
 ```
+
+<br>
+
+## 실행 방법
+
+1. DB: Oracle 21c XE에서 `db/schema.sql` 실행
+2. backend
+   - `backend/.env.example`을 복사해 `backend/.env`를 만들고 DB 접속 값을 넣음
+   - `cd backend` → `./mvnw spring-boot:run` (http://localhost:8797)
+3. frontend
+   - `cd frontend` → `npm install` → `npm run dev`
+4. ml
+   - `cd ml` → `python -m venv venv` → 가상환경 켜기 (Windows `venv\Scripts\activate`, macOS `source venv/bin/activate`)
+   - `pip install -r requirements.txt` → `fastapi dev app/main.py`
