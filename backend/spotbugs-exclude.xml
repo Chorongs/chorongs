@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Lombok이 만드는 List 필드 getter/setter를 SpotBugs가 "내부 목록 노출"(EI_EXPOSE_REP, EI_EXPOSE_REP2)로 잡음.
+	DTO는 요청, 응답 값을 옮기는 그릇이라 목록이 노출돼도 공격 경로가 없어서, DTO 패키지에서 이 두 규칙만 끔.
+	다른 패키지와 다른 규칙은 그대로 검사함. 범위를 넓히려면 dev 팀 리뷰 필수.
+-->
+<FindBugsFilter>
+	<Match>
+		<Package name="~chorong\..*\.dto"/>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+	</Match>
+</FindBugsFilter>
