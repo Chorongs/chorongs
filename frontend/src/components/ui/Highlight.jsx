@@ -3,7 +3,8 @@ import styled from 'styled-components'
 // UI-20 검색어 강조: 글자를 검색어 기준으로 나눠 검색어 부분만 <mark>로 감쌈 (연노랑 --hl)
 // HTML을 그대로 넣지 않고 글자로만 그린다 (E1). 검색어 속 특수문자는 글자 그대로 비교한다.
 const Mark = styled.mark`
-  border-radius: 2px;
+  padding: 0 1px;
+  border-radius: 3px;
   background: var(--hl);
   color: inherit;
 `

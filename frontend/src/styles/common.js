@@ -37,10 +37,10 @@ const buttonVariant = {
     }
   `,
   soft: css`
-    background: var(--mist-2);
+    background: var(--mist);
     color: var(--ink);
     &:hover:not(:disabled) {
-      background: var(--line);
+      background: var(--mist-2);
     }
   `,
   ghost: css`
@@ -52,22 +52,30 @@ const buttonVariant = {
   `,
 }
 
+// 주 버튼(기본 크기)만 16px 800, 나머지는 15px 700 (시안)
+const isBigPrimary = ({ $variant, $size }) =>
+  (!$variant || $variant === 'primary') && (!$size || $size === 'base' || $size === 'lg')
+
 export const Button = styled.button.attrs((props) => ({
   type: props.type || 'button',
 }))`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   height: ${({ $size }) => BUTTON_HEIGHT[$size] || BUTTON_HEIGHT.base};
-  padding: 0 ${({ $size }) => ($size === 'sm' || $size === 'rating' ? '12px' : '20px')};
+  padding: 0 ${({ $size }) => ($size === 'sm' || $size === 'rating' ? '13px' : '20px')};
   border: 1px solid transparent;
   border-radius: ${({ $size }) => ($size === 'rating' ? 'var(--r-xs)' : 'var(--r-sm)')};
-  font-size: ${({ $size }) => BUTTON_FONT[$size] || BUTTON_FONT.base};
-  font-weight: 700;
+  font-size: ${(props) => (isBigPrimary(props) ? 'var(--fs-lg)' : BUTTON_FONT[props.$size] || BUTTON_FONT.base)};
+  font-weight: ${(props) => (isBigPrimary(props) ? 800 : 700)};
   text-align: center;
+  white-space: nowrap;
   cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast);
+  transition: background var(--t-fast), border-color var(--t-fast), transform .1s;
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
   ${({ $variant }) => buttonVariant[$variant] || buttonVariant.primary}
   ${disabledStyle}
 `
@@ -89,7 +97,8 @@ export const IconButton = styled.button.attrs((props) => ({
   cursor: pointer;
   transition: background var(--t-fast);
   &:hover:not(:disabled) {
-    background: var(--mist-2);
+    background: var(--mist);
+    color: var(--ink);
   }
   ${disabledStyle}
 `
@@ -122,31 +131,38 @@ export const Chip = styled.button.attrs((props) => ({
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   height: ${({ $size }) => ($size === 'sm' ? '32px' : '38px')};
-  padding: 0 16px;
+  padding: 0 ${({ $size }) => ($size === 'sm' ? '12px' : '15px')};
   border: 1px solid var(--line-2);
   border-radius: var(--r-pill);
   background: var(--paper);
   color: var(--ink-2);
-  font-size: var(--fs-md);
+  font-size: ${({ $size }) => ($size === 'sm' ? 'var(--fs-sm)' : 'var(--fs-md)')};
   font-weight: 600;
   text-align: center;
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--t-fast), border-color var(--t-fast);
   &:hover:not(:disabled) {
-    background: var(--mist);
+    border-color: var(--cocoa);
+    color: var(--ink);
   }
   &[aria-pressed='true'] {
     border-color: var(--brand);
     background: var(--brand-soft);
     color: var(--brand-text);
-    font-weight: 700;
+    font-weight: 800;
   }
   ${disabledStyle}
 `
 
-// UI-13 작은 딱지: $variant (default 회색 / good 충족 / warn 주의 / bad 위험)
+// UI-13 작은 딱지: $variant (default 회색 / acc 주황 강조 / good 충족 / warn 주의 / bad 위험)
 const tagVariant = {
+  acc: css`
+    background: var(--brand-soft);
+    color: var(--brand-text);
+  `,
   good: css`
     background: var(--good-soft);
     color: var(--good);
@@ -160,7 +176,7 @@ const tagVariant = {
     color: var(--bad);
   `,
   default: css`
-    background: var(--mist-2);
+    background: var(--mist);
     color: var(--ink-2);
   `,
 }
@@ -168,10 +184,14 @@ const tagVariant = {
 export const Tag = styled.span`
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
   border-radius: var(--r-xs);
   font-size: var(--fs-xs);
-  font-weight: 600;
+  font-weight: 700;
+  white-space: nowrap;
   text-align: center;
   ${({ $variant }) => tagVariant[$variant] || tagVariant.default}
 `
@@ -181,6 +201,7 @@ export const InlineError = styled.p.attrs({ role: 'alert' })`
   margin: 0;
   color: var(--bad);
   font-size: var(--fs-sm);
+  font-weight: 600;
   &:empty {
     display: none;
   }

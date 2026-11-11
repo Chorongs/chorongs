@@ -14,14 +14,16 @@ const Form = styled.form`
   align-items: center;
   gap: 8px;
   height: 52px;
-  padding: 0 8px 0 16px;
+  padding: 0 8px 0 14px;
+  overflow: hidden;
   border: 1px solid var(--line-2);
   border-radius: var(--r-sm);
   background: var(--paper);
-  color: var(--cocoa);
+  color: var(--muted);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
   &:focus-within {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
   }
   @media (max-width: 899px) {
     height: 48px;
@@ -37,7 +39,13 @@ const Input = styled.input`
   background: transparent;
   color: var(--ink);
   font-size: var(--fs-lg);
+  font-weight: 500;
   text-align: left;
+  &::placeholder {
+    color: var(--muted);
+    font-size: var(--fs-base);
+    font-weight: 500;
+  }
 `
 
 // 지우기 칸 자리는 항상 잡아 두어 글자를 쓸 때 칸이 흔들리지 않게 함

@@ -12,13 +12,13 @@ const Head = styled.button.attrs({ type: 'button' })`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
-  padding: 16px 0;
+  padding: 20px 4px;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: var(--fs-xl);
+  font-size: var(--fs-lg);
   font-weight: 800;
   text-align: left;
   cursor: pointer;
@@ -27,15 +27,16 @@ const Head = styled.button.attrs({ type: 'button' })`
 const Arrow = styled.span`
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--cocoa);
+  color: var(--muted);
   transition: transform var(--t-pop);
   transform: rotate(${({ $isOpen }) => ($isOpen ? '180deg' : '0deg')});
 `
 
 const Body = styled.div`
-  padding: 0 0 20px;
+  padding: 0 4px 22px;
   color: var(--ink-2);
   font-size: var(--fs-base);
+  line-height: 1.75;
   text-align: left;
 `
 

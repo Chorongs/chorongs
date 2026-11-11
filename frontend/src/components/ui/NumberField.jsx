@@ -14,22 +14,22 @@ const Wrap = styled.div`
 
 const Label = styled.label`
   color: var(--ink-2);
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
 `
 
 const Box = styled.div`
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: stretch;
   height: 52px;
-  padding: 0 16px;
+  overflow: hidden;
   border: 1px solid ${({ $hasError }) => ($hasError ? 'var(--bad)' : 'var(--line-2)')};
   border-radius: var(--r-sm);
   background: var(--paper);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
   &:focus-within {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
   }
   @media (max-width: 899px) {
     height: 48px;
@@ -38,8 +38,9 @@ const Box = styled.div`
 
 const Input = styled.input`
   flex: 1;
+  width: 100%;
   min-width: 0;
-  padding: 0;
+  padding: 0 14px;
   border: 0;
   outline: none;
   background: transparent;
@@ -52,8 +53,13 @@ const Input = styled.input`
 `
 
 const Unit = styled.span`
+  display: flex;
+  align-items: center;
+  padding: 0 15px 0 4px;
   color: var(--cocoa);
   font-size: var(--fs-md);
+  font-weight: 700;
+  white-space: nowrap;
 `
 
 const Quick = styled.div`

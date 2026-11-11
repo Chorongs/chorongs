@@ -17,8 +17,8 @@ const Mark = styled.span`
   ${({ $src }) =>
     $src &&
     `
-    -webkit-mask: url(${$src}) center / contain no-repeat;
-    mask: url(${$src}) center / contain no-repeat;
+    -webkit-mask: url("${$src}") center / contain no-repeat;
+    mask: url("${$src}") center / contain no-repeat;
   `}
 `
 

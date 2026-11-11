@@ -134,6 +134,10 @@ const GlobalStyle = createGlobalStyle`
     box-sizing: border-box;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     margin: 0;
     background: var(--paper);
@@ -141,7 +145,51 @@ const GlobalStyle = createGlobalStyle`
     font-family: var(--f-ui);
     font-size: var(--fs-base);
     line-height: 1.6;
+    letter-spacing: -.01em;
+    word-break: keep-all;
+    overflow-wrap: break-word;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* 시안 기본 초기화: 제목, 문단, 목록, 링크, 버튼 */
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin: 0;
+    line-height: 1.3;
+    letter-spacing: -.035em;
+    text-wrap: balance;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  ul,
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  dl,
+  dd {
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    text-align: inherit;
   }
 
   button,
@@ -150,6 +198,7 @@ const GlobalStyle = createGlobalStyle`
   textarea {
     font: inherit;
     color: inherit;
+    letter-spacing: inherit;
   }
 
   /* 키보드로 옮긴 곳 표시 (접근성: outline 지우기 금지) */

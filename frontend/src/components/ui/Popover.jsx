@@ -16,8 +16,8 @@ const Menu = styled.div`
   right: 0;
   z-index: 70;
   min-width: 180px;
-  padding: 8px;
-  border-radius: var(--r-md);
+  padding: 22px;
+  border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-pop);
   text-align: left;
