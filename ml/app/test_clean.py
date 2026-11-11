@@ -1,7 +1,11 @@
 from datetime import date
 
-from app.clean import (clean_fss, fill_credit_rates, parse_irt, parse_kinfa_end,
-                       to_date, to_rate, to_text)
+import pandas as pd
+
+from app.clean import (bare_term_units, biz_limit, clean_fss, credit_from_rates, drop_closed,
+                       fill_credit_rates, parse_age, parse_credit, parse_fss_term, parse_income,
+                       parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit, parse_prepay,
+                       to_company, to_date, to_rate, to_text)
 
 
 def _fss_tables(credit_base=(), credit_option=(), biz_base=(), biz_option=()):
@@ -19,9 +23,12 @@ def _fss_tables(credit_base=(), credit_option=(), biz_base=(), biz_option=()):
 
 def _base_row(fin_co_no, fin_prdt_cd, kor_co_nm, fin_prdt_nm, subm_day="202610161557", **extra):
     """금감원 기본 정보 행 1개"""
-    return dict(fin_co_no=fin_co_no, fin_prdt_cd=fin_prdt_cd, kor_co_nm=kor_co_nm,
-                fin_prdt_nm=fin_prdt_nm, fin_co_subm_day=subm_day,
-                dcls_strt_day="20261020", dcls_end_day="", **extra)
+    row = dict(fin_co_no=fin_co_no, fin_prdt_cd=fin_prdt_cd, kor_co_nm=kor_co_nm,
+               fin_prdt_nm=fin_prdt_nm, fin_co_subm_day=subm_day,
+               dcls_strt_day="20261020", dcls_end_day="",
+               loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="")
+    row.update(extra)
+    return row
 
 
 # ---------- 값 하나 정제 ----------
@@ -209,16 +216,17 @@ def test_clean_fss_신협은_상품명으로_묶어_1개():
     assert [(p["source_code"], p["company_name"]) for p in products] == [("032000_기업자유예탁금", "신협")]
 
 
-def test_clean_fss_신협_금리는_비운다():
-    # Given
-    base = [_base_row("0010601", "1306", "정락", "기업자유예탁금", top_fin_grp_no="032000")]
-    option = [{"fin_co_no": "0010601", "fin_prdt_cd": "1306",
-               "lend_rate_min": "1.1", "lend_rate_max": "20.0"}]
+def test_clean_fss_신협_금리는_조합들의_0을_뺀_최저_최고():
+    # Given: 두 번째 조합 최저 금리는 0 (빈 값)
+    base = [_base_row("0010601", "1306", "정락", "기업자유예탁금", top_fin_grp_no="032000"),
+            _base_row("0010602", "1306", "금성", "기업자유예탁금", top_fin_grp_no="032000")]
+    option = [{"fin_co_no": "0010601", "fin_prdt_cd": "1306", "lend_rate_min": "1.1", "lend_rate_max": "19.5"},
+              {"fin_co_no": "0010602", "fin_prdt_cd": "1306", "lend_rate_min": "0", "lend_rate_max": "20.0"}]
     tables = _fss_tables(biz_base=base, biz_option=option)
     # When
     product = clean_fss(tables)[0]
     # Then
-    assert (product["rate_min"], product["rate_max"], product["rates"]) == (None, None, [])
+    assert (product["rate_min"], product["rate_max"], product["rates"]) == (1.1, 20.0, [])
 
 
 def test_clean_fss_신협_base_date는_가장_늦은_제출일():
@@ -230,3 +238,336 @@ def test_clean_fss_신협_base_date는_가장_늦은_제출일():
     product = clean_fss(tables)[0]
     # Then
     assert product["base_date"] == date(2026, 10, 20)
+
+
+# ---------- 1단계 보완 (정제 기준 문서) ----------
+
+def test_to_company_주식회사를_지운다():
+    # Given
+    value = "주식회사 카카오뱅크"
+    # When
+    result = to_company(value)
+    # Then
+    assert result == "카카오뱅크"
+
+
+def test_parse_irt_글_앞_금리_숫자를_쓴다():
+    # Given
+    value = "2.1 *전북특별자치도에서 3년간 1%, 부안군에서 3년간 2% 이자지원"
+    # When
+    result = parse_irt(value)
+    # Then
+    assert result == (2.1, 2.1, None)
+
+
+def test_parse_irt_글_속_퍼센트는_최저_최고():
+    # Given
+    value = "(보증금)연1.3%, (월세금,20만원 한도)연0%"
+    # When
+    result = parse_irt(value)
+    # Then
+    assert result == (0.0, 1.3, None)
+
+
+def test_parse_kinfa_end_12를_넘는_월은_다음_해로():
+    # Given
+    value = "2025년 1월~16월 예산소진시까지"
+    # When
+    result = parse_kinfa_end(value)
+    # Then
+    assert result == date(2026, 4, 30)
+
+
+def test_drop_closed_종료일이_오늘_이전이면_뺀다():
+    # Given
+    products = [{"disclose_end": date(2026, 11, 10)}, {"disclose_end": date(2026, 11, 11)},
+                {"disclose_end": None}]
+    # When
+    result = drop_closed(products, date(2026, 11, 11))
+    # Then
+    assert result == products[1:]
+
+
+# ---------- 2단계: 한도 ----------
+
+def test_parse_limit_억과_천을_만원으로():
+    # Given
+    value = "최대 1억 5천"
+    # When
+    result = parse_limit(value)
+    # Then
+    assert result == 15000
+
+
+def test_parse_limit_같은_기업_당_총_한도는_뺀다():
+    # Given
+    value = "본건 7000(같은기업당 재단보증금액 1억5천만원 이내)"
+    # When
+    result = parse_limit(value, bare_unit=1)
+    # Then
+    assert result == 7000
+
+
+def test_parse_limit_붙은_금액은_나눠_가장_큰_값():
+    # Given
+    value = "5,00010,000 (코로나 19 피해 소기업, 소상공인)"
+    # When
+    result = parse_limit(value, bare_unit=1)
+    # Then
+    assert result == 10000
+
+
+def test_parse_limit_비율만_있으면_빈_값():
+    # Given
+    value = "LTV 70%"
+    # When
+    result = parse_limit(value)
+    # Then
+    assert result is None
+
+
+def test_parse_limit_금감원_단위_없는_숫자는_빈_값():
+    # Given
+    value = "1"
+    # When
+    result = parse_limit(value)
+    # Then
+    assert result is None
+
+
+def test_biz_limit_구간은_아래쪽_값():
+    # Given
+    limit_range, detail = "1억원~5억원", "최대 1억 5천"
+    # When
+    result = biz_limit(limit_range, detail)
+    # Then
+    assert result == 10000
+
+
+def test_biz_limit_구간이_기타면_세부_글에서():
+    # Given
+    limit_range, detail = "기타", "최대 15억원"
+    # When
+    result = biz_limit(limit_range, detail)
+    # Then
+    assert result == 150000
+
+
+# ---------- 2단계: 기간 ----------
+
+def test_parse_kinfa_term_여러_년이면_가장_큰_값_개월():
+    # Given
+    value = "10, 15, 20, 30"
+    # When
+    result = parse_kinfa_term(value)
+    # Then
+    assert result == 360
+
+
+def test_parse_kinfa_term_괄호_속_최장_기간도_본다():
+    # Given
+    value = "2(최장 8년)"
+    # When
+    result = parse_kinfa_term(value)
+    # Then
+    assert result == 96
+
+
+def test_parse_fss_term_연장_포함_가장_큰_값():
+    # Given
+    value = "1년 (최장 5년까지 1년단위 연장)"
+    # When
+    result = parse_fss_term(value)
+    # Then
+    assert result == 60
+
+
+def test_parse_fss_term_년과_개월이_붙은_값():
+    # Given
+    value = "2년6개월"
+    # When
+    result = parse_fss_term(value)
+    # Then
+    assert result == 30
+
+
+def test_parse_fss_term_단위_없으면_회사_단위로():
+    # Given: 회사 단위가 년(12)
+    value = "15"
+    # When
+    result = parse_fss_term(value, bare_months=12)
+    # Then
+    assert result == 180
+
+
+def test_bare_term_units_가장_큰_값이_24_이상이면_개월():
+    # Given
+    base = pd.DataFrame({"kor_co_nm": ["가캐피탈", "가캐피탈", "나은행", "나은행"],
+                         "loan_term": ["84", "6~12", "10", "15"]})
+    # When
+    result = bare_term_units(base)
+    # Then
+    assert result == {"가캐피탈": 1, "나은행": 12}
+
+
+# ---------- 2단계: 신용 ----------
+
+def test_parse_credit_이상은_1000까지():
+    # Given
+    value = "대표자 개인신용평점 595점 이상"
+    # When
+    result = parse_credit(value)
+    # Then
+    assert result == (595, 1000)
+
+
+def test_parse_credit_하위_20퍼센트는_749점_이하():
+    # Given
+    value = "개인신용평점이 하위 100분의 20 이하"
+    # When
+    result = parse_credit(value)
+    # Then
+    assert result == (0, 749)
+
+
+def test_parse_credit_범위_뒤_이하를_다시_세지_않음():
+    # Given
+    value = "대표자의 개인신용평점이 595~839점 이하인 기업"
+    # When
+    result = parse_credit(value)
+    # Then
+    assert result == (595, 839)
+
+
+def test_parse_credit_등급_조건은_빈_값():
+    # Given
+    value = "재단 신용평가시스템에 의한 평가등급이 B등급 이상일 것"
+    # When
+    result = parse_credit(value)
+    # Then
+    assert result == (None, None)
+
+
+def test_credit_from_rates_공시_구간을_합친_범위():
+    # Given: 구간 4(801~900) 공시, 5(701~800) 추정, 6(601~700) 공시
+    rates = [{"rate_kind": "CREDIT", "rate_key": "4", "rate_source": "DISCLOSED"},
+             {"rate_kind": "CREDIT", "rate_key": "5", "rate_source": "ESTIMATED"},
+             {"rate_kind": "CREDIT", "rate_key": "6", "rate_source": "DISCLOSED"}]
+    # When
+    result = credit_from_rates(rates)
+    # Then
+    assert result == (601, 900)
+
+
+# ---------- 2단계: 나이 ----------
+
+def test_parse_age_범위():
+    # Given
+    value = "만 19세 이상 34세 이하 청년"
+    # When
+    result = parse_age(value)
+    # Then
+    assert result == (19, 34)
+
+
+def test_parse_age_미만은_하나_뺀다():
+    # Given
+    value = "40세 미만"
+    # When
+    result = parse_age(value)
+    # Then
+    assert result == (None, 39)
+
+
+def test_parse_age_민법상_성년은_19세_이상():
+    # Given
+    value = "민법상 성년"
+    # When
+    result = parse_age(value)
+    # Then
+    assert result == (19, None)
+
+
+# ---------- 2단계: 소득 ----------
+
+def test_parse_income_월_소득은_12배():
+    # Given
+    value = "월평균 소득 315만원 이하 (비정규직 근로자 예외)"
+    # When
+    result = parse_income(value)
+    # Then
+    assert result[:3] == (None, 3780, "SELF")
+
+
+def test_parse_income_부부합산_여러_금액이면_가장_큰_상한():
+    # Given
+    value = "부부합산 연소득 6천만원 이하(생애최초, 2자녀 이상 가구 7천만원, 신혼가구 8천5백만원)"
+    # When
+    result = parse_income(value)
+    # Then
+    assert result[:3] == (None, 8500, "COUPLE")
+
+
+def test_parse_income_이상은_하한():
+    # Given
+    value = "가처분소득 연 600만원 이상"
+    # When
+    result = parse_income(value)
+    # Then
+    assert result[:3] == (600, None, "SELF")
+
+
+def test_parse_income_금액_없는_조건은_OTHER와_원문():
+    # Given
+    value = "3인가구 기준 중위소득 이하"
+    # When
+    result = parse_income(value)
+    # Then
+    assert result == (None, None, "OTHER", "3인가구 기준 중위소득 이하")
+
+
+def test_parse_income_없음은_모두_빈_값():
+    # Given
+    value = "없음"
+    # When
+    result = parse_income(value)
+    # Then
+    assert result == (None, None, None, None)
+
+
+# ---------- 2단계: 중도상환수수료 ----------
+
+def test_parse_prepay_면제는_0과_Y():
+    # Given
+    value = "면제"
+    # When
+    result = parse_prepay(value)
+    # Then
+    assert result == (0.0, "Y")
+
+
+def test_parse_prepay_가장_큰_퍼센트와_N():
+    # Given
+    value = "상환금액X요율*X(잔존일수/대출일수) *0.02%~0.53%"
+    # When
+    result = parse_prepay(value)
+    # Then
+    assert result == (0.53, "N")
+
+
+def test_parse_prepay_수수료율이_아닌_큰_퍼센트는_뺀다():
+    # Given
+    value = "조기상환원금 × 0.4% × [(3년-대출경과일수) / 3년] 매년 대출잔액의 10% 까지 중도상환수수료 면제"
+    # When
+    result = parse_prepay(value)
+    # Then
+    assert result == (0.4, "N")
+
+
+def test_parse_prepay_빈_값은_모름():
+    # Given
+    value = "-"
+    # When
+    result = parse_prepay(value)
+    # Then
+    assert result == (None, None)
