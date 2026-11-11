@@ -77,4 +77,5 @@ ml/data/model/*
 !ml/data/model/.gitkeep
 __pycache__/
 .venv/
+.pytest_cache/
 .ipynb_checkpoints/
