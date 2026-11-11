@@ -106,3 +106,6 @@ backend 기능 폴더 안 모양
 4. ml
    - `cd ml` → `python -m venv venv` → 가상환경 켜기 (Windows `venv\Scripts\activate`, macOS `source venv/bin/activate`)
    - `pip install -r requirements.txt` → `fastapi dev app/main.py`
+
+
+test
