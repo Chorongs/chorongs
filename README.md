@@ -99,7 +99,7 @@ backend 기능 폴더 안 모양
 
 1. DB: Oracle 21c XE에서 `db/schema.sql` 실행
 2. backend
-   - `backend/.env.example`을 복사해 `backend/.env`를 만들고 DB 접속 값을 넣음
+   - `backend/.env.example`에 적힌 이름으로 PC 환경변수를 넣음 (값은 파일에 쓰지 않음)
    - `cd backend` → `./mvnw spring-boot:run` (http://localhost:8797)
 3. frontend
    - `cd frontend` → `npm install` → `npm run dev`
