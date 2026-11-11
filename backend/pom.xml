@@ -150,6 +150,7 @@
 						<artifactId>spotbugs-maven-plugin</artifactId>
 						<version>4.8.6.4</version>
 						<configuration>
+							<excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
 							<plugins>
 								<plugin>
 									<groupId>com.h3xstream.findsecbugs</groupId>

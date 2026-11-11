@@ -8,3 +8,7 @@
 
 # 백엔드 코드
 /backend/ @Chorongs/be-review
+
+# 검사 설정 (SpotBugs 제외 규칙, 라이브러리 목록): 검사를 약하게 할 수 있어서 dev 팀 리뷰
+/backend/pom.xml @Chorongs/dev
+/backend/spotbugs-exclude.xml @Chorongs/dev
