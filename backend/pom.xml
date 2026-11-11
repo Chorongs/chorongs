@@ -83,6 +83,16 @@
 			<artifactId>spring-boot-starter-webmvc-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- 입력값 검사: DTO에 @NotBlank, @Min 등을 달고 @Valid로 요청 값을 검사 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<!-- 소셜 로그인: 카카오, 네이버 OAuth2 로그인 (MEM-05) -->
+		<dependency>
+	  		<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-client</artifactId>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -129,5 +139,28 @@
 			</plugin>
 		</plugins>
 	</build>
-
+	<!-- 보안 취약점 검사 (선택 실행): mvn -Psast compile spotbugs:check -->
+	<profiles>
+		<profile>
+			<id>sast</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>com.github.spotbugs</groupId>
+						<artifactId>spotbugs-maven-plugin</artifactId>
+						<version>4.8.6.4</version>
+						<configuration>
+							<plugins>
+								<plugin>
+									<groupId>com.h3xstream.findsecbugs</groupId>
+									<artifactId>findsecbugs-plugin</artifactId>
+									<version>1.13.0</version>
+								</plugin>
+							</plugins>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
