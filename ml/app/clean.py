@@ -14,6 +14,7 @@
     4단계 칸: tags (tag 칸 목록), target_detail, check_reasons (4-1은 NEW_PHRASE만)
              4-1 칩: TARGET 지원 대상, PURPOSE 자금 용도 (단어표 artifacts/tag_words.json)
              4-2 칩: AMOUNT 필요 금액, REPAY 상환 방법, CREDIT 신용점수 구간
+             4-3 칩: SECTOR 금융권, COMPANY 취급기관, REGION 지원 지역
 
     - 0, '-', 빈 칸은 빈 값(None) (중도상환수수료 0은 '수수료 없음'이라 예외)
     - 글자 칸은 HTML 문자(&#40; 등)를 되돌리고 앞뒤 공백 제거 (raw_json은 원본 그대로)
@@ -771,10 +772,11 @@ def load_words(path=WORDS_PATH):
 WORDS = load_words()
 
 
-def match_words(text, entries):
+def match_words(text, entries, consume=False):
     """
         글 속 단어 → (칩 목록, 세부 값 목록)
         entries: [{"word", "chip", "detail"(없어도 됨)}], 같은 칩은 1번만
+        consume: 찾은 단어를 글에서 지우고 다음 단어를 봄 ('저축은행'을 찾은 뒤 '은행'으로 다시 세지 않음)
     """
     chips, details = [], []
     if not text:
@@ -783,6 +785,8 @@ def match_words(text, entries):
     for entry in entries:
         if entry["word"] not in text:
             continue
+        if consume:
+            text = text.replace(entry["word"], " ")
         if entry["chip"] not in chips:
             chips.append(entry["chip"])
         if entry.get("detail") and entry["detail"] not in details:
@@ -996,6 +1000,84 @@ def fss_credit(loan_type, rates):
     return [] if loan_type == "CREDIT" else [words["review_chip"]]
 
 
+def fss_group_chip(tag_type, group_no, company_name):
+    """금감원 금융권, 취급기관 칩: 권역 코드의 기본 칩, 회사명 단어가 걸리면 그 칩 (모르는 권역은 결측)"""
+    group = WORDS[tag_type]["fss_groups"].get(to_text(group_no))
+    if group is None:
+        return []
+    chips, _ = match_words(company_name, group.get("name_words", []))
+    return chips[:1] or [group["default"]]
+
+
+def kinfa_sector(company_name):
+    """서민 금융권 칩: 제공기관명 단어 중 위에서부터 처음 걸린 1개, 못 정하면 기타 (정제 기준 3-6)"""
+    words = WORDS["SECTOR"]
+    chips, _ = match_words(company_name, words["kinfa_words"])
+    return chips[:1] or [words["kinfa_default"]]
+
+
+def fss_bank_names(tables):
+    """같은 불러오기의 금감원 원본에서 은행 권역 회사명 목록 (서민 취급기관 대조용)"""
+    group = WORDS["COMPANY"]["kinfa_bank"]["group"]
+    names = set()
+    for kind in FSS_LOAN_TYPES:
+        for row in tables.get(f"finlife_{kind}_base", []):
+            if to_text(row.get("top_fin_grp_no")) == group:
+                names.add(to_company(row.get("kor_co_nm")))
+    names.discard(None)
+    return names
+
+
+def kinfa_company(row, bank_names=()):
+    """
+        서민 취급기관 칩 (신청하는 곳, 여러 개 가능, 정제 기준 3-5)
+
+        - 취급기관 칸 글의 단어 → 칩 (찾은 단어는 지우고 다음 단어를 봄)
+        - '은행' 글자가 없는 이름은 금감원 은행 회사명과 같을 때만 은행 (표기가 다르면 aliases)
+        - 빈 값, '취급기관(10개)'처럼 어디인지 없는 글 → 결측
+        - 아는 단어가 없으면 기타 (실행 로그에 원문을 출력해 단어표 추가 여부 확인)
+    """
+    words = WORDS["COMPANY"]
+    text = to_text(row.get("hdlinst"))
+    if text is None or text in words["kinfa_missing_phrases"]:
+        return []
+
+    chips, _ = match_words(text, words["kinfa_words"], consume=True)
+
+    bank = words["kinfa_bank"]
+    names = set(bank_names)
+    if bank["chip"] not in chips and (
+            any(name in text for name in names)
+            or any(alias in text and target in names for alias, target in bank["aliases"].items())):
+        chips.append(bank["chip"])
+
+    return _in_order(chips, words["chips"]) if chips else [words["other_chip"]]
+
+
+def kinfa_region(row, company_name):
+    """
+        서민 지원 지역 칩 (정제 기준 3-5)
+
+        - 거주 지역 칸에 '전국'이 있으면 전국, 아니면 시도 이름 (여러 개 가능)
+        - 칸이 비면 상품명 + 제공기관명의 시도 이름 (경남은행, 부산은행 같은 은행 이름은 빼고 봄)
+        - 그래도 없으면 결측
+    """
+    words = WORDS["REGION"]
+    area = to_text(row.get("rsdAreaPamtEqltIstm"))
+
+    if area is not None:
+        if words["nationwide"] in area:
+            return [words["nationwide"]]
+        text = area
+    else:
+        text = f"{to_text(row.get('finprdnm')) or ''} {company_name or ''}"
+        for word in words["name_skip_words"]:
+            text = text.replace(word, " ")
+
+    chips, _ = match_words(text, words["words"])
+    return _in_order(chips, words["chips"])
+
+
 def _tag_fields(chips_by_type, target_detail=None, is_new=False):
     """필터별 칩 목록 → 4단계 칸 (tags, target_detail, check_reasons)"""
     return {
@@ -1006,27 +1088,35 @@ def _tag_fields(chips_by_type, target_detail=None, is_new=False):
     }
 
 
-def kinfa_tags(row, numbers):
-    """서민 행 1개 + 2단계 숫자 칸 → 4단계 칸"""
+def kinfa_tags(row, numbers, bank_names=()):
+    """서민 행 1개 + 2단계 숫자 칸 → 4단계 칸 (bank_names: 금감원 은행 회사명, 취급기관 대조용)"""
     targets, detail, new_target = kinfa_target(row)
     purposes, new_purpose = kinfa_purpose(row)
+    company = to_company(row.get("ofrinstnm"))
     return _tag_fields({
         "TARGET": targets,
         "PURPOSE": purposes,
         "AMOUNT": amount_chips(numbers["limit_amount"], row.get("lnlmt")),
         "REPAY": repay_chips(row.get("rdptmthd")),
+        "SECTOR": kinfa_sector(company),
+        "COMPANY": kinfa_company(row, bank_names),
+        "REGION": kinfa_region(row, company),
         "CREDIT": kinfa_credit(row, numbers["credit_min"], numbers["credit_max"]),
     }, detail, new_target or new_purpose)
 
 
 def fss_tags(loan_type, row, numbers, rates, options):
-    """금감원 기본 행 1개 → 4단계 칸 (단어표에 없는 새 문구는 서민 대상, 용도 칸에서만 셈)"""
+    """금감원 기본 행 1개 → 4단계 칸 (단어표에 없는 새 문구는 서민 대상, 용도 칸에서만 셈, 지역은 전국)"""
     biz = loan_type == "BIZ"
+    company = to_company(row["kor_co_nm"])
     return _tag_fields({
         "TARGET": fss_target(loan_type, row["join_deny"] if biz else None),
         "PURPOSE": fss_purpose(loan_type, row["use_way"] if biz else None),
         "AMOUNT": fss_amount(loan_type, row, numbers["limit_amount"]),
         "REPAY": fss_repay(loan_type, row, options),
+        "SECTOR": fss_group_chip("SECTOR", row["top_fin_grp_no"], company),
+        "COMPANY": fss_group_chip("COMPANY", row["top_fin_grp_no"], company),
+        "REGION": [WORDS["REGION"]["nationwide"]],
         "CREDIT": fss_credit(loan_type, rates),
     })
 
@@ -1038,13 +1128,14 @@ def drop_closed(products, today):
 
 # ---------- 출처별 정제 ----------
 
-def clean_kinfa(rows, collected_on):
+def clean_kinfa(rows, collected_on, bank_names=()):
     """
         서민금융진흥원 행 목록 → 상품 목록 (EXT-01)
 
         - source_code = seq, loan_type KINFA
         - base_date = 수집한 날 (원본에 기준일 칸이 없음)
         - 공시 시작일은 기준이 없어 비움, 종료일은 운영 기간 글에서
+        - bank_names: 같은 불러오기의 금감원 은행 회사명 (fss_bank_names, 취급기관 칩 대조용)
     """
     products = []
 
@@ -1068,7 +1159,7 @@ def clean_kinfa(rows, collected_on):
             "rates": [],
             **numbers,
             **kinfa_features(row),
-            **kinfa_tags(row, numbers),
+            **kinfa_tags(row, numbers, bank_names),
         })
 
     return products
@@ -1223,7 +1314,8 @@ def main():
     # 수집한 날 = 서민 CSV를 저장한 날
     collected_on = date.fromtimestamp((CSV_DIR / "kinfa_loan_products.csv").stat().st_mtime)
 
-    products = clean_kinfa(tables["kinfa_loan_products"], collected_on) + clean_fss(tables)
+    products = (clean_kinfa(tables["kinfa_loan_products"], collected_on, fss_bank_names(tables))
+                + clean_fss(tables))
     closed = len(products)
     products = drop_closed(products, date.today())
     logger.info("판매 종료 제외 %d개", closed - len(products))
@@ -1241,12 +1333,16 @@ def main():
     for col in ("rate_type", "online_yn", "policy_yn", "extra_cond"):
         logger.info("  %s: %s", col,
                     dict(Counter((p["loan_type"], p[col]) for p in products if col != "extra_cond" or p[col])))
-    for tag_type in ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "CREDIT"):
+    for tag_type in ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "SECTOR", "COMPANY", "REGION", "CREDIT"):
         counts = Counter(t["tag_value"] for p in products for t in p["tags"] if t["tag_type"] == tag_type)
         missing = sum(not any(t["tag_type"] == tag_type for t in p["tags"]) for p in products)
         logger.info("  %s 칩: %s / 결측 %d개", tag_type, dict(counts), missing)
     logger.info("  target_detail: %s", dict(Counter(p["target_detail"] for p in products if p["target_detail"])))
     logger.info("  새 문구(NEW_PHRASE) %d개", sum("NEW_PHRASE" in p["check_reasons"] for p in products))
+    other = WORDS["COMPANY"]["other_chip"]
+    unknown = Counter(json.loads(p["raw_json"])["hdlinst"] for p in products if p["source"] == "KINFA"
+                      and {"tag_type": "COMPANY", "tag_value": other} in p["tags"])
+    logger.info("  취급기관 기타 원문 (은행 등이면 단어표에 추가): %s", dict(unknown))
 
 
 if __name__ == "__main__":

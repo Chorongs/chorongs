@@ -4,8 +4,10 @@ import pandas as pd
 
 from app.clean import (WORDS, amount_chips, bare_term_units, biz_limit, clean_fss, clean_kinfa,
                        credit_bands, credit_from_rates, drop_closed, fill_credit_rates, fss_amount,
-                       fss_credit, fss_online, fss_policy, fss_purpose, fss_rate_type, fss_repay,
-                       fss_target, kinfa_credit, kinfa_online, kinfa_purpose, kinfa_target,
+                       fss_bank_names, fss_credit, fss_group_chip, fss_online, fss_policy,
+                       fss_purpose, fss_rate_type, fss_repay, fss_target, kinfa_company,
+                       kinfa_credit, kinfa_online, kinfa_purpose, kinfa_region, kinfa_sector,
+                       kinfa_target,
                        merge_yn, parse_age, parse_credit, parse_extra_cond, parse_fss_term,
                        parse_income, parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit,
                        parse_prepay, rate_type_from_texts, repay_chips, to_company, to_date, to_rate,
@@ -32,7 +34,7 @@ def _base_row(fin_co_no, fin_prdt_cd, kor_co_nm, fin_prdt_nm, subm_day="20261016
                dcls_strt_day="20261020", dcls_end_day="",
                loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="",
                join_way="", fin_prdt_type_nm="", lend_rate_type="", join_deny="", use_way="",
-               loan_type="", rpay_type="")
+               loan_type="", rpay_type="", top_fin_grp_no="020000")
     row.update(extra)
     return row
 
@@ -743,19 +745,19 @@ def test_clean_fss_신협은_조합들_금리_방식을_합친다():
 
 # ---------- 4단계: 필터 칩 (4-1 지원 대상, 자금 용도) ----------
 
-TAG_TYPES = ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "CREDIT")
+TAG_TYPES = ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "SECTOR", "COMPANY", "REGION", "CREDIT")
 CHIP_GROUPS = ("fss_loan_types", "rate_keys", "fss_option_codes")   # 아래 글이 전부 칩 이름인 칸
 
 
 def _chips_in(value, key="", all_strings=False):
-    """단어표 안의 칩 이름 ('chip'으로 끝나는 칸 + CHIP_GROUPS 아래 글)"""
+    """단어표 안의 칩 이름 ('chip', 'default'로 끝나는 칸 + CHIP_GROUPS 아래 글)"""
     if isinstance(value, dict):
         for k, v in value.items():
             yield from _chips_in(v, k, all_strings or k in CHIP_GROUPS)
     elif isinstance(value, list):
         for v in value:
             yield from _chips_in(v, key, all_strings)
-    elif isinstance(value, str) and (all_strings or key.endswith("chip")):
+    elif isinstance(value, str) and (all_strings or key.endswith(("chip", "default"))):
         yield value
 
 
@@ -1170,3 +1172,206 @@ def test_fss_credit_전세는_심사_후_결정():
     chips = fss_credit("RENT", rates)
     # Then
     assert chips == ["심사 후 결정"]
+
+
+# ---------- 4단계: 필터 칩 (4-3 금융권, 취급기관, 지원 지역) ----------
+
+def test_fss_group_chip_은행_권역_특수은행():
+    # Given
+    company = "중소기업은행"
+    # When
+    chips = fss_group_chip("SECTOR", "020000", company)
+    # Then
+    assert chips == ["특수은행"]
+
+
+def test_fss_group_chip_아이엠뱅크는_시중은행():
+    # Given
+    company = "아이엠뱅크"
+    # When
+    chips = fss_group_chip("SECTOR", "020000", company)
+    # Then
+    assert chips == ["시중은행"]
+
+
+def test_fss_group_chip_여신전문_카드는_카드사():
+    # Given
+    company = "신한카드"
+    # When
+    chips = fss_group_chip("SECTOR", "030200", company)
+    # Then
+    assert chips == ["카드사"]
+
+
+def test_fss_group_chip_보험_생명이_없으면_손해보험():
+    # Given
+    company = "삼성화재해상보험"
+    # When
+    chips = fss_group_chip("SECTOR", "050000", company)
+    # Then
+    assert chips == ["손해보험"]
+
+
+def test_fss_group_chip_취급기관은_이름_말고_권역_코드로():
+    # Given
+    company = "현대오일뱅크"
+    # When
+    chips = fss_group_chip("COMPANY", "032000", company)
+    # Then
+    assert chips == ["신협/새마을금고"]
+
+
+def test_kinfa_sector_도_이름이_있으면_지자체():
+    # Given
+    company = "경상북도 김천시"
+    # When
+    chips = kinfa_sector(company)
+    # Then
+    assert chips == ["지자체"]
+
+
+def test_kinfa_sector_서민금융진흥원은_서민금융기관():
+    # Given
+    company = "서민금융진흥원"
+    # When
+    chips = kinfa_sector(company)
+    # Then
+    assert chips == ["서민금융기관"]
+
+
+def test_kinfa_sector_제공기관이_없으면_기타():
+    # Given
+    company = None
+    # When
+    chips = kinfa_sector(company)
+    # Then
+    assert chips == ["기타"]
+
+
+def test_kinfa_company_여러_곳이면_칩_여러_개():
+    # Given
+    row = {"hdlinst": "한국주택금융공사, 취급은행"}
+    # When
+    chips = kinfa_company(row)
+    # Then
+    assert chips == ["은행", "공공기관"]
+
+
+def test_kinfa_company_저축은행은_은행으로_다시_세지_않음():
+    # Given
+    row = {"hdlinst": "지역농협, 수협, 산림조합, 새마을금고, 신협, 저축은행"}
+    # When
+    chips = kinfa_company(row)
+    # Then
+    assert chips == ["저축은행", "신협/새마을금고"]
+
+
+def test_kinfa_company_금감원_은행_이름과_같으면_은행():
+    # Given
+    row = {"hdlinst": "아이엠뱅크"}
+    # When
+    chips = kinfa_company(row, {"아이엠뱅크"})
+    # Then
+    assert chips == ["은행"]
+
+
+def test_kinfa_company_표기가_다르면_별칭으로_대조():
+    # Given
+    row = {"hdlinst": "iM뱅크"}
+    # When
+    chips = kinfa_company(row, {"아이엠뱅크"})
+    # Then
+    assert chips == ["은행"]
+
+
+def test_kinfa_company_금감원_은행에_없는_뱅크는_기타():
+    # Given
+    row = {"hdlinst": "푸드뱅크"}
+    # When
+    chips = kinfa_company(row, {"아이엠뱅크"})
+    # Then
+    assert chips == ["기타"]
+
+
+def test_kinfa_company_금감원_이름이_없으면_대조_못_해_기타():
+    # Given
+    row = {"hdlinst": "아이엠뱅크"}
+    # When
+    chips = kinfa_company(row, set())
+    # Then
+    assert chips == ["기타"]
+
+
+def test_kinfa_company_어디인지_없는_글은_결측():
+    # Given
+    row = {"hdlinst": "취급기관(10개)"}
+    # When
+    chips = kinfa_company(row)
+    # Then
+    assert chips == []
+
+
+def test_fss_bank_names_은행_권역_회사명만():
+    # Given
+    tables = _fss_tables(credit_base=[
+        _base_row("0010001", "P01", "가은행", "직장인대출", top_fin_grp_no="020000"),
+        _base_row("0010002", "P02", "나저축은행", "비상금대출", top_fin_grp_no="030300"),
+    ])
+    # When
+    names = fss_bank_names(tables)
+    # Then
+    assert names == {"가은행"}
+
+
+def test_kinfa_region_시도가_여러_개면_칩_여러_개():
+    # Given
+    row = {"rsdAreaPamtEqltIstm": "경남, 울산"}
+    # When
+    chips = kinfa_region(row, "")
+    # Then
+    assert chips == ["울산", "경남"]
+
+
+def test_kinfa_region_전국이_있으면_전국만():
+    # Given
+    row = {"rsdAreaPamtEqltIstm": "전국(농어촌)"}
+    # When
+    chips = kinfa_region(row, "")
+    # Then
+    assert chips == ["전국"]
+
+
+def test_kinfa_region_칸이_비면_상품명_시도():
+    # Given
+    row = {"rsdAreaPamtEqltIstm": "-", "finprdnm": "경기도 중소기업 육성자금"}
+    # When
+    chips = kinfa_region(row, "경기신용보증재단")
+    # Then
+    assert chips == ["경기"]
+
+
+def test_kinfa_region_은행_이름의_시도는_빼고_본다():
+    # Given
+    row = {"rsdAreaPamtEqltIstm": "-", "finprdnm": "경남은행 특별출연 협약보증"}
+    # When
+    chips = kinfa_region(row, "울산신용보증재단")
+    # Then
+    assert chips == ["울산"]
+
+
+def test_kinfa_region_시도_이름이_없으면_결측():
+    # Given
+    row = {"rsdAreaPamtEqltIstm": "-", "finprdnm": "햇살론일반"}
+    # When
+    chips = kinfa_region(row, "서민금융진흥원")
+    # Then
+    assert chips == []
+
+
+def test_clean_fss_금감원은_지원_지역_전국():
+    # Given
+    base = [_base_row("0010001", "P01", "가은행", "직장인대출", crdt_prdt_type="1")]
+    # When
+    product = clean_fss(_fss_tables(credit_base=base))[0]
+    # Then
+    assert [t["tag_value"] for t in product["tags"] if t["tag_type"] == "REGION"] == ["전국"]
