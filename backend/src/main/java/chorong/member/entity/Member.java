@@ -2,16 +2,14 @@ package chorong.member.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.ColumnDefault;
-
+import lombok.*;
 import java.time.LocalDateTime;
-import java.util.Date;
 
 @Entity
 @Getter
-@NoArgsConstructor()
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+@AllArgsConstructor
 public class Member {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,5 +25,4 @@ public class Member {
     private LocalDateTime termsAgreedAt;
     @NotNull
     private LocalDateTime createdAt;
-
 }
