@@ -1,22 +1,17 @@
 import styled from 'styled-components'
-
-// TODO(RC-02): 가안의 '약속 3줄' 문구로 채우기 (명세서에 문구 없음)
-const PROMISES = []
+import useUiStore from '../../store/useUiStore'
+import { Button } from '../../styles/common'
 
 const Wrap = styled.section`
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 28px;
-  align-items: start;
-
-  @media (min-width: 900px) {
-    grid-template-columns: 1fr 1fr;
-  }
+  display: flex;
+  align-items: center;
+  min-height: calc(100vh - 108px);
 `
 
 const Intro = styled.div`
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 20px;
 `
 
@@ -32,36 +27,31 @@ const Title = styled.h1`
   }
 `
 
-const PromiseList = styled.ul`
+const Lead = styled.p`
   margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: var(--fs-base);
+  font-family: var(--f-ui);
+  font-size: var(--fs-xl);
   line-height: 1.6;
   color: var(--ink-2);
 `
 
-const CardArea = styled.div`
-  min-width: 0;
-`
-
+/*
+    RC-02 소개 영역 (첫 화면 가득)
+    - 소개 글 + [나에게 맞는 상품 추천받기] → 추천 창 열기 (RC-14, useUiStore.openRecommend)
+    - 글은 모두 고정 (서버 호출 없음). 아래 화살표 없음
+*/
 function HeroSection() {
+  const openRecommend = useUiStore((state) => state.openRecommend)
+
   return (
     <Wrap aria-labelledby="hero-title">
       <Intro>
         <Title id="hero-title">대출, 더 이상 어렵지 않아요</Title>
-        <PromiseList>
-          {PROMISES.map((promise) => (
-            <li key={promise}>{promise}</li>
-          ))}
-        </PromiseList>
+        <Lead>신청할 수 있는 대출을 추천 이유와 함께 보여드려요</Lead>
+        <Button $size="lg" onClick={() => openRecommend()}>
+          나에게 맞는 상품 추천받기
+        </Button>
       </Intro>
-      <CardArea>
-        {/* TODO(RC-03, UI-05): 공통 Panel(큰 회색 판) 안에 <RecommendStepper /> 넣기 (공통 부품이 올라온 뒤 연결) */}
-      </CardArea>
     </Wrap>
   )
 }

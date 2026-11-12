@@ -33,6 +33,47 @@ export const isValidIncome = (income) => isNumberInRange(income, 0, 99999)
 // 맞춤 추천 입력 (RC-03~05): 필요 금액 10만원~10억원 (만원 단위로 10~100,000)
 export const isValidNeed = (need) => isNumberInRange(need, 10, 100000)
 
+// 단계별 입력 검사: 첫 번째로 걸린 칸을 { field, message }로 돌려주고, 통과하면 null
+// field는 화면 칸 이름 (실패하면 그 칸에 커서를 옮기고 문구를 보여 줌)
+
+// 1단계 나에 대해: 직업, 나이, 연소득, 기존 대출 (지역은 고르지 않아도 됨)
+export const getAboutMeError = (input) => {
+  if (isBlank(input.job)) return { field: 'job', message: '직업을 골라 주세요' }
+  if (isBlank(input.ageGroup)) return { field: 'ageGroup', message: '나이를 골라 주세요' }
+  if (!isValidIncome(input.income)) {
+    return { field: 'income', message: '연소득을 0~99,999만원 사이로 입력해 주세요' }
+  }
+  // 기존 대출: '잘 모르겠어요'(debtUnknown)이거나 월 상환액 입력 ('대출 없어요' = 0)
+  if (!input.debtUnknown && !isNumberInRange(input.debtMonthly, 0, 99999)) {
+    return { field: 'debt', message: '매달 갚는 대출을 입력하거나 골라 주세요' }
+  }
+  return null
+}
+
+// 2단계 필요한 돈: 용도, 필요 금액, 갚을 기간
+export const getMoneyError = (input) => {
+  if (isBlank(input.purpose)) return { field: 'purpose', message: '자금 용도를 골라 주세요' }
+  if (!isValidNeed(input.need)) {
+    return { field: 'need', message: '필요 금액을 10만원~10억원 사이로 입력해 주세요' }
+  }
+  if (!isValidMonths(input.purpose, input.months)) {
+    return { field: 'months', message: '갚을 기간을 골라 주세요' }
+  }
+  return null
+}
+
+// 3단계 신용, 우선순위: 신용 구간(필수), 최근 1년 연체, 가장 중요한 것 1~3개
+export const getCreditError = (input) => {
+  if (isBlank(input.creditBand)) return { field: 'creditBand', message: '신용점수 구간을 골라 주세요' }
+  if (typeof input.overdue !== 'boolean') {
+    return { field: 'overdue', message: '최근 1년 연체 여부를 골라 주세요' }
+  }
+  if (input.priorities.length < 1 || input.priorities.length > 3) {
+    return { field: 'priorities', message: '가장 중요한 것을 1~3개 골라 주세요' }
+  }
+  return null
+}
+
 // 갚을 기간 선택지 (개월): 전월세, 주택 구입은 60/120/180, 그 밖의 용도는 12/36/60
 export const getMonthsOptions = (purpose) =>
   HOUSING_PURPOSES.includes(purpose) ? MONTHS_OPTIONS_HOUSING : MONTHS_OPTIONS_DEFAULT

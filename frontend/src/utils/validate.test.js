@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  getAboutMeError,
+  getCreditError,
+  getMoneyError,
   getMonthsOptions,
   isBlank,
   isLengthInRange,
@@ -284,5 +287,168 @@ describe('isValidMonths', () => {
     const result = isValidMonths(purpose, null)
     // Then
     expect(result).toBe(false)
+  })
+})
+
+const validAboutMe = { job: 'OFFICE', ageGroup: 'YOUTH', income: 3000, debtMonthly: 0, debtUnknown: false }
+const validMoney = { purpose: '생활비', need: 500, months: 36 }
+const validCredit = { creditBand: 'BAND3', overdue: false, priorities: ['LOW_RATE'] }
+
+describe('getAboutMeError', () => {
+  it('모두 채우면 null이다', () => {
+    // Given
+    const input = { ...validAboutMe }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('직업을 안 골랐으면 job 칸이 걸린다', () => {
+    // Given
+    const input = { ...validAboutMe, job: null }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result.field).toBe('job')
+  })
+
+  it('나이를 안 골랐으면 ageGroup 칸이 걸린다', () => {
+    // Given
+    const input = { ...validAboutMe, ageGroup: null }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result.field).toBe('ageGroup')
+  })
+
+  it('연소득이 99,999를 넘으면 income 칸이 걸린다', () => {
+    // Given
+    const input = { ...validAboutMe, income: 100000 }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result.field).toBe('income')
+  })
+
+  it('기존 대출을 비워 두면 debt 칸이 걸린다', () => {
+    // Given
+    const input = { ...validAboutMe, debtMonthly: null }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result.field).toBe('debt')
+  })
+
+  it('기존 대출을 잘 모르겠어요(debtUnknown)로 고르면 통과한다', () => {
+    // Given
+    const input = { ...validAboutMe, debtMonthly: null, debtUnknown: true }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('칸이 여러 개 틀리면 먼저 나오는 칸(job)이 걸린다', () => {
+    // Given
+    const input = { ...validAboutMe, job: null, income: -1 }
+    // When
+    const result = getAboutMeError(input)
+    // Then
+    expect(result.field).toBe('job')
+  })
+})
+
+describe('getMoneyError', () => {
+  it('모두 채우면 null이다', () => {
+    // Given
+    const input = { ...validMoney }
+    // When
+    const result = getMoneyError(input)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('용도를 안 골랐으면 purpose 칸이 걸린다', () => {
+    // Given
+    const input = { ...validMoney, purpose: null }
+    // When
+    const result = getMoneyError(input)
+    // Then
+    expect(result.field).toBe('purpose')
+  })
+
+  it('필요 금액이 10만원 미만이면 need 칸이 걸린다', () => {
+    // Given
+    const input = { ...validMoney, need: 9 }
+    // When
+    const result = getMoneyError(input)
+    // Then
+    expect(result.field).toBe('need')
+  })
+
+  it('기간을 안 골랐으면 months 칸이 걸린다', () => {
+    // Given
+    const input = { ...validMoney, months: null }
+    // When
+    const result = getMoneyError(input)
+    // Then
+    expect(result.field).toBe('months')
+  })
+
+  it('기간을 잘 모르겠어요(0)로 고르면 통과한다', () => {
+    // Given
+    const input = { ...validMoney, months: 0 }
+    // When
+    const result = getMoneyError(input)
+    // Then
+    expect(result).toBeNull()
+  })
+})
+
+describe('getCreditError', () => {
+  it('모두 채우면 null이다', () => {
+    // Given
+    const input = { ...validCredit }
+    // When
+    const result = getCreditError(input)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('신용 구간을 안 골랐으면 creditBand 칸이 걸린다', () => {
+    // Given
+    const input = { ...validCredit, creditBand: null }
+    // When
+    const result = getCreditError(input)
+    // Then
+    expect(result.field).toBe('creditBand')
+  })
+
+  it('연체 여부를 안 골랐으면 overdue 칸이 걸린다', () => {
+    // Given
+    const input = { ...validCredit, overdue: null }
+    // When
+    const result = getCreditError(input)
+    // Then
+    expect(result.field).toBe('overdue')
+  })
+
+  it('가장 중요한 것을 하나도 안 골랐으면 priorities 칸이 걸린다', () => {
+    // Given
+    const input = { ...validCredit, priorities: [] }
+    // When
+    const result = getCreditError(input)
+    // Then
+    expect(result.field).toBe('priorities')
+  })
+
+  it('가장 중요한 것을 4개 고르면 priorities 칸이 걸린다', () => {
+    // Given
+    const input = { ...validCredit, priorities: ['A', 'B', 'C', 'D'] }
+    // When
+    const result = getCreditError(input)
+    // Then
+    expect(result.field).toBe('priorities')
   })
 })

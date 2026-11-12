@@ -65,3 +65,29 @@ export const QUICK_AMOUNT_OPTIONS = [
   { value: 1000, label: '1,000만' },
   { value: 3000, label: '3,000만' },
 ]
+
+// 신용점수 구간 5개 (NICE 점수 기준, 화면 글 = CREDIT 칩 글자)
+export const CREDIT_BAND_OPTIONS = [
+  { value: 'BAND1', label: '900 초과' },
+  { value: 'BAND2', label: '801~900' },
+  { value: 'BAND3', label: '701~800' },
+  { value: 'BAND4', label: '601~700' },
+  { value: 'BAND5', label: '600 이하' },
+]
+
+// 최근 1년 연체 (값은 true, false)
+export const OVERDUE_OPTIONS = [
+  { value: false, label: '없어요' },
+  { value: true, label: '있어요' },
+]
+
+// 가장 중요한 것 6개 (1~3개 고름)
+export const PRIORITY_OPTIONS = [
+  { value: 'LOW_RATE', label: '낮은 금리' },
+  { value: 'HIGH_LIMIT', label: '넉넉한 한도' },
+  { value: 'LOW_PAYMENT', label: '적은 월 부담' },
+  { value: 'ONLINE', label: '비대면 신청' },
+  { value: 'POLICY', label: '정부/서민 지원' },
+  { value: 'NO_PREPAY_FEE', label: '중도상환수수료 없음' },
+]
+export const PRIORITY_MAX = 3
