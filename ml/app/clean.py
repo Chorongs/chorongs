@@ -15,6 +15,7 @@
              4-1 칩: TARGET 지원 대상, PURPOSE 자금 용도 (단어표 artifacts/tag_words.json)
              4-2 칩: AMOUNT 필요 금액, REPAY 상환 방법, CREDIT 신용점수 구간
              4-3 칩: SECTOR 금융권, COMPANY 취급기관, REGION 지원 지역
+    5단계: 검증 4기준 → check_reasons (NO_NAME, RATE_REVERSED, RATE_OVER_20, NEW_PHRASE)
 
     - 0, '-', 빈 칸은 빈 값(None) (중도상환수수료 0은 '수수료 없음'이라 예외)
     - 글자 칸은 HTML 문자(&#40; 등)를 되돌리고 앞뒤 공백 제거 (raw_json은 원본 그대로)
@@ -73,6 +74,8 @@ BIZ_LIMIT_RANGES = {"1천만원~5천만원": 1000, "5천만원~1억원": 5000,
 ONLINE_WORDS = r"비대면|어플|앱|app|온라인|인터넷|모바일|보증드림|전자약정|온택트"
 OFFLINE_WORDS = r"방문|지점|영업점|내방|창구|예약"
 NO_EXTRA_COND = ("없음", "무관")    # 세대 조건이 없다는 원문
+
+RATE_CHECK_MAX = 20     # 최고 금리가 이 %를 넘으면 확인 필요 (ADMIN-04)
 
 PREPAY_MAX = 5      # 중도상환수수료로 보는 % 상한 (넘으면 '대출금의 10%까지 면제' 같은 다른 숫자)
 TERM_BARE_MONTHS = 24   # 단위 없는 대출기간: 회사의 가장 큰 값이 이 이상이면 개월, 아니면 년
@@ -1126,6 +1129,48 @@ def drop_closed(products, today):
     return [p for p in products if p["disclose_end"] is None or p["disclose_end"] >= today]
 
 
+# ---------- 5단계: 검증 ----------
+
+def check_product(product):
+    """
+        확인 필요 사유 (ADMIN-04, 정제 기준 3-9). 사유가 있으면 반영 불가
+
+        - NO_NAME: 상품명 또는 제공기관 없음
+        - RATE_REVERSED: 최저 금리 > 최고 금리
+        - RATE_OVER_20: 최고 금리 20% 초과
+        (NEW_PHRASE는 4단계 칩 나누기에서 붙임)
+    """
+    reasons = []
+    rate_min, rate_max = product["rate_min"], product["rate_max"]
+
+    if not product["product_name"] or not product["company_name"]:
+        reasons.append("NO_NAME")
+    if rate_min is not None and rate_max is not None and rate_min > rate_max:
+        reasons.append("RATE_REVERSED")
+    if rate_max is not None and rate_max > RATE_CHECK_MAX:
+        reasons.append("RATE_OVER_20")
+    return reasons
+
+
+def clean_products(tables, sources, collected_on, today):
+    """
+        수집한 출처의 원본 → 정제, 판매 종료 제외, 검증까지 끝난 상품 목록 (EXT-01, EXT-02)
+
+        - sources: 수집에 성공한 출처 ('KINFA', 'FSS'). 없는 출처는 정제하지 않음
+        - 서민 취급기관 은행 대조는 같이 받은 금감원 은행 이름으로 (금감원이 없으면 빈 목록)
+    """
+    products = []
+    if "KINFA" in sources:
+        products += clean_kinfa(tables["kinfa_loan_products"], collected_on, fss_bank_names(tables))
+    if "FSS" in sources:
+        products += clean_fss(tables)
+
+    products = drop_closed(products, today)
+    for product in products:
+        product["check_reasons"] = product["check_reasons"] + check_product(product)
+    return products
+
+
 # ---------- 출처별 정제 ----------
 
 def clean_kinfa(rows, collected_on, bank_names=()):
@@ -1234,7 +1279,8 @@ def clean_credit_union(base, groups):
         # 4단계 칩: 가입 제한, 대출 용도, 상환 방식은 조합들 글을 합쳐 판단
         merged = first.copy()
         for col in ("join_deny", "use_way", "rpay_type"):
-            merged[col] = ", ".join(group[col].unique())
+            # API 빈 칸(None, NaN)은 빼고, 같은 글은 1번만
+            merged[col] = ", ".join(dict.fromkeys(t for t in map(to_text, group[col]) if t))
 
         products.append({
             "source": "FSS",
@@ -1314,11 +1360,7 @@ def main():
     # 수집한 날 = 서민 CSV를 저장한 날
     collected_on = date.fromtimestamp((CSV_DIR / "kinfa_loan_products.csv").stat().st_mtime)
 
-    products = (clean_kinfa(tables["kinfa_loan_products"], collected_on, fss_bank_names(tables))
-                + clean_fss(tables))
-    closed = len(products)
-    products = drop_closed(products, date.today())
-    logger.info("판매 종료 제외 %d개", closed - len(products))
+    products = clean_products(tables, ("KINFA", "FSS"), collected_on, date.today())
 
     logger.info("정제 상품 %d개: %s", len(products), dict(Counter(p["loan_type"] for p in products)))
     logger.info("금리 빈 상품 %d개", sum(p["rate_min"] is None and p["rate_max"] is None for p in products))
@@ -1338,7 +1380,8 @@ def main():
         missing = sum(not any(t["tag_type"] == tag_type for t in p["tags"]) for p in products)
         logger.info("  %s 칩: %s / 결측 %d개", tag_type, dict(counts), missing)
     logger.info("  target_detail: %s", dict(Counter(p["target_detail"] for p in products if p["target_detail"])))
-    logger.info("  새 문구(NEW_PHRASE) %d개", sum("NEW_PHRASE" in p["check_reasons"] for p in products))
+    logger.info("  확인 필요 %d개, 사유별 %s", sum(bool(p["check_reasons"]) for p in products),
+                dict(Counter(r for p in products for r in p["check_reasons"])))
     other = WORDS["COMPANY"]["other_chip"]
     unknown = Counter(json.loads(p["raw_json"])["hdlinst"] for p in products if p["source"] == "KINFA"
                       and {"tag_type": "COMPANY", "tag_value": other} in p["tags"])

@@ -2,7 +2,8 @@ from datetime import date
 
 import pandas as pd
 
-from app.clean import (WORDS, amount_chips, bare_term_units, biz_limit, clean_fss, clean_kinfa,
+from app.clean import (WORDS, amount_chips, bare_term_units, biz_limit, check_product, clean_fss,
+                       clean_kinfa, clean_products,
                        credit_bands, credit_from_rates, drop_closed, fill_credit_rates, fss_amount,
                        fss_bank_names, fss_credit, fss_group_chip, fss_online, fss_policy,
                        fss_purpose, fss_rate_type, fss_repay, fss_target, kinfa_company,
@@ -1368,6 +1369,18 @@ def test_kinfa_region_시도_이름이_없으면_결측():
     assert chips == []
 
 
+def test_clean_fss_신협_API_빈_칸_None도_합칠_수_있다():
+    # Given
+    biz_base = [
+        _base_row("0001", "100", "정락", "시설자금대출금", top_fin_grp_no="032000", join_deny=None),
+        _base_row("0002", "100", "중앙", "시설자금대출금", top_fin_grp_no="032000", join_deny="저신용자"),
+    ]
+    # When
+    product = clean_fss(_fss_tables(biz_base=biz_base))[0]
+    # Then
+    assert [t["tag_value"] for t in product["tags"] if t["tag_type"] == "TARGET"] == ["저신용/서민", "사업자"]
+
+
 def test_clean_fss_금감원은_지원_지역_전국():
     # Given
     base = [_base_row("0010001", "P01", "가은행", "직장인대출", crdt_prdt_type="1")]
@@ -1375,3 +1388,84 @@ def test_clean_fss_금감원은_지원_지역_전국():
     product = clean_fss(_fss_tables(credit_base=base))[0]
     # Then
     assert [t["tag_value"] for t in product["tags"] if t["tag_type"] == "REGION"] == ["전국"]
+
+
+# ---------- 5단계: 검증 ----------
+
+def _product(product_name="가대출", company_name="가은행", rate_min=3.0, rate_max=5.0):
+    """check_product 입력: 검증에 쓰는 칸만"""
+    return {"product_name": product_name, "company_name": company_name,
+            "rate_min": rate_min, "rate_max": rate_max}
+
+
+def test_check_product_정상이면_사유_없음():
+    # Given
+    product = _product(rate_max=20.0)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == []
+
+
+def test_check_product_상품명이_없으면_NO_NAME():
+    # Given
+    product = _product(product_name=None)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == ["NO_NAME"]
+
+
+def test_check_product_기관이_없으면_NO_NAME():
+    # Given
+    product = _product(company_name=None)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == ["NO_NAME"]
+
+
+def test_check_product_최저가_최고보다_크면_RATE_REVERSED():
+    # Given
+    product = _product(rate_min=4.96, rate_max=3.72)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == ["RATE_REVERSED"]
+
+
+def test_check_product_최고_20퍼센트_초과면_RATE_OVER_20():
+    # Given
+    product = _product(rate_max=21.74)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == ["RATE_OVER_20"]
+
+
+def test_check_product_금리가_비면_금리_검사_안_함():
+    # Given
+    product = _product(rate_min=None, rate_max=None)
+    # When
+    reasons = check_product(product)
+    # Then
+    assert reasons == []
+
+
+def test_clean_products_사유가_여러_개면_모두_붙인다():
+    # Given
+    tables = {"kinfa_loan_products": [{"seq": "1", "finprdnm": "가대출", "ofrinstnm": "", "irt": "5~3",
+                                       "trgt": "근로자", "usge": "생계"}]}
+    # When
+    product = clean_products(tables, ["KINFA"], date(2026, 11, 12), date(2026, 11, 12))[0]
+    # Then
+    assert product["check_reasons"] == ["NO_NAME", "RATE_REVERSED"]
+
+
+def test_clean_products_수집한_출처만_정제한다():
+    # Given
+    tables = _fss_tables(credit_base=[_base_row("0010001", "P01", "가은행", "직장인대출", crdt_prdt_type="1")])
+    # When
+    products = clean_products(tables, ["FSS"], date(2026, 11, 12), date(2026, 11, 12))
+    # Then
+    assert {p["source"] for p in products} == {"FSS"}
