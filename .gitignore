@@ -78,3 +78,4 @@ ml/data/model/*
 __pycache__/
 .venv/
 .ipynb_checkpoints/
+/.metadata/
