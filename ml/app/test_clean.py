@@ -2,12 +2,14 @@ from datetime import date
 
 import pandas as pd
 
-from app.clean import (WORDS, bare_term_units, biz_limit, clean_fss, clean_kinfa, credit_from_rates,
-                       drop_closed, fill_credit_rates, fss_online, fss_policy, fss_purpose,
-                       fss_rate_type, fss_target, kinfa_online, kinfa_purpose, kinfa_target,
+from app.clean import (WORDS, amount_chips, bare_term_units, biz_limit, clean_fss, clean_kinfa,
+                       credit_bands, credit_from_rates, drop_closed, fill_credit_rates, fss_amount,
+                       fss_credit, fss_online, fss_policy, fss_purpose, fss_rate_type, fss_repay,
+                       fss_target, kinfa_credit, kinfa_online, kinfa_purpose, kinfa_target,
                        merge_yn, parse_age, parse_credit, parse_extra_cond, parse_fss_term,
                        parse_income, parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit,
-                       parse_prepay, rate_type_from_texts, to_company, to_date, to_rate, to_text)
+                       parse_prepay, rate_type_from_texts, repay_chips, to_company, to_date, to_rate,
+                       to_text)
 
 
 def _fss_tables(credit_base=(), credit_option=(), biz_base=(), biz_option=()):
@@ -29,7 +31,8 @@ def _base_row(fin_co_no, fin_prdt_cd, kor_co_nm, fin_prdt_nm, subm_day="20261016
                fin_prdt_nm=fin_prdt_nm, fin_co_subm_day=subm_day,
                dcls_strt_day="20261020", dcls_end_day="",
                loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="",
-               join_way="", fin_prdt_type_nm="", lend_rate_type="", join_deny="", use_way="")
+               join_way="", fin_prdt_type_nm="", lend_rate_type="", join_deny="", use_way="",
+               loan_type="", rpay_type="")
     row.update(extra)
     return row
 
@@ -740,18 +743,26 @@ def test_clean_fss_신협은_조합들_금리_방식을_합친다():
 
 # ---------- 4단계: 필터 칩 (4-1 지원 대상, 자금 용도) ----------
 
+TAG_TYPES = ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "CREDIT")
+CHIP_GROUPS = ("fss_loan_types", "rate_keys", "fss_option_codes")   # 아래 글이 전부 칩 이름인 칸
+
+
+def _chips_in(value, key="", all_strings=False):
+    """단어표 안의 칩 이름 ('chip'으로 끝나는 칸 + CHIP_GROUPS 아래 글)"""
+    if isinstance(value, dict):
+        for k, v in value.items():
+            yield from _chips_in(v, k, all_strings or k in CHIP_GROUPS)
+    elif isinstance(value, list):
+        for v in value:
+            yield from _chips_in(v, key, all_strings)
+    elif isinstance(value, str) and (all_strings or key.endswith("chip")):
+        yield value
+
+
 def test_tag_words_단어표_칩은_모두_칩_목록_값():
     # Given
-    used = set()
-    for tag_type in ("TARGET", "PURPOSE"):
-        words = WORDS[tag_type]
-        for key, value in words.items():
-            if key.endswith(("_words", "_products")):
-                used |= {(tag_type, e["chip"]) for e in value}
-        used |= {(tag_type, c) for chips in words["fss_loan_types"].values() for c in chips}
-    housing = WORDS["PURPOSE"]["kinfa_housing"]
-    used |= {("PURPOSE", housing["buy_chip"]), ("PURPOSE", housing["rent_chip"])}
-    allowed = {(t, c) for t in ("TARGET", "PURPOSE") for c in WORDS[t]["chips"]}
+    used = {(t, chip) for t in TAG_TYPES for chip in _chips_in(WORDS[t])}
+    allowed = {(t, chip) for t in TAG_TYPES for chip in WORDS[t]["chips"]}
     # When
     unknown = used - allowed
     # Then
@@ -930,3 +941,232 @@ def test_clean_fss_신협은_조합들_가입_제한을_합친다():
     product = clean_fss(_fss_tables(biz_base=biz_base))[0]
     # Then
     assert [t["tag_value"] for t in product["tags"] if t["tag_type"] == "TARGET"] == ["저신용/서민", "사업자"]
+
+
+# ---------- 4단계: 필터 칩 (4-2 필요 금액, 상환 방법, 신용점수 구간) ----------
+
+def test_amount_chips_한도_숫자는_그_금액_이상_누적():
+    # Given
+    limit_amount = 5000
+    # When
+    chips = amount_chips(limit_amount)
+    # Then
+    assert chips == ["1천만원 이상", "3천만원 이상", "5천만원 이상"]
+
+
+def test_amount_chips_1천만원_안_되면_1천만원_미만():
+    # Given
+    limit_amount = 500
+    # When
+    chips = amount_chips(limit_amount)
+    # Then
+    assert chips == ["1천만원 미만"]
+
+
+def test_amount_chips_사업자_구간이_1천만원_미만이면_그_칩():
+    # Given
+    limit_range = "1천만원 미만"
+    # When
+    chips = amount_chips(None, "해당없음", "보증대출", limit_range)
+    # Then
+    assert chips == ["1천만원 미만"]
+
+
+def test_amount_chips_해당사항_없음_담보대출만이면_담보_보증_비율():
+    # Given
+    text, loan_kinds = "해당사항 없음", "담보대출"
+    # When
+    chips = amount_chips(None, text, loan_kinds)
+    # Then
+    assert chips == ["담보/보증 비율"]
+
+
+def test_amount_chips_빈_글_신용대출이면_심사_후_결정():
+    # Given
+    text, loan_kinds = "", "담보대출, 신용대출"
+    # When
+    chips = amount_chips(None, text, loan_kinds)
+    # Then
+    assert chips == ["심사 후 결정"]
+
+
+def test_amount_chips_별도_한도_없음은_한도_제한_없음():
+    # Given
+    text = "별도 한도 없음"
+    # When
+    chips = amount_chips(None, text, "담보대출")
+    # Then
+    assert chips == ["한도 제한 없음"]
+
+
+def test_amount_chips_매출과_담보가_같이_있으면_매출_실비_먼저():
+    # Given
+    text = "과거 1년 매출액 1/2 이내 (담보 감정가 80% 이내)"
+    # When
+    chips = amount_chips(None, text)
+    # Then
+    assert chips == ["매출/실비 기준"]
+
+
+def test_amount_chips_LTV는_담보_보증_비율():
+    # Given
+    text = "LTV 70%"
+    # When
+    chips = amount_chips(None, text)
+    # Then
+    assert chips == ["담보/보증 비율"]
+
+
+def test_amount_chips_못_정하면_결측():
+    # Given
+    text = "1"
+    # When
+    chips = amount_chips(None, text)
+    # Then
+    assert chips == []
+
+
+def test_fss_amount_개인신용은_심사_후_결정():
+    # Given
+    loan_type = "CREDIT"
+    # When
+    chips = fss_amount(loan_type, None, None)
+    # Then
+    assert chips == ["심사 후 결정"]
+
+
+def test_repay_chips_원리금_괄호는_두_칩():
+    # Given
+    text = "원(리)금균등분할상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["원리금균등", "원금균등"]
+
+
+def test_repay_chips_원금균등분할은_방식_미표기를_붙이지_않음():
+    # Given
+    text = "원금균등분할상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["원금균등"]
+
+
+def test_repay_chips_균등분할상환은_방식_미표기():
+    # Given
+    text = "일시상환, 균등분할상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["만기일시", "분할상환(방식 미표기)"]
+
+
+def test_repay_chips_임의상환은_다른_방식이_있으면_뺀다():
+    # Given
+    text = "만기일시상환, 임의상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["만기일시"]
+
+
+def test_repay_chips_임의상환만_있으면_기타():
+    # Given
+    text = "임의상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["기타"]
+
+
+def test_repay_chips_빈_값은_결측():
+    # Given
+    text = "-"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == []
+
+
+def test_fss_repay_전세_옵션_코드로():
+    # Given
+    options = pd.DataFrame([{"rpay_type": "D"}, {"rpay_type": "S"}])
+    # When
+    chips = fss_repay("RENT", None, options)
+    # Then
+    assert chips == ["만기일시", "분할상환(방식 미표기)"]
+
+
+def test_credit_bands_하위_20퍼센트는_걸치는_구간_모두():
+    # Given
+    credit_min, credit_max = 0, 749
+    # When
+    chips = credit_bands(credit_min, credit_max)
+    # Then
+    assert chips == ["701~800", "601~700", "600 이하"]
+
+
+def test_kinfa_credit_없음은_신용_무관():
+    # Given
+    row = {"crdtsc": "없음"}
+    # When
+    chips = kinfa_credit(row, None, None)
+    # Then
+    assert chips == ["신용 무관"]
+
+
+def test_kinfa_credit_빈_칸_보증기관이_있으면_심사_후_결정():
+    # Given
+    row = {"crdtsc": "-", "grninst": "신용보증기금"}
+    # When
+    chips = kinfa_credit(row, None, None)
+    # Then
+    assert chips == ["심사 후 결정"]
+
+
+def test_kinfa_credit_빈_칸_보증기관도_없으면_결측():
+    # Given
+    row = {"crdtsc": "-", "grninst": "-"}
+    # When
+    chips = kinfa_credit(row, None, None)
+    # Then
+    assert chips == []
+
+
+def test_kinfa_credit_점수_없는_조건은_심사_후_결정():
+    # Given
+    row = {"crdtsc": "재단 내부신용평가 B 등급 이상인 기업"}
+    # When
+    chips = kinfa_credit(row, None, None)
+    # Then
+    assert chips == ["심사 후 결정"]
+
+
+def test_fss_credit_공시_구간만_칩():
+    # Given
+    rates = [{"rate_kind": "CREDIT", "rate_key": "1", "rate_source": "DISCLOSED"},
+             {"rate_kind": "CREDIT", "rate_key": "6", "rate_source": "ESTIMATED"},
+             {"rate_kind": "CREDIT", "rate_key": "12", "rate_source": "DISCLOSED"}]
+    # When
+    chips = fss_credit("CREDIT", rates)
+    # Then
+    assert chips == ["900 초과", "600 이하"]
+
+
+def test_fss_credit_개인신용_금리_행이_없으면_결측():
+    # Given
+    rates = []
+    # When
+    chips = fss_credit("CREDIT", rates)
+    # Then
+    assert chips == []
+
+
+def test_fss_credit_전세는_심사_후_결정():
+    # Given
+    rates = []
+    # When
+    chips = fss_credit("RENT", rates)
+    # Then
+    assert chips == ["심사 후 결정"]

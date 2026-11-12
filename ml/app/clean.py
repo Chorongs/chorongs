@@ -13,6 +13,7 @@
     3단계 칸: rate_type, online_yn, policy_yn, extra_cond (target_detail은 4단계 지원 대상 칩과 같이)
     4단계 칸: tags (tag 칸 목록), target_detail, check_reasons (4-1은 NEW_PHRASE만)
              4-1 칩: TARGET 지원 대상, PURPOSE 자금 용도 (단어표 artifacts/tag_words.json)
+             4-2 칩: AMOUNT 필요 금액, REPAY 상환 방법, CREDIT 신용점수 구간
 
     - 0, '-', 빈 칸은 빈 값(None) (중도상환수수료 0은 '수수료 없음'이라 예외)
     - 글자 칸은 HTML 문자(&#40; 등)를 되돌리고 앞뒤 공백 제거 (raw_json은 원본 그대로)
@@ -62,8 +63,6 @@ COMPANY_WORDS = ("주식회사", "㈜")   # 회사명에서 지우는 말
 # 신용 구간 rate_key → NICE 점수 범위 (900 초과 = 901~1000, 300 이하 = 0~300)
 CREDIT_SCORES = {"1": (901, 1000), "4": (801, 900), "5": (701, 800), "6": (601, 700),
                  "10": (501, 600), "11": (401, 500), "12": (301, 400), "13": (0, 300)}
-# 신용점수 '하위 n%' → NICE 점수 상한. 매년 4월 1일 바뀌는 설정값 (4단계에서 단어표 파일로 옮김)
-CREDIT_LOWER = {20: 749, 50: 889}
 
 # 금감원 사업자 한도 구간 → 아래쪽 값(만원). '1천만원 미만', '기타'는 세부 칸 글에서
 BIZ_LIMIT_RANGES = {"1천만원~5천만원": 1000, "5천만원~1억원": 5000,
@@ -460,7 +459,7 @@ def parse_credit(value):
         서민 신용점수 조건 글 → (credit_min, credit_max) NICE 0~1000
 
         - '595점 이상' → 595~1000 / '839점 이하' → 0~839 / '595~879' / '595점 이상 839점 이하'
-        - '하위 20%', '하위 100분의 20' → 0~749 (CREDIT_LOWER)
+        - '하위 20%', '하위 100분의 20' → 0~749 (단어표 CREDIT lower_scores 설정값)
         - 조건이 여러 개면 합친 범위 (Track1 880~1000 + Track2 595~879 → 595~1000)
         - 점수 없는 조건('없음', 'B등급 이상' 등)은 (None, None)
     """
@@ -470,10 +469,11 @@ def parse_credit(value):
 
     score = r"(1,000|\d{3,4})"
     ranges = []
+    lower = WORDS["CREDIT"]["lower_scores"]
 
     for m in re.finditer(r"하위\s*(?:100분의\s*)?(\d+)", text):
-        if int(m[1]) in CREDIT_LOWER:
-            ranges.append((0, CREDIT_LOWER[int(m[1])]))
+        if m[1] in lower:
+            ranges.append((0, lower[m[1]]))
 
     both = score + r"\s*점\s*이상\s*" + score + r"\s*점\s*이하"
     for m in re.finditer(both, text):
@@ -878,30 +878,157 @@ def fss_purpose(loan_type, use_way=None):
     return _in_order(chips, words["chips"])
 
 
-def _tags(tag_type, chips):
-    """칩 목록 → tag 칸 목록"""
-    return [{"tag_type": tag_type, "tag_value": chip} for chip in chips]
+def amount_chips(limit_amount, text=None, loan_kinds="", limit_range=None):
+    """
+        필요 금액 칩 (정제 기준 3-5)
+
+        - 한도(만원)가 숫자면 금액 칩 (1천만원 미만 / 그 금액 이상 누적), 종류 칩은 붙이지 않음
+        - 사업자 한도 구간이 '1천만원 미만'이면 1천만원 미만
+        - 한도 글이 비었거나 '해당사항 없음': 상품 종류(loan_kinds)가 담보대출만 → 담보/보증 비율,
+          신용대출이 있으면 → 심사 후 결정, 그 밖은 결측
+        - 그 밖의 글은 단어표 kind_words 위에서부터 처음 걸린 칩 1개, 못 정하면 결측 (칩 없음)
+    """
+    words = WORDS["AMOUNT"]
+
+    if limit_amount is not None:
+        if limit_amount < words["under"]["limit"]:
+            return [words["under"]["chip"]]
+        return [s["chip"] for s in words["steps"] if limit_amount >= s["limit"]]
+
+    if to_text(limit_range) == words["biz_under_range"]:
+        return [words["under"]["chip"]]
+
+    text = to_text(text)
+    if text is None or text in words["not_applicable_phrases"]:
+        kinds = loan_kinds or ""
+        if kinds == words["secured_only_kind"]["kind"]:
+            return [words["secured_only_kind"]["chip"]]
+        if words["credit_kind"]["kind"] in kinds:
+            return [words["credit_kind"]["chip"]]
+        return []
+
+    chips, _ = match_words(text, words["kind_words"])
+    return chips[:1]
 
 
-def kinfa_tags(row):
-    """서민 행 1개 → 4단계 칸"""
+def fss_amount(loan_type, row, limit_amount):
+    """금감원 필요 금액 칩: 개인신용은 상품 종류로 (심사 후 결정), 전세·주담대는 loan_lmt, 사업자는 구간 + 세부 글"""
+    fixed = WORDS["AMOUNT"]["fss_loan_types"].get(loan_type)
+    if fixed is not None:
+        return list(fixed)
+    if loan_type == "BIZ":
+        return amount_chips(limit_amount, row["loan_limit_detl"], row["loan_type"], row["loan_limit"])
+    return amount_chips(limit_amount, row["loan_lmt"])
+
+
+def repay_chips(text):
+    """
+        상환 방법 글 → 칩 (서민 rdptmthd, 금감원 사업자 rpay_type)
+
+        - 단어표 words ('원(리)금'은 원리금균등 + 원금균등)
+        - 균등분할, 분할상환, 균분은 원금균등, 원리금균등 칩이 없을 때만 분할상환(방식 미표기)
+        - 임의상환은 다른 칩이 없을 때만 기타
+        - 빈 값은 결측, 아는 단어가 없는 글은 기타
+    """
+    words = WORDS["REPAY"]
+    text = to_text(text)
+    if text is None:
+        return []
+
+    chips, _ = match_words(text, words["words"])
+    split = words["split"]
+    if not any(c in chips for c in split["skip_chips"]) and any(w in text for w in split["words"]):
+        chips.append(split["chip"])
+    if not chips:
+        chips, _ = match_words(text, words["alone_words"])
+    if not chips:
+        chips = ["기타"]
+    return _in_order(chips, words["chips"])
+
+
+def fss_repay(loan_type, row, options):
+    """금감원 상환 방법 칩: 사업자는 rpay_type 글, 전세·주담대는 옵션 코드(S 만기일시, D 분할상환), 개인신용은 칸 없음 → 결측"""
+    if loan_type == "BIZ":
+        return repay_chips(row["rpay_type"])
+    if loan_type == "CREDIT" or options is None or options.empty:
+        return []
+    codes = WORDS["REPAY"]["fss_option_codes"]
+    chips = [codes[c] for c in set(options["rpay_type"]) if c in codes]
+    return _in_order(chips, WORDS["REPAY"]["chips"])
+
+
+def credit_bands(credit_min, credit_max):
+    """점수 범위 → 걸치는 신용점수 구간 칩 ('하위 20%' 0~749 → 600 이하, 601~700, 701~800)"""
+    return [b["chip"] for b in WORDS["CREDIT"]["bands"] if credit_min <= b["max"] and credit_max >= b["min"]]
+
+
+def kinfa_credit(row, credit_min, credit_max):
+    """
+        서민 신용점수 구간 칩 (정제 기준 3-5)
+
+        - '없음', '해당사항 없음' → 신용 무관
+        - 점수 범위가 있으면 걸치는 구간 모두
+        - 점수 없는 조건(B등급, CSS, '기관 문의' 등) → 심사 후 결정
+        - 신용 칸이 비면 보증기관 칸(grninst)에 값이 있는 보증 상품만 심사 후 결정, 아니면 결측
+    """
+    words = WORDS["CREDIT"]
+    text = to_text(row.get("crdtsc"))
+
+    if text is None:
+        return [words["review_chip"]] if to_text(row.get("grninst")) else []
+    if text in words["free_phrases"]:
+        return [words["free_chip"]]
+    if credit_min is not None and credit_max is not None:
+        return credit_bands(credit_min, credit_max)
+    return [words["review_chip"]]
+
+
+def fss_credit(loan_type, rates):
+    """
+        금감원 신용점수 구간 칩: 공시된 신용 구간 금리가 있는 구간만 (추정 칸 제외)
+        구간 공시가 없으면 개인신용은 결측, 전세·주담대·사업자(신협 포함)는 심사 후 결정
+    """
+    words = WORDS["CREDIT"]
+    keys = {r["rate_key"] for r in rates if r["rate_kind"] == "CREDIT" and r["rate_source"] == "DISCLOSED"}
+    chips = list({words["rate_keys"][k] for k in keys})
+    if chips:
+        return _in_order(chips, words["chips"])
+    return [] if loan_type == "CREDIT" else [words["review_chip"]]
+
+
+def _tag_fields(chips_by_type, target_detail=None, is_new=False):
+    """필터별 칩 목록 → 4단계 칸 (tags, target_detail, check_reasons)"""
+    return {
+        "tags": [{"tag_type": tag_type, "tag_value": chip}
+                 for tag_type, chips in chips_by_type.items() for chip in chips],
+        "target_detail": target_detail,
+        "check_reasons": ["NEW_PHRASE"] if is_new else [],
+    }
+
+
+def kinfa_tags(row, numbers):
+    """서민 행 1개 + 2단계 숫자 칸 → 4단계 칸"""
     targets, detail, new_target = kinfa_target(row)
     purposes, new_purpose = kinfa_purpose(row)
-    return {
-        "tags": _tags("TARGET", targets) + _tags("PURPOSE", purposes),
-        "target_detail": detail,
-        "check_reasons": ["NEW_PHRASE"] if new_target or new_purpose else [],
-    }
+    return _tag_fields({
+        "TARGET": targets,
+        "PURPOSE": purposes,
+        "AMOUNT": amount_chips(numbers["limit_amount"], row.get("lnlmt")),
+        "REPAY": repay_chips(row.get("rdptmthd")),
+        "CREDIT": kinfa_credit(row, numbers["credit_min"], numbers["credit_max"]),
+    }, detail, new_target or new_purpose)
 
 
-def fss_tags(loan_type, join_deny=None, use_way=None):
-    """금감원 상품 1개 → 4단계 칸 (단어표에 없는 새 문구는 서민 대상, 용도 칸에서만 셈)"""
-    return {
-        "tags": _tags("TARGET", fss_target(loan_type, join_deny))
-                + _tags("PURPOSE", fss_purpose(loan_type, use_way)),
-        "target_detail": None,
-        "check_reasons": [],
-    }
+def fss_tags(loan_type, row, numbers, rates, options):
+    """금감원 기본 행 1개 → 4단계 칸 (단어표에 없는 새 문구는 서민 대상, 용도 칸에서만 셈)"""
+    biz = loan_type == "BIZ"
+    return _tag_fields({
+        "TARGET": fss_target(loan_type, row["join_deny"] if biz else None),
+        "PURPOSE": fss_purpose(loan_type, row["use_way"] if biz else None),
+        "AMOUNT": fss_amount(loan_type, row, numbers["limit_amount"]),
+        "REPAY": fss_repay(loan_type, row, options),
+        "CREDIT": fss_credit(loan_type, rates),
+    })
 
 
 def drop_closed(products, today):
@@ -923,6 +1050,7 @@ def clean_kinfa(rows, collected_on):
 
     for row in rows:
         rate_min, rate_max, rate_note = parse_irt(row.get("irt"))
+        numbers = kinfa_numbers(row)
 
         products.append({
             "source": "KINFA",
@@ -938,9 +1066,9 @@ def clean_kinfa(rows, collected_on):
             "disclose_start": None,
             "disclose_end": parse_kinfa_end(row.get("prdoprprid")),
             "rates": [],
-            **kinfa_numbers(row),
+            **numbers,
             **kinfa_features(row),
-            **kinfa_tags(row),
+            **kinfa_tags(row, numbers),
         })
 
     return products
@@ -963,6 +1091,7 @@ def _fss_product(row, loan_type, keys, groups, bare_months=None):
     key = tuple(row[k] for k in keys)
     options = groups.get(key)
     rate_min, rate_max, rates = fss_rates(loan_type, options)
+    numbers = fss_numbers(row, loan_type, rates, bare_months)
 
     return {
         "source": "FSS",
@@ -978,10 +1107,9 @@ def _fss_product(row, loan_type, keys, groups, bare_months=None):
         "disclose_start": to_date(row["dcls_strt_day"]),
         "disclose_end": to_date(row["dcls_end_day"]),
         "rates": rates,
-        **fss_numbers(row, loan_type, rates, bare_months),
+        **numbers,
         **fss_features(row, loan_type, options),
-        **(fss_tags(loan_type, row["join_deny"], row["use_way"]) if loan_type == "BIZ"
-           else fss_tags(loan_type)),
+        **fss_tags(loan_type, row, numbers, rates, options),
     }
 
 
@@ -1010,6 +1138,12 @@ def clean_credit_union(base, groups):
                 mins.extend(place["lend_rate_min"].map(to_rate))
                 maxs.extend(place["lend_rate_max"].map(to_rate))
         rate_min, rate_max = _min_max(mins, maxs)
+        numbers = fss_numbers(first, "BIZ", [])
+
+        # 4단계 칩: 가입 제한, 대출 용도, 상환 방식은 조합들 글을 합쳐 판단
+        merged = first.copy()
+        for col in ("join_deny", "use_way", "rpay_type"):
+            merged[col] = ", ".join(group[col].unique())
 
         products.append({
             "source": "FSS",
@@ -1025,14 +1159,13 @@ def clean_credit_union(base, groups):
             "disclose_start": to_date(first["dcls_strt_day"]),
             "disclose_end": to_date(first["dcls_end_day"]),
             "rates": [],
-            **fss_numbers(first, "BIZ", []),
+            **numbers,
             # 3단계 칸은 조합들 값을 합침 (금리 방식이 조합마다 다르면 BOTH)
             "rate_type": rate_type_from_texts(group["lend_rate_type"]),
             "online_yn": merge_yn(group["join_way"].map(fss_online)),
             "policy_yn": merge_yn(group["fin_prdt_type_nm"].map(fss_policy)),
             "extra_cond": None,
-            # 4단계 칩도 조합들의 가입 제한, 대출 용도 글을 합쳐 판단
-            **fss_tags("BIZ", ", ".join(group["join_deny"].unique()), ", ".join(group["use_way"].unique())),
+            **fss_tags("BIZ", merged, numbers, [], options),
         })
 
     return products
@@ -1108,7 +1241,7 @@ def main():
     for col in ("rate_type", "online_yn", "policy_yn", "extra_cond"):
         logger.info("  %s: %s", col,
                     dict(Counter((p["loan_type"], p[col]) for p in products if col != "extra_cond" or p[col])))
-    for tag_type in ("TARGET", "PURPOSE"):
+    for tag_type in ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "CREDIT"):
         counts = Counter(t["tag_value"] for p in products for t in p["tags"] if t["tag_type"] == tag_type)
         missing = sum(not any(t["tag_type"] == tag_type for t in p["tags"]) for p in products)
         logger.info("  %s 칩: %s / 결측 %d개", tag_type, dict(counts), missing)
