@@ -3,7 +3,7 @@ import styled, { keyframes } from 'styled-components'
 import useUiStore from '../../store/useUiStore'
 
 // UI-21 알림 메시지: 화면 아래 짧은 글, 2.4초 뒤 사라짐 (새 알림이 오면 시간 다시 셈)
-// TODO: 비교함(CM-09)이 떠 있으면 그 위로 올리기 (useCompareStore가 올라온 뒤 연결)
+// TODO(CM-09, CHORONG-47): 비교함이 떠 있으면 그 위로 올리기 (useCompareStore가 올라온 뒤 연결)
 const TOAST_MS = 2400
 
 // 시안처럼 아래에서 살짝 올라오며 나타난다 (모바일은 탭바 66 위)

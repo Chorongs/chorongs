@@ -4,7 +4,7 @@ import logoImg from '../../assets/images/logo_main.png'
 
 // LY-13 푸터: 로고 / 링크 / 서비스 고지 / 데이터 출처 (관리자 링크 없음)
 // 모양은 시안과 같게: 연회색 바탕, 위쪽에 로고 + 한 줄 소개 + 링크, 아래에 고지 글
-// TODO: '이용약관', '개인정보 수집/이용' 링크는 약관 창 TermsDialog(CM-21)가 올라온 뒤 추가
+// TODO(CM-21, CHORONG-43): '이용약관', '개인정보 수집/이용' 링크는 약관 창 TermsDialog가 올라온 뒤 추가
 const Wrap = styled.footer`
   border-top: 1px solid var(--line);
   background: var(--mist);

@@ -10,7 +10,7 @@ import Modal from '../ui/Modal'
 
 // LY-15 모바일 전체 메뉴: Modal 부품 사용 (Esc → 닫힘). 시안처럼 화면 가득, 위에 로고 + 닫기
 // 링크를 누르면 닫히고, 열려 있는 동안 뒤 화면 스크롤을 잠금
-// TODO: 로고 아래 계정 칸(로그인 이름 / '로그인' 안내)은 useAuthStore가 올라온 뒤 (CHORONG-43, LY-08과 같이)
+// TODO(LY-08, CHORONG-43): 로고 아래 계정 칸(로그인 이름 / '로그인' 안내)은 useAuthStore가 올라온 뒤 (계정 메뉴와 같이)
 const Top = styled.div`
   display: flex;
   align-items: center;
