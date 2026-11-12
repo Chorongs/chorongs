@@ -421,11 +421,13 @@ def parse_fss_term(value, bare_months=None):
 
         - 'N년', 'N개월', 'N일' 중 가장 큰 값 (연장 포함: '1년(최장 5년)' → 60)
         - 단위가 하나도 없는 글('84', '6~12')은 bare_months (회사별 단위, bare_term_units)
+        - '+' 뒤에 붙은 기간('납품기한 + 6개월')은 날짜에 더하는 값이라 보지 않음
     """
     text = to_text(value)
     if text is None:
         return None
 
+    text = re.sub(r"\+\s*" + NUM + r"\s*(개월|년|일)", "", text)
     months = [int(y) * 12 + int(mo) for y, mo in re.findall(r"(\d+)\s*년\s*(\d+)\s*개월", text)]   # 2년6개월
     for m in re.finditer(NUM + r"\s*(개월|년|일)", text):
         n, unit = float(m[1]), m[2]
@@ -806,7 +808,7 @@ def kinfa_target(row):
     """
         서민 지원 대상 칩 → (칩 목록, target_detail, 새 문구 여부) (정제 기준 3-5, 기획서 3-3)
 
-        - 옮길 상품 목록에 있으면 그 칩 (세부 지원 조건에만 대상 제한이 있는 상품)
+        - 옮길 상품 목록에 있으면 그 칩들 (세부 지원 조건에만 대상 제한이 있는 상품)
         - 대상 구분(trgt) 글의 단어 → 칩. '기타'는 다른 칩이 없을 때만 기타
         - 대상 칸이 비었거나 대상을 알 수 없는 원문('개인')이면 상품명 단어로
         - 대상 칸 글에 아는 단어가 하나도 없으면 기타 + 새 문구 (확인 필요)
@@ -818,7 +820,7 @@ def kinfa_target(row):
 
     for move in words["kinfa_move_products"]:
         if move["product_name"] == name:
-            return [move["chip"]], move["detail"], False
+            return list(move["chips"]), move["detail"], False
 
     chips, details = match_words(text, words["kinfa_words"])
     if not chips:

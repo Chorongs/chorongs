@@ -409,6 +409,24 @@ def test_parse_fss_term_단위_없으면_회사_단위로():
     assert result == 180
 
 
+def test_parse_fss_term_더하기_뒤_기간은_보지_않는다():
+    # Given: 납품 날짜에 더하는 기간만 있는 글
+    value = "납품기한 + 6개월"
+    # When
+    result = parse_fss_term(value)
+    # Then
+    assert result is None
+
+
+def test_parse_fss_term_더하기_뒤_기간을_빼고_남은_기간은_읽는다():
+    # Given
+    value = "(한도약정) 1년 (한도내 개별대출) 발주정보상 납품기일+1개월"
+    # When
+    result = parse_fss_term(value)
+    # Then
+    assert result == 12
+
+
 def test_bare_term_units_가장_큰_값이_24_이상이면_개월():
     # Given
     base = pd.DataFrame({"kor_co_nm": ["가캐피탈", "가캐피탈", "나은행", "나은행"],
@@ -758,7 +776,7 @@ def _chips_in(value, key="", all_strings=False):
     elif isinstance(value, list):
         for v in value:
             yield from _chips_in(v, key, all_strings)
-    elif isinstance(value, str) and (all_strings or key.endswith(("chip", "default"))):
+    elif isinstance(value, str) and (all_strings or key.endswith(("chip", "chips", "default"))):
         yield value
 
 
@@ -824,6 +842,15 @@ def test_kinfa_target_옮길_상품은_목록의_칩():
     result = kinfa_target(row)
     # Then
     assert result == (["특별 지원 대상"], None, False)
+
+
+def test_kinfa_target_옮길_상품_칩_여러_개와_세부_값():
+    # Given
+    row = {"trgt": "영세 개인사업자", "finprdnm": "햇살론119"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["사업자", "특별 지원 대상"], "채무조정, 성실상환", False)
 
 
 def test_kinfa_target_모르는_문구는_기타와_새_문구():
@@ -1000,6 +1027,24 @@ def test_amount_chips_별도_한도_없음은_한도_제한_없음():
     chips = amount_chips(None, text, "담보대출")
     # Then
     assert chips == ["한도 제한 없음"]
+
+
+def test_amount_chips_총_한도_없음은_한도_제한_없음이_아니다():
+    # Given: 서민 학자금 한도 글 (한도 제한 없음은 금감원 사업자 문구만)
+    text = "해당 학기 소요액 전액(학부생: 개인 총 한도 없음, 대학원생 개인 총한도 있음)"
+    # When
+    chips = amount_chips(None, text)
+    # Then
+    assert chips == ["매출/실비 기준"]
+
+
+def test_amount_chips_발주금액은_매출_실비():
+    # Given
+    text = "발주금액의 80%, 결제정보등록 이후 대출가능액 상이"
+    # When
+    chips = amount_chips(None, text)
+    # Then
+    assert chips == ["매출/실비 기준"]
 
 
 def test_amount_chips_매출과_담보가_같이_있으면_매출_실비_먼저():
@@ -1265,6 +1310,24 @@ def test_kinfa_company_저축은행은_은행으로_다시_세지_않음():
     chips = kinfa_company(row)
     # Then
     assert chips == ["저축은행", "신협/새마을금고"]
+
+
+def test_kinfa_company_수협은행은_은행만():
+    # Given
+    row = {"hdlinst": "SH수협은행"}
+    # When
+    chips = kinfa_company(row)
+    # Then
+    assert chips == ["은행"]
+
+
+def test_kinfa_company_지역수협은_신협_새마을금고():
+    # Given
+    row = {"hdlinst": "수협은행, 수협"}
+    # When
+    chips = kinfa_company(row)
+    # Then
+    assert chips == ["은행", "신협/새마을금고"]
 
 
 def test_kinfa_company_금감원_은행_이름과_같으면_은행():
