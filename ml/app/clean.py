@@ -1,5 +1,5 @@
 """
-    상품 정제 1~2단계 (EXT-01, EXT-02)
+    상품 정제 1~3단계 (EXT-01, EXT-02)
     규칙 기준: docs 상품 데이터 정제, 필터 기준 / 데이터 처리 기획서
 
     수집 원본 행 목록 (collect.py와 같은 모양: {CSV 이름: 행 목록}) → 상품 목록
@@ -10,6 +10,7 @@
              base_date, disclose_start, disclose_end, rates
     2단계 칸: limit_amount, term_max, credit_min, credit_max, age_min, age_max,
              income_min, income_max, income_basis, income_note, prepay_fee_max, no_prepay_fee_yn
+    3단계 칸: rate_type, online_yn, policy_yn, extra_cond (target_detail은 4단계 지원 대상 칩과 같이)
 
     - 0, '-', 빈 칸은 빈 값(None) (중도상환수수료 0은 '수수료 없음'이라 예외)
     - 글자 칸은 HTML 문자(&#40; 등)를 되돌리고 앞뒤 공백 제거 (raw_json은 원본 그대로)
@@ -64,6 +65,11 @@ CREDIT_LOWER = {20: 749, 50: 889}
 # 금감원 사업자 한도 구간 → 아래쪽 값(만원). '1천만원 미만', '기타'는 세부 칸 글에서
 BIZ_LIMIT_RANGES = {"1천만원~5천만원": 1000, "5천만원~1억원": 5000,
                     "1억원~5억원": 10000, "5억원 초과": 50000}
+
+# 비대면 신청: 서민 신청 방법 글에서 찾는 말 (홈페이지는 '예약'이 없을 때만 온라인 신청으로 봄)
+ONLINE_WORDS = r"비대면|어플|앱|app|온라인|인터넷|모바일|보증드림|전자약정|온택트"
+OFFLINE_WORDS = r"방문|지점|영업점|내방|창구|예약"
+NO_EXTRA_COND = ("없음", "무관")    # 세대 조건이 없다는 원문
 
 PREPAY_MAX = 5      # 중도상환수수료로 보는 % 상한 (넘으면 '대출금의 10%까지 면제' 같은 다른 숫자)
 TERM_BARE_MONTHS = 24   # 단위 없는 대출기간: 회사의 가장 큰 값이 이 이상이면 개월, 아니면 년
@@ -630,6 +636,127 @@ def fss_numbers(row, loan_type, rates, bare_months=None):
     return numbers
 
 
+# ---------- 3단계: 특징 칸 ----------
+
+def _rate_type(fixed, variable):
+    """고정, 변동 여부 → FIXED / VARIABLE / BOTH / None"""
+    if fixed and variable:
+        return "BOTH"
+    if fixed:
+        return "FIXED"
+    if variable:
+        return "VARIABLE"
+    return None
+
+
+def rate_type_from_texts(values):
+    """
+        금리 방식 글 목록 → rate_type (기획서 3-5)
+
+        - '고정'과 '변동'이 같이 있으면 BOTH / '고정', '무이자'(0%로 고정) → FIXED / '변동' → VARIABLE
+        - '-', '은행금리', '협약금리', 금리 숫자만 있는 글 등 → None (방식 모름)
+        - 여러 글(신협 조합들)은 합쳐서 판단 (조합마다 다르면 BOTH)
+    """
+    texts = [t for t in map(to_text, values) if t]
+    fixed = any("고정" in t or "무이자" in t for t in texts)
+    variable = any("변동" in t for t in texts)
+    return _rate_type(fixed, variable)
+
+
+def fss_rate_type(loan_type, row, options):
+    """
+        금감원 rate_type (기획서 3-5)
+
+        - CREDIT: 원본에 칸 없음 → None
+        - BIZ: 기본 행 lend_rate_type 글
+        - RENT, MORTGAGE: 금리 옵션의 lend_rate_type 코드 F(고정), C(변동). 옵션이 없으면 None
+    """
+    if loan_type == "CREDIT":
+        return None
+    if loan_type == "BIZ":
+        return rate_type_from_texts([row["lend_rate_type"]])
+    if options is None or options.empty:
+        return None
+
+    codes = set(options["lend_rate_type"])
+    return _rate_type("F" in codes, "C" in codes)
+
+
+def kinfa_online(value):
+    """
+        서민 신청 방법 글(jnmthd) → online_yn
+
+        - 비대면, 어플, 앱, 온라인, 인터넷, 모바일, 보증드림, 전자약정, 온택트가 있거나
+          '홈페이지'가 있고 '예약'이 없으면 Y
+        - 그 말이 없고 방문, 지점, 영업점, 내방, 창구, 예약(상담 예약 후 방문)이 있으면 N
+        - '기관 문의'처럼 방법을 알 수 없는 글, 빈 값 → None
+    """
+    text = to_text(value)
+    if text is None:
+        return None
+    if re.search(ONLINE_WORDS, text, re.IGNORECASE) or ("홈페이지" in text and "예약" not in text):
+        return "Y"
+    if re.search(OFFLINE_WORDS, text):
+        return "N"
+    return None
+
+
+def fss_online(value):
+    """금감원 가입 방법(join_way) → online_yn: '인터넷', '스마트폰'이 있으면 Y, 그 밖의 값 N, 빈 값 None"""
+    text = to_text(value)
+    if text is None:
+        return None
+    return "Y" if re.search("인터넷|스마트폰", text) else "N"
+
+
+def fss_policy(value):
+    """금감원 사업자 상품구분(fin_prdt_type_nm) → policy_yn: 정책금융상품 Y, 일반대출상품 N, 그 밖 None"""
+    return {"정책금융상품": "Y", "일반대출상품": "N"}.get(to_text(value))
+
+
+def merge_yn(values):
+    """여러 Y/N(신협 조합들) 합치기: 하나라도 Y면 Y, 아니면 N이 있으면 N, 다 모르면 None"""
+    values = set(values)
+    if "Y" in values:
+        return "Y"
+    if "N" in values:
+        return "N"
+    return None
+
+
+def parse_extra_cond(value):
+    """서민 세대 조건(housholdcnt) → extra_cond 원문 ('없음', '무관', '-', 빈 값 → None, 기획서 3-4)"""
+    text = to_text(value)
+    if text is None or text in NO_EXTRA_COND:
+        return None
+    return text
+
+
+def kinfa_features(row):
+    """서민 행 1개 → 3단계 칸 (서민 상품은 전부 정책금융이라 policy_yn Y, 정제 기준 3-6)"""
+    return {
+        "rate_type": rate_type_from_texts([row.get("irtCtg")]),
+        "online_yn": kinfa_online(row.get("jnmthd")),
+        "policy_yn": "Y",
+        "extra_cond": parse_extra_cond(row.get("housholdcnt")),
+    }
+
+
+def fss_features(row, loan_type, options):
+    """
+        금감원 기본 행 1개 → 3단계 칸
+
+        - policy_yn: 사업자만 상품구분 칸으로, 신용·전세·주담대는 원본에 칸 없음 → None
+        - extra_cond: 원본에 세대 조건 칸 없음 → None
+    """
+    return {
+        "rate_type": fss_rate_type(loan_type, row, options),
+        "online_yn": fss_online(row["join_way"]),
+        "policy_yn": fss_policy(row["fin_prdt_type_nm"]) if loan_type == "BIZ" else None,
+        "extra_cond": None,
+    }
+
+
 def drop_closed(products, today):
     """공시 종료일이 오늘 이전인 상품은 적재하지 않음 (정제 기준 3-3)"""
     return [p for p in products if p["disclose_end"] is None or p["disclose_end"] >= today]
@@ -665,6 +792,7 @@ def clean_kinfa(rows, collected_on):
             "disclose_end": parse_kinfa_end(row.get("prdoprprid")),
             "rates": [],
             **kinfa_numbers(row),
+            **kinfa_features(row),
         })
 
     return products
@@ -703,6 +831,7 @@ def _fss_product(row, loan_type, keys, groups, bare_months=None):
         "disclose_end": to_date(row["dcls_end_day"]),
         "rates": rates,
         **fss_numbers(row, loan_type, rates, bare_months),
+        **fss_features(row, loan_type, options),
     }
 
 
@@ -747,6 +876,11 @@ def clean_credit_union(base, groups):
             "disclose_end": to_date(first["dcls_end_day"]),
             "rates": [],
             **fss_numbers(first, "BIZ", []),
+            # 3단계 칸은 조합들 값을 합침 (금리 방식이 조합마다 다르면 BOTH)
+            "rate_type": rate_type_from_texts(group["lend_rate_type"]),
+            "online_yn": merge_yn(group["join_way"].map(fss_online)),
+            "policy_yn": merge_yn(group["fin_prdt_type_nm"].map(fss_policy)),
+            "extra_cond": None,
         })
 
     return products
@@ -819,6 +953,9 @@ def main():
                 "income_min", "income_max", "income_basis", "prepay_fee_max"):
         logger.info("  %s 값 있음: %s", col,
                     dict(Counter(p["source"] for p in products if p[col] is not None)))
+    for col in ("rate_type", "online_yn", "policy_yn", "extra_cond"):
+        logger.info("  %s: %s", col,
+                    dict(Counter((p["loan_type"], p[col]) for p in products if col != "extra_cond" or p[col])))
 
 
 if __name__ == "__main__":

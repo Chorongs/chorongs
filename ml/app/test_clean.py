@@ -3,9 +3,10 @@ from datetime import date
 import pandas as pd
 
 from app.clean import (bare_term_units, biz_limit, clean_fss, credit_from_rates, drop_closed,
-                       fill_credit_rates, parse_age, parse_credit, parse_fss_term, parse_income,
-                       parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit, parse_prepay,
-                       to_company, to_date, to_rate, to_text)
+                       fill_credit_rates, fss_online, fss_policy, fss_rate_type, kinfa_online,
+                       merge_yn, parse_age, parse_credit, parse_extra_cond, parse_fss_term,
+                       parse_income, parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit,
+                       parse_prepay, rate_type_from_texts, to_company, to_date, to_rate, to_text)
 
 
 def _fss_tables(credit_base=(), credit_option=(), biz_base=(), biz_option=()):
@@ -26,7 +27,8 @@ def _base_row(fin_co_no, fin_prdt_cd, kor_co_nm, fin_prdt_nm, subm_day="20261016
     row = dict(fin_co_no=fin_co_no, fin_prdt_cd=fin_prdt_cd, kor_co_nm=kor_co_nm,
                fin_prdt_nm=fin_prdt_nm, fin_co_subm_day=subm_day,
                dcls_strt_day="20261020", dcls_end_day="",
-               loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="")
+               loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="",
+               join_way="", fin_prdt_type_nm="", lend_rate_type="")
     row.update(extra)
     return row
 
@@ -571,3 +573,165 @@ def test_parse_prepay_빈_값은_모름():
     result = parse_prepay(value)
     # Then
     assert result == (None, None)
+
+
+# ---------- 3단계: 금리 방식 ----------
+
+def test_rate_type_from_texts_고정과_변동이_같이_있으면_BOTH():
+    # Given
+    values = ["고정금리/변동금리"]
+    # When
+    result = rate_type_from_texts(values)
+    # Then
+    assert result == "BOTH"
+
+
+def test_rate_type_from_texts_무이자는_FIXED():
+    # Given
+    values = ["무이자"]
+    # When
+    result = rate_type_from_texts(values)
+    # Then
+    assert result == "FIXED"
+
+
+def test_rate_type_from_texts_방식_없는_글은_빈_값():
+    # Given
+    values = ["은행금리"]
+    # When
+    result = rate_type_from_texts(values)
+    # Then
+    assert result is None
+
+
+def test_rate_type_from_texts_조합마다_다르면_BOTH():
+    # Given
+    values = ["고정금리", "변동금리"]
+    # When
+    result = rate_type_from_texts(values)
+    # Then
+    assert result == "BOTH"
+
+
+def test_fss_rate_type_전세_옵션_코드가_C만이면_VARIABLE():
+    # Given
+    options = pd.DataFrame([{"lend_rate_type": "C"}, {"lend_rate_type": "C"}])
+    # When
+    result = fss_rate_type("RENT", {}, options)
+    # Then
+    assert result == "VARIABLE"
+
+
+def test_fss_rate_type_개인신용은_칸이_없어_빈_값():
+    # Given
+    row = {"lend_rate_type": "고정금리"}
+    # When
+    result = fss_rate_type("CREDIT", row, None)
+    # Then
+    assert result is None
+
+
+# ---------- 3단계: 비대면, 정책, 세대 조건 ----------
+
+def test_kinfa_online_어플_신청은_Y():
+    # Given
+    value = "사업장 소재 강원신용보증재단 각 지점 방문 혹은 보증드림 어플로 신청"
+    # When
+    result = kinfa_online(value)
+    # Then
+    assert result == "Y"
+
+
+def test_kinfa_online_홈페이지_상담_예약은_N():
+    # Given
+    value = "광주신용보증재단 홈페이지에서 보증상담 예약"
+    # When
+    result = kinfa_online(value)
+    # Then
+    assert result == "N"
+
+
+def test_kinfa_online_지점_방문만이면_N():
+    # Given
+    value = "사업장 소재 서울신용보증재단 각 지점 방문"
+    # When
+    result = kinfa_online(value)
+    # Then
+    assert result == "N"
+
+
+def test_kinfa_online_방법을_알_수_없으면_빈_값():
+    # Given
+    value = "기관 문의"
+    # When
+    result = kinfa_online(value)
+    # Then
+    assert result is None
+
+
+def test_fss_online_스마트폰이_있으면_Y():
+    # Given
+    value = "영업점,스마트폰"
+    # When
+    result = fss_online(value)
+    # Then
+    assert result == "Y"
+
+
+def test_fss_online_전화만이면_N():
+    # Given
+    value = "전화(텔레뱅킹)"
+    # When
+    result = fss_online(value)
+    # Then
+    assert result == "N"
+
+
+def test_fss_policy_정책금융상품은_Y():
+    # Given
+    value = "정책금융상품"
+    # When
+    result = fss_policy(value)
+    # Then
+    assert result == "Y"
+
+
+def test_merge_yn_하나라도_Y면_Y():
+    # Given
+    values = ["N", None, "Y"]
+    # When
+    result = merge_yn(values)
+    # Then
+    assert result == "Y"
+
+
+def test_parse_extra_cond_세대_조건은_원문():
+    # Given
+    value = "1주택 이내"
+    # When
+    result = parse_extra_cond(value)
+    # Then
+    assert result == "1주택 이내"
+
+
+def test_parse_extra_cond_무관은_빈_값():
+    # Given
+    value = "무관"
+    # When
+    result = parse_extra_cond(value)
+    # Then
+    assert result is None
+
+
+def test_clean_fss_신협은_조합들_금리_방식을_합친다():
+    # Given
+    biz_base = [
+        _base_row("0001", "100", "정락", "시설자금대출금", top_fin_grp_no="032000",
+                  lend_rate_type="고정금리", join_way="영업점", fin_prdt_type_nm="일반대출상품"),
+        _base_row("0002", "100", "중앙", "시설자금대출금", top_fin_grp_no="032000",
+                  lend_rate_type="변동금리", join_way="영업점,스마트폰", fin_prdt_type_nm="일반대출상품"),
+    ]
+    # When
+    product = clean_fss(_fss_tables(biz_base=biz_base))[0]
+    # Then
+    assert (product["rate_type"], product["online_yn"], product["policy_yn"]) == ("BOTH", "Y", "N")
