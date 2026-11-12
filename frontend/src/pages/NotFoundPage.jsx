@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import Icon from '../components/ui/Icon'
 import { Button } from '../styles/common'
 
 // LY-16 없는 주소 화면: 안내 문구 + [홈으로]
@@ -30,7 +31,10 @@ function NotFoundPage() {
     <Wrap>
       <Title>찾을 수 없는 주소예요</Title>
       <Desc>주소가 잘못되었거나 없어진 화면이에요.</Desc>
-      <Button onClick={() => navigate('/')}>홈으로</Button>
+      <Button onClick={() => navigate('/')}>
+        홈으로
+        <Icon name="arrow" size={13} />
+      </Button>
     </Wrap>
   )
 }

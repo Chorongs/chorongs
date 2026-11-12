@@ -7,6 +7,7 @@ import Icon from './Icon'
 // Esc, 뒤 막 클릭 → onClose / 열리면 창 안 첫 버튼에 커서, 닫히면 누르던 버튼으로 돌아감
 // 창 안에서만 Tab 이동. createPortal은 안 쓰고 Layout에서 한 번만 그린다.
 // width: 창 폭 (기본 580) / isTop: 다른 팝업 위에 뜨는 창 (상품 상세 창, 로그인 안내 창, z-index 91)
+// isTallOnMobile: 모바일(900px 미만)에서 내용이 짧아도 높이 90%로 올라오는 창 (상품 상세 창)
 // isFull: 화면 가득 채우는 창 (모바일 전체 메뉴) / showClose: false면 위쪽 닫기 줄을 안 그림 (제목 줄에 닫기 버튼을 직접 두는 창)
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -71,6 +72,7 @@ const Dialog = styled.div`
   @media (max-width: 899px) {
     width: 100%;
     max-height: ${({ $isFull }) => ($isFull ? 'none' : '90vh')};
+    height: ${({ $isFull, $isTallOnMobile }) => ($isFull ? '100%' : $isTallOnMobile ? '90vh' : 'auto')};
     padding: ${({ $isFull }) =>
       $isFull
         ? 'calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left))'
@@ -86,7 +88,17 @@ const Close = styled.div`
 `
 
 // showClose: false면 위쪽 닫기 줄을 안 그림 (제목 줄에 닫기 버튼을 직접 두는 창, 예: 상품 상세 창)
-function Modal({ isOpen, onClose, label, children, width = 580, isTop = false, showClose = true, isFull = false }) {
+function Modal({
+  isOpen,
+  onClose,
+  label,
+  children,
+  width = 580,
+  isTop = false,
+  showClose = true,
+  isFull = false,
+  isTallOnMobile = false,
+}) {
   const dialogRef = useRef(null)
 
   useEffect(() => {
@@ -142,6 +154,7 @@ function Modal({ isOpen, onClose, label, children, width = 580, isTop = false, s
         tabIndex={-1}
         $width={width}
         $isFull={isFull}
+        $isTallOnMobile={isTallOnMobile}
       >
         {showClose && (
           <Close>

@@ -26,7 +26,8 @@ const Mark = styled.span`
 function Icon({ name, size = 18 }) {
   const src = ICON_URLS[`../../assets/icons/${name}.svg`]
   // 없는 이름이면 오류 없이 빈 칸
-  return <Mark $src={src} $size={size} aria-hidden="true" />
+  // data-icon: 쓰는 쪽(예: Button의 arrow)이 아이콘 이름으로 모양을 바꿀 때 씀
+  return <Mark $src={src} $size={size} data-icon={name} aria-hidden="true" />
 }
 
 export default Icon

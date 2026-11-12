@@ -21,7 +21,7 @@ import RateText from './RateText'
 // TODO(CM-08, CHORONG-45): '내 조건 안내' EligibilityNotice (3칸 아래, useRecommendStore의 입력값이 올라온 뒤)
 // TODO(RC-09, CHORONG-45): 추천 이유 ReasonList (sheetFrom이 'recommend'일 때 3칸 아래, productId를 넘겨 표시)
 // TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
-// TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로
+// TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
 // TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
 // TODO(CM-16, CHORONG-36): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // TODO(ST-03, CHORONG-45): [이자 계산] 금액은 useRecommendStore의 lastInput.need와 한도 중 작은 값 (지금은 기본값 1,000만원)
@@ -240,7 +240,7 @@ function buildSections(product) {
         purpose.length > 0 && { label: '자금 용도', content: purpose.join(', ') },
         // 금감원 상품의 나이, 소득, 연체 조건은 값이 없어 기관 확인으로 안내
         (isFss || ageText) && { label: '나이 조건', content: isFss ? '기관 확인' : ageText },
-        (isFss || product.incomeNote) && { label: '소득 기준', content: isFss ? '기관 확인' : product.incomeNote },
+        (isFss || product.incomeNote) && { label: '소득 조건', content: isFss ? '기관 확인' : product.incomeNote },
         creditText && { label: '신용점수 기준', content: creditText },
         isFss && { label: '연체 조건', content: '기관 확인' },
         !isFss && product.extraCond && { label: '그 밖의 조건', content: product.extraCond },
@@ -401,8 +401,8 @@ function ProductDetail({ product, onClose }) {
 
       <Actions>
         <Button onClick={handleCalc}>
-          <Icon name="calc" />
           이자 계산
+          <Icon name="arrow" size={13} />
         </Button>
       </Actions>
 
@@ -515,7 +515,7 @@ function ProductDetailSheet() {
   }
 
   return (
-    <Modal isOpen onClose={closeProduct} label="상품 상세" isTop showClose={false}>
+    <Modal isOpen onClose={closeProduct} label="상품 상세" isTop showClose={false} isTallOnMobile>
       {body}
     </Modal>
   )

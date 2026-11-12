@@ -13,12 +13,6 @@ const disabledStyle = css`
 
 // UI-01 버튼: $variant (primary 기본 / outline / soft / ghost), $size (base 기본 / sm / rating / lg)
 const BUTTON_HEIGHT = { base: '48px', sm: '36px', rating: '30px', lg: '56px' }
-const BUTTON_FONT = {
-  base: 'var(--fs-base)',
-  sm: 'var(--fs-sm)',
-  rating: 'var(--fs-sm)',
-  lg: 'var(--fs-lg)',
-}
 
 const buttonVariant = {
   primary: css`
@@ -52,9 +46,8 @@ const buttonVariant = {
   `,
 }
 
-// 주 버튼(기본 크기)만 16px 800, 나머지는 15px 700 (시안)
-const isBigPrimary = ({ $variant, $size }) =>
-  (!$variant || $variant === 'primary') && (!$size || $size === 'base' || $size === 'lg')
+// 글자: 주 버튼 --fs-lg 800 / 나머지 --fs-base 700 (크기와 상관없이)
+const isPrimary = ({ $variant }) => !$variant || $variant === 'primary'
 
 export const Button = styled.button.attrs((props) => ({
   type: props.type || 'button',
@@ -67,14 +60,18 @@ export const Button = styled.button.attrs((props) => ({
   padding: 0 ${({ $size }) => ($size === 'sm' || $size === 'rating' ? '13px' : '20px')};
   border: 1px solid transparent;
   border-radius: ${({ $size }) => ($size === 'rating' ? 'var(--r-xs)' : 'var(--r-sm)')};
-  font-size: ${(props) => (isBigPrimary(props) ? 'var(--fs-lg)' : BUTTON_FONT[props.$size] || BUTTON_FONT.base)};
-  font-weight: ${(props) => (isBigPrimary(props) ? 800 : 700)};
+  font-size: ${(props) => (isPrimary(props) ? 'var(--fs-lg)' : 'var(--fs-base)')};
+  font-weight: ${(props) => (isPrimary(props) ? 800 : 700)};
   text-align: center;
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--t-fast), border-color var(--t-fast), transform .1s;
   &:active:not(:disabled) {
     transform: translateY(1px);
+  }
+  /* 다른 화면으로 가는 버튼: 글자 뒤 <Icon name="arrow" size={13} />을 -45도 돌려 ↗ 모양으로 */
+  & [data-icon='arrow'] {
+    transform: rotate(-45deg);
   }
   ${({ $variant }) => buttonVariant[$variant] || buttonVariant.primary}
   ${disabledStyle}

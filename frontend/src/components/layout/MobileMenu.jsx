@@ -10,7 +10,10 @@ import Modal from '../ui/Modal'
 
 // LY-15 모바일 전체 메뉴: Modal 부품 사용 (Esc → 닫힘). 시안처럼 화면 가득, 위에 로고 + 닫기
 // 링크를 누르면 닫히고, 열려 있는 동안 뒤 화면 스크롤을 잠금
-// TODO(LY-08, CHORONG-43): 로고 아래 계정 칸(로그인 이름 / '로그인' 안내)은 useAuthStore가 올라온 뒤 (계정 메뉴와 같이)
+// 캐링 추천은 LY-05와 같음 (추천받기 전이면 추천 창 열고 메뉴 닫기, 받은 뒤면 /recommend 이동)
+// TODO(ST-03, CHORONG-45): useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾼다.
+// TODO(ST-01, CHORONG-43): 맨 위 계정 줄은 useAuthStore가 올라온 뒤 추가한다.
+//   회원: '{닉네임}님' + '{카카오 또는 네이버} 로그인' → /my / 비회원: '카카오, 네이버로 로그인' + '찜과 기록은 회원만 저장돼요' → /login
 const Top = styled.div`
   display: flex;
   align-items: center;
@@ -60,6 +63,16 @@ const MenuIcon = styled.span`
 function MobileMenu() {
   const menuOpen = useUiStore((state) => state.menuOpen)
   const closeMenu = useUiStore((state) => state.closeMenu)
+  const openRecommend = useUiStore((state) => state.openRecommend)
+  const hasResult = false
+
+  const handleItemClick = (event, item) => {
+    closeMenu()
+    if (item.isRecommend && !hasResult) {
+      event.preventDefault()
+      openRecommend()
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -83,7 +96,12 @@ function MobileMenu() {
           <Group key={group.title}>
             <GroupTitle>{group.title}</GroupTitle>
             {group.items.map((item) => (
-              <MenuLink key={item.to} to={item.to} end={item.end} onClick={closeMenu}>
+              <MenuLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={(event) => handleItemClick(event, item)}
+              >
                 <MenuIcon>
                   <Icon name={item.icon} />
                 </MenuIcon>
