@@ -1,5 +1,5 @@
 """
-    상품 정제 1~3단계 (EXT-01, EXT-02)
+    상품 정제 1~4단계 (EXT-01, EXT-02)
     규칙 기준: docs 상품 데이터 정제, 필터 기준 / 데이터 처리 기획서
 
     수집 원본 행 목록 (collect.py와 같은 모양: {CSV 이름: 행 목록}) → 상품 목록
@@ -11,6 +11,8 @@
     2단계 칸: limit_amount, term_max, credit_min, credit_max, age_min, age_max,
              income_min, income_max, income_basis, income_note, prepay_fee_max, no_prepay_fee_yn
     3단계 칸: rate_type, online_yn, policy_yn, extra_cond (target_detail은 4단계 지원 대상 칩과 같이)
+    4단계 칸: tags (tag 칸 목록), target_detail, check_reasons (4-1은 NEW_PHRASE만)
+             4-1 칩: TARGET 지원 대상, PURPOSE 자금 용도 (단어표 artifacts/tag_words.json)
 
     - 0, '-', 빈 칸은 빈 값(None) (중도상환수수료 0은 '수수료 없음'이라 예외)
     - 글자 칸은 HTML 문자(&#40; 등)를 되돌리고 앞뒤 공백 제거 (raw_json은 원본 그대로)
@@ -33,6 +35,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 CSV_DIR = Path(__file__).resolve().parent.parent / "data" / "csv"
+WORDS_PATH = Path(__file__).resolve().parent / "artifacts" / "tag_words.json"   # 정제 단어표
 
 # 금감원 CSV 종류 이름 → loan_type
 FSS_LOAN_TYPES = {
@@ -757,6 +760,150 @@ def fss_features(row, loan_type, options):
     }
 
 
+# ---------- 4단계: 필터 칩 ----------
+
+def load_words(path=WORDS_PATH):
+    """단어표 파일 → dict"""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+WORDS = load_words()
+
+
+def match_words(text, entries):
+    """
+        글 속 단어 → (칩 목록, 세부 값 목록)
+        entries: [{"word", "chip", "detail"(없어도 됨)}], 같은 칩은 1번만
+    """
+    chips, details = [], []
+    if not text:
+        return chips, details
+
+    for entry in entries:
+        if entry["word"] not in text:
+            continue
+        if entry["chip"] not in chips:
+            chips.append(entry["chip"])
+        if entry.get("detail") and entry["detail"] not in details:
+            details.append(entry["detail"])
+    return chips, details
+
+
+def _in_order(chips, order):
+    """칩을 단어표 chips 순서(화면 칩 순서)로"""
+    return sorted(chips, key=order.index)
+
+
+def kinfa_target(row):
+    """
+        서민 지원 대상 칩 → (칩 목록, target_detail, 새 문구 여부) (정제 기준 3-5, 기획서 3-3)
+
+        - 옮길 상품 목록에 있으면 그 칩 (세부 지원 조건에만 대상 제한이 있는 상품)
+        - 대상 구분(trgt) 글의 단어 → 칩. '기타'는 다른 칩이 없을 때만 기타
+        - 대상 칸이 비었거나 대상을 알 수 없는 원문('개인')이면 상품명 단어로
+        - 대상 칸 글에 아는 단어가 하나도 없으면 기타 + 새 문구 (확인 필요)
+        - target_detail: 특별 지원 대상 세부 값, 여러 개면 ', '로 이음
+    """
+    words = WORDS["TARGET"]
+    name = to_text(row.get("finprdnm"))
+    text = to_text(row.get("trgt"))
+
+    for move in words["kinfa_move_products"]:
+        if move["product_name"] == name:
+            return [move["chip"]], move["detail"], False
+
+    chips, details = match_words(text, words["kinfa_words"])
+    if not chips:
+        chips, _ = match_words(text, words["kinfa_alone_words"])
+
+    is_new = False
+    if not chips:
+        if text is None or text in words["kinfa_unknown_phrases"]:
+            chips, details = match_words(name, words["kinfa_name_words"])
+        else:
+            chips, is_new = ["기타"], True
+
+    detail = ", ".join(details) if "특별 지원 대상" in chips and details else None
+    return _in_order(chips, words["chips"]), detail, is_new
+
+
+def kinfa_purpose(row):
+    """
+        서민 자금 용도 칩 → (칩 목록, 새 문구 여부) (정제 기준 3-5)
+
+        - 용도(usge) 글의 단어 → 칩 ('생계, 기타' → 생활비 + 기타)
+        - '주거'는 상품명에 구입, 디딤돌, 보금자리, 모기지가 있으면 주택 구입, 아니면 전월세
+        - 용도 칸이 비면 상품명 단어로, 그래도 없으면 결측 (칩 없음)
+        - 용도 칸 글에 아는 단어가 하나도 없으면 기타 + 새 문구 (확인 필요)
+    """
+    words = WORDS["PURPOSE"]
+    name = to_text(row.get("finprdnm")) or ""
+    text = to_text(row.get("usge"))
+
+    if text is None:
+        chips, _ = match_words(name, words["kinfa_name_words"])
+        return _in_order(chips, words["chips"]), False
+
+    chips, _ = match_words(text, words["kinfa_words"])
+    housing = words["kinfa_housing"]
+    if housing["word"] in text:
+        buy = any(w in name for w in housing["buy_name_words"])
+        chip = housing["buy_chip"] if buy else housing["rent_chip"]
+        if chip not in chips:
+            chips.append(chip)
+
+    if not chips:
+        return ["기타"], True
+    return _in_order(chips, words["chips"]), False
+
+
+def fss_target(loan_type, join_deny=None):
+    """금감원 지원 대상 칩: 상품 종류로 (신용, 전세, 주담대 = 제한 없음 / 사업자) + 사업자 가입 제한 칸 단어"""
+    words = WORDS["TARGET"]
+    chips = list(words["fss_loan_types"][loan_type])
+    if loan_type == "BIZ":
+        extra, _ = match_words(to_text(join_deny), words["fss_join_deny_words"])
+        chips += [c for c in extra if c not in chips]
+    return _in_order(chips, words["chips"])
+
+
+def fss_purpose(loan_type, use_way=None):
+    """금감원 자금 용도 칩: 상품 종류로 (신용 = 생활비, 전세 = 전월세, 주담대 = 주택 구입, 사업자 = 사업 운영) + 사업자 대출 용도 칸 단어"""
+    words = WORDS["PURPOSE"]
+    chips = list(words["fss_loan_types"][loan_type])
+    if loan_type == "BIZ":
+        extra, _ = match_words(to_text(use_way), words["fss_use_way_words"])
+        chips += [c for c in extra if c not in chips]
+    return _in_order(chips, words["chips"])
+
+
+def _tags(tag_type, chips):
+    """칩 목록 → tag 칸 목록"""
+    return [{"tag_type": tag_type, "tag_value": chip} for chip in chips]
+
+
+def kinfa_tags(row):
+    """서민 행 1개 → 4단계 칸"""
+    targets, detail, new_target = kinfa_target(row)
+    purposes, new_purpose = kinfa_purpose(row)
+    return {
+        "tags": _tags("TARGET", targets) + _tags("PURPOSE", purposes),
+        "target_detail": detail,
+        "check_reasons": ["NEW_PHRASE"] if new_target or new_purpose else [],
+    }
+
+
+def fss_tags(loan_type, join_deny=None, use_way=None):
+    """금감원 상품 1개 → 4단계 칸 (단어표에 없는 새 문구는 서민 대상, 용도 칸에서만 셈)"""
+    return {
+        "tags": _tags("TARGET", fss_target(loan_type, join_deny))
+                + _tags("PURPOSE", fss_purpose(loan_type, use_way)),
+        "target_detail": None,
+        "check_reasons": [],
+    }
+
+
 def drop_closed(products, today):
     """공시 종료일이 오늘 이전인 상품은 적재하지 않음 (정제 기준 3-3)"""
     return [p for p in products if p["disclose_end"] is None or p["disclose_end"] >= today]
@@ -793,6 +940,7 @@ def clean_kinfa(rows, collected_on):
             "rates": [],
             **kinfa_numbers(row),
             **kinfa_features(row),
+            **kinfa_tags(row),
         })
 
     return products
@@ -832,6 +980,8 @@ def _fss_product(row, loan_type, keys, groups, bare_months=None):
         "rates": rates,
         **fss_numbers(row, loan_type, rates, bare_months),
         **fss_features(row, loan_type, options),
+        **(fss_tags(loan_type, row["join_deny"], row["use_way"]) if loan_type == "BIZ"
+           else fss_tags(loan_type)),
     }
 
 
@@ -881,6 +1031,8 @@ def clean_credit_union(base, groups):
             "online_yn": merge_yn(group["join_way"].map(fss_online)),
             "policy_yn": merge_yn(group["fin_prdt_type_nm"].map(fss_policy)),
             "extra_cond": None,
+            # 4단계 칩도 조합들의 가입 제한, 대출 용도 글을 합쳐 판단
+            **fss_tags("BIZ", ", ".join(group["join_deny"].unique()), ", ".join(group["use_way"].unique())),
         })
 
     return products
@@ -956,6 +1108,12 @@ def main():
     for col in ("rate_type", "online_yn", "policy_yn", "extra_cond"):
         logger.info("  %s: %s", col,
                     dict(Counter((p["loan_type"], p[col]) for p in products if col != "extra_cond" or p[col])))
+    for tag_type in ("TARGET", "PURPOSE"):
+        counts = Counter(t["tag_value"] for p in products for t in p["tags"] if t["tag_type"] == tag_type)
+        missing = sum(not any(t["tag_type"] == tag_type for t in p["tags"]) for p in products)
+        logger.info("  %s 칩: %s / 결측 %d개", tag_type, dict(counts), missing)
+    logger.info("  target_detail: %s", dict(Counter(p["target_detail"] for p in products if p["target_detail"])))
+    logger.info("  새 문구(NEW_PHRASE) %d개", sum("NEW_PHRASE" in p["check_reasons"] for p in products))
 
 
 if __name__ == "__main__":

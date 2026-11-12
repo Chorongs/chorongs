@@ -1,0 +1,103 @@
+{
+  "about": "정제 단어표 (기획서 3-7). 원문에 word가 들어 있으면 chip을 붙임. 새 문구가 확인 필요(NEW_PHRASE)로 뜨면 여기에 단어를 추가하고 다시 불러옴",
+
+  "TARGET": {
+    "chips": ["제한 없음", "청년/학생", "직장인", "저신용/서민", "사업자", "특별 지원 대상", "기타"],
+    "kinfa_words": [
+      {"word": "채무조정", "chip": "특별 지원 대상", "detail": "채무조정"},
+      {"word": "개인회생", "chip": "특별 지원 대상", "detail": "채무조정"},
+      {"word": "성실상환", "chip": "특별 지원 대상", "detail": "성실상환"},
+      {"word": "전세피해", "chip": "특별 지원 대상", "detail": "전세피해"},
+      {"word": "전세사기", "chip": "특별 지원 대상", "detail": "전세피해"},
+      {"word": "연금", "chip": "특별 지원 대상", "detail": "연금"},
+      {"word": "귀어", "chip": "특별 지원 대상", "detail": "농어업"},
+      {"word": "어업인", "chip": "특별 지원 대상", "detail": "농어업"},
+      {"word": "청년", "chip": "청년/학생"},
+      {"word": "대학", "chip": "청년/학생"},
+      {"word": "학생", "chip": "청년/학생"},
+      {"word": "학부생", "chip": "청년/학생"},
+      {"word": "취업준비생", "chip": "청년/학생"},
+      {"word": "학습", "chip": "청년/학생"},
+      {"word": "근로자", "chip": "직장인"},
+      {"word": "금융취약계층", "chip": "저신용/서민"},
+      {"word": "서민", "chip": "저신용/서민"},
+      {"word": "저소득", "chip": "저신용/서민"},
+      {"word": "주거취약", "chip": "저신용/서민"},
+      {"word": "신용등급", "chip": "저신용/서민"},
+      {"word": "미소금융", "chip": "저신용/서민"},
+      {"word": "사업자", "chip": "사업자"},
+      {"word": "소상공인", "chip": "사업자"},
+      {"word": "기업", "chip": "사업자"},
+      {"word": "자영업", "chip": "사업자"},
+      {"word": "창업자", "chip": "사업자"},
+      {"word": "예술인", "chip": "기타"},
+      {"word": "북한이탈", "chip": "기타"}
+    ],
+    "kinfa_alone_words": [
+      {"word": "기타", "chip": "기타"}
+    ],
+    "kinfa_unknown_phrases": ["개인"],
+    "kinfa_name_words": [
+      {"word": "학자금", "chip": "청년/학생"},
+      {"word": "금융취약계층", "chip": "저신용/서민"},
+      {"word": "성실상환", "chip": "특별 지원 대상", "detail": "성실상환"}
+    ],
+    "kinfa_move_products": [
+      {"product_name": "직업훈련생계비 융자(직업훈련생계비)", "chip": "특별 지원 대상", "detail": null}
+    ],
+    "fss_loan_types": {
+      "CREDIT": ["제한 없음"],
+      "RENT": ["제한 없음"],
+      "MORTGAGE": ["제한 없음"],
+      "BIZ": ["사업자"]
+    },
+    "fss_join_deny_words": [
+      {"word": "저신용자", "chip": "저신용/서민"},
+      {"word": "청년", "chip": "청년/학생"}
+    ]
+  },
+
+  "PURPOSE": {
+    "chips": ["생활비", "전월세", "학자금", "주택 구입", "대환", "창업", "사업 운영", "기타"],
+    "kinfa_words": [
+      {"word": "생계", "chip": "생활비"},
+      {"word": "생활안정", "chip": "생활비"},
+      {"word": "의료비", "chip": "생활비"},
+      {"word": "장제비", "chip": "생활비"},
+      {"word": "재해복구", "chip": "생활비"},
+      {"word": "전월세", "chip": "전월세"},
+      {"word": "학자금", "chip": "학자금"},
+      {"word": "대환", "chip": "대환"},
+      {"word": "저금리전환", "chip": "대환"},
+      {"word": "창업", "chip": "창업"},
+      {"word": "운영", "chip": "사업 운영"},
+      {"word": "운전", "chip": "사업 운영"},
+      {"word": "시설", "chip": "사업 운영"},
+      {"word": "기타", "chip": "기타"}
+    ],
+    "kinfa_housing": {
+      "word": "주거",
+      "buy_name_words": ["구입", "디딤돌", "보금자리", "모기지"],
+      "buy_chip": "주택 구입",
+      "rent_chip": "전월세"
+    },
+    "kinfa_name_words": [
+      {"word": "자영업", "chip": "사업 운영"},
+      {"word": "운영자금", "chip": "사업 운영"},
+      {"word": "소상공인", "chip": "사업 운영"},
+      {"word": "협약보증", "chip": "사업 운영"},
+      {"word": "햇살론", "chip": "생활비"},
+      {"word": "생계", "chip": "생활비"}
+    ],
+    "fss_loan_types": {
+      "CREDIT": ["생활비"],
+      "RENT": ["전월세"],
+      "MORTGAGE": ["주택 구입"],
+      "BIZ": ["사업 운영"]
+    },
+    "fss_use_way_words": [
+      {"word": "대환", "chip": "대환"},
+      {"word": "창업", "chip": "창업"}
+    ]
+  }
+}

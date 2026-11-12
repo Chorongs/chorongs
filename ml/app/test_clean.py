@@ -2,8 +2,9 @@ from datetime import date
 
 import pandas as pd
 
-from app.clean import (bare_term_units, biz_limit, clean_fss, credit_from_rates, drop_closed,
-                       fill_credit_rates, fss_online, fss_policy, fss_rate_type, kinfa_online,
+from app.clean import (WORDS, bare_term_units, biz_limit, clean_fss, clean_kinfa, credit_from_rates,
+                       drop_closed, fill_credit_rates, fss_online, fss_policy, fss_purpose,
+                       fss_rate_type, fss_target, kinfa_online, kinfa_purpose, kinfa_target,
                        merge_yn, parse_age, parse_credit, parse_extra_cond, parse_fss_term,
                        parse_income, parse_irt, parse_kinfa_end, parse_kinfa_term, parse_limit,
                        parse_prepay, rate_type_from_texts, to_company, to_date, to_rate, to_text)
@@ -28,7 +29,7 @@ def _base_row(fin_co_no, fin_prdt_cd, kor_co_nm, fin_prdt_nm, subm_day="20261016
                fin_prdt_nm=fin_prdt_nm, fin_co_subm_day=subm_day,
                dcls_strt_day="20261020", dcls_end_day="",
                loan_limit="", loan_limit_detl="", loan_term="", erly_rpay_fee="",
-               join_way="", fin_prdt_type_nm="", lend_rate_type="")
+               join_way="", fin_prdt_type_nm="", lend_rate_type="", join_deny="", use_way="")
     row.update(extra)
     return row
 
@@ -735,3 +736,197 @@ def test_clean_fss_신협은_조합들_금리_방식을_합친다():
     product = clean_fss(_fss_tables(biz_base=biz_base))[0]
     # Then
     assert (product["rate_type"], product["online_yn"], product["policy_yn"]) == ("BOTH", "Y", "N")
+
+
+# ---------- 4단계: 필터 칩 (4-1 지원 대상, 자금 용도) ----------
+
+def test_tag_words_단어표_칩은_모두_칩_목록_값():
+    # Given
+    used = set()
+    for tag_type in ("TARGET", "PURPOSE"):
+        words = WORDS[tag_type]
+        for key, value in words.items():
+            if key.endswith(("_words", "_products")):
+                used |= {(tag_type, e["chip"]) for e in value}
+        used |= {(tag_type, c) for chips in words["fss_loan_types"].values() for c in chips}
+    housing = WORDS["PURPOSE"]["kinfa_housing"]
+    used |= {("PURPOSE", housing["buy_chip"]), ("PURPOSE", housing["rent_chip"])}
+    allowed = {(t, c) for t in ("TARGET", "PURPOSE") for c in WORDS[t]["chips"]}
+    # When
+    unknown = used - allowed
+    # Then
+    assert unknown == set()
+
+
+def test_kinfa_target_단어가_여러_개면_칩_여러_개():
+    # Given
+    row = {"trgt": "근로자, 사업자, 청년", "finprdnm": "가대출"}
+    # When
+    chips, _, _ = kinfa_target(row)
+    # Then
+    assert chips == ["청년/학생", "직장인", "사업자"]
+
+
+def test_kinfa_target_특별_지원_대상은_세부_값():
+    # Given
+    row = {"trgt": "채무조정자", "finprdnm": "가대출"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["특별 지원 대상"], "채무조정", False)
+
+
+def test_kinfa_target_기타는_다른_칩이_있으면_뺀다():
+    # Given
+    row = {"trgt": "금융취약계층, 기타", "finprdnm": "보금자리론"}
+    # When
+    chips, _, _ = kinfa_target(row)
+    # Then
+    assert chips == ["저신용/서민"]
+
+
+def test_kinfa_target_기타만_있으면_기타_칩():
+    # Given
+    row = {"trgt": "기타", "finprdnm": "신혼희망타운전용 주택담보장기대출"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["기타"], None, False)
+
+
+def test_kinfa_target_대상을_알_수_없는_원문은_상품명으로():
+    # Given
+    row = {"trgt": "개인", "finprdnm": "성실상환자 대출(소액금융)"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["특별 지원 대상"], "성실상환", False)
+
+
+def test_kinfa_target_옮길_상품은_목록의_칩():
+    # Given
+    row = {"trgt": "근로자", "finprdnm": "직업훈련생계비 융자(직업훈련생계비)"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["특별 지원 대상"], None, False)
+
+
+def test_kinfa_target_모르는_문구는_기타와_새_문구():
+    # Given
+    row = {"trgt": "우주비행사", "finprdnm": "가대출"}
+    # When
+    result = kinfa_target(row)
+    # Then
+    assert result == (["기타"], None, True)
+
+
+def test_kinfa_purpose_주거는_상품명에_구입_단어가_있으면_주택_구입():
+    # Given
+    row = {"usge": "주거", "finprdnm": "디딤돌대출"}
+    # When
+    result = kinfa_purpose(row)
+    # Then
+    assert result == (["주택 구입"], False)
+
+
+def test_kinfa_purpose_주거는_구입_단어가_없으면_전월세():
+    # Given
+    row = {"usge": "주거", "finprdnm": "전세자금보증_일반"}
+    # When
+    chips, _ = kinfa_purpose(row)
+    # Then
+    assert chips == ["전월세"]
+
+
+def test_kinfa_purpose_기타는_다른_칩과_같이_붙는다():
+    # Given
+    row = {"usge": "생계, 기타", "finprdnm": "자영업자스피드대출금"}
+    # When
+    chips, _ = kinfa_purpose(row)
+    # Then
+    assert chips == ["생활비", "기타"]
+
+
+def test_kinfa_purpose_용도가_비면_상품명으로():
+    # Given
+    row = {"usge": "-", "finprdnm": "햇살론15"}
+    # When
+    result = kinfa_purpose(row)
+    # Then
+    assert result == (["생활비"], False)
+
+
+def test_kinfa_purpose_상품명에도_없으면_결측():
+    # Given
+    row = {"usge": "-", "finprdnm": "청년 미래이음 대출"}
+    # When
+    result = kinfa_purpose(row)
+    # Then
+    assert result == ([], False)
+
+
+def test_kinfa_purpose_모르는_문구는_기타와_새_문구():
+    # Given
+    row = {"usge": "우주여행", "finprdnm": "가대출"}
+    # When
+    result = kinfa_purpose(row)
+    # Then
+    assert result == (["기타"], True)
+
+
+def test_fss_target_사업자_가입_제한에_저신용자면_추가():
+    # Given
+    join_deny = "저신용자, 기타"
+    # When
+    chips = fss_target("BIZ", join_deny)
+    # Then
+    assert chips == ["저신용/서민", "사업자"]
+
+
+def test_fss_target_전세는_제한_없음():
+    # Given
+    loan_type = "RENT"
+    # When
+    chips = fss_target(loan_type)
+    # Then
+    assert chips == ["제한 없음"]
+
+
+def test_fss_purpose_개인신용은_생활비():
+    # Given
+    loan_type = "CREDIT"
+    # When
+    chips = fss_purpose(loan_type)
+    # Then
+    assert chips == ["생활비"]
+
+
+def test_fss_purpose_사업자_대출_용도에_대환이면_추가():
+    # Given
+    use_way = "일반,대환"
+    # When
+    chips = fss_purpose("BIZ", use_way)
+    # Then
+    assert chips == ["대환", "사업 운영"]
+
+
+def test_clean_kinfa_새_문구면_확인_필요():
+    # Given
+    rows = [{"seq": "1", "finprdnm": "가대출", "trgt": "우주비행사", "usge": "생계"}]
+    # When
+    product = clean_kinfa(rows, date(2026, 11, 12))[0]
+    # Then
+    assert product["check_reasons"] == ["NEW_PHRASE"]
+
+
+def test_clean_fss_신협은_조합들_가입_제한을_합친다():
+    # Given
+    biz_base = [
+        _base_row("0001", "100", "정락", "시설자금대출금", top_fin_grp_no="032000", join_deny="제한없음"),
+        _base_row("0002", "100", "중앙", "시설자금대출금", top_fin_grp_no="032000", join_deny="저신용자"),
+    ]
+    # When
+    product = clean_fss(_fss_tables(biz_base=biz_base))[0]
+    # Then
+    assert [t["tag_value"] for t in product["tags"] if t["tag_type"] == "TARGET"] == ["저신용/서민", "사업자"]
