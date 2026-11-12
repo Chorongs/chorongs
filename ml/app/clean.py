@@ -468,9 +468,10 @@ def parse_credit(value):
         - '하위 20%', '하위 100분의 20' → 0~749 (단어표 CREDIT lower_scores 설정값)
         - 조건이 여러 개면 합친 범위 (Track1 880~1000 + Track2 595~879 → 595~1000)
         - 점수 없는 조건('없음', 'B등급 이상' 등)은 (None, None)
+        - '무관' 조건이 붙으면 (None, None) ('하위 20%(연소득 3,500만원 이하는 무관)': 점수로 거르면 저소득자가 빠짐)
     """
     text = to_text(value)
-    if text is None:
+    if text is None or "무관" in text:
         return None, None
 
     score = r"(1,000|\d{3,4})"

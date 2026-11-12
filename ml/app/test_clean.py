@@ -475,6 +475,15 @@ def test_parse_credit_등급_조건은_빈_값():
     assert result == (None, None)
 
 
+def test_parse_credit_무관_조건이_붙으면_빈_값():
+    # Given
+    value = "하위 100분의 20%(연소득 3,500만원 이하는 무관)"
+    # When
+    result = parse_credit(value)
+    # Then
+    assert result == (None, None)
+
+
 def test_credit_from_rates_공시_구간을_합친_범위():
     # Given: 구간 4(801~900) 공시, 5(701~800) 추정, 6(601~700) 공시
     rates = [{"rate_kind": "CREDIT", "rate_key": "4", "rate_source": "DISCLOSED"},
@@ -853,6 +862,15 @@ def test_kinfa_target_옮길_상품_칩_여러_개와_세부_값():
     assert result == (["사업자", "특별 지원 대상"], "채무조정, 성실상환", False)
 
 
+def test_kinfa_target_옮길_상품은_HTML_괄호_상품명도_찾음():
+    # Given
+    row = {"trgt": "서민계층", "finprdnm": "보증부 서민대출&#40;햇살론&#41; 협약보증"}
+    # When
+    chips, _, _ = kinfa_target(row)
+    # Then
+    assert chips == ["저신용/서민", "사업자"]
+
+
 def test_kinfa_target_모르는_문구는_기타와_새_문구():
     # Given
     row = {"trgt": "우주비행사", "finprdnm": "가대출"}
@@ -869,6 +887,15 @@ def test_kinfa_purpose_주거는_상품명에_구입_단어가_있으면_주택_
     result = kinfa_purpose(row)
     # Then
     assert result == (["주택 구입"], False)
+
+
+def test_kinfa_purpose_주거는_적격대출이면_주택_구입():
+    # Given
+    row = {"usge": "주거", "finprdnm": "기본형 적격대출"}
+    # When
+    chips, _ = kinfa_purpose(row)
+    # Then
+    assert chips == ["주택 구입"]
 
 
 def test_kinfa_purpose_주거는_구입_단어가_없으면_전월세():
@@ -1099,6 +1126,15 @@ def test_repay_chips_원금균등분할은_방식_미표기를_붙이지_않음(
     chips = repay_chips(text)
     # Then
     assert chips == ["원금균등"]
+
+
+def test_repay_chips_기한연장은_만기일시():
+    # Given
+    text = "1년마다 기한연장 또는 1년거치 4년 월단위 원금균등분할상환"
+    # When
+    chips = repay_chips(text)
+    # Then
+    assert chips == ["원금균등", "만기일시"]
 
 
 def test_repay_chips_균등분할상환은_방식_미표기():

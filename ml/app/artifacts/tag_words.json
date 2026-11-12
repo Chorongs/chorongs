@@ -49,8 +49,20 @@
       {"product_name": "북한이탈주민 특별보증", "chips": ["사업자", "기타"], "detail": null},
       {"product_name": "햇살론119", "chips": ["사업자", "특별 지원 대상"], "detail": "채무조정, 성실상환"},
       {"product_name": "민간사업수행기관 창업·운영자금_생활안정자금", "chips": ["직장인", "저신용/서민", "사업자"], "detail": null},
-      {"product_name": "햇살론 플러스(자영업자)", "chips": ["저신용/서민", "사업자"], "detail": null},
-      {"product_name": "징검다리론", "chips": ["직장인", "사업자", "특별 지원 대상"], "detail": "성실상환"}
+      {"product_name": "햇살론 플러스(자영업자)", "chips": ["직장인", "저신용/서민", "사업자"], "detail": null},
+      {"product_name": "징검다리론", "chips": ["직장인", "사업자", "특별 지원 대상"], "detail": "성실상환"},
+      {"product_name": "햇살론카드", "chips": ["직장인", "사업자"], "detail": null},
+      {"product_name": "미소금융 운영자금_청년", "chips": ["청년/학생", "저신용/서민", "사업자"], "detail": null},
+      {"product_name": "청년 미래이음 대출", "chips": ["청년/학생", "저신용/서민"], "detail": null},
+      {"product_name": "취약계층 소상공인 금융지원 협약보증", "chips": ["저신용/서민", "사업자"], "detail": null},
+      {"product_name": "보증부 서민대출(햇살론) 협약보증", "chips": ["저신용/서민", "사업자"], "detail": null},
+      {"product_name": "미소금융 재기자금123_운영자금", "chips": ["저신용/서민", "사업자", "특별 지원 대상"], "detail": "채무조정"},
+      {"product_name": "전세자금보증(특례)_정책서민금융 이용자", "chips": ["저신용/서민", "특별 지원 대상"], "detail": "성실상환"},
+      {"product_name": "사잇돌Ⅱ대출_표준", "chips": ["직장인", "사업자"], "detail": null},
+      {"product_name": "사잇돌Ⅱ대출_대환형", "chips": ["직장인", "사업자"], "detail": null},
+      {"product_name": "민간사업수행기관 생활안정자금_나눔과기쁨", "chips": ["직장인", "저신용/서민", "사업자"], "detail": null},
+      {"product_name": "민간사업수행기관 생활안정자금_신나는조합", "chips": ["직장인", "저신용/서민", "사업자"], "detail": null},
+      {"product_name": "민간사업수행기관 생활안정자금_기업과공동체", "chips": ["직장인", "저신용/서민", "사업자"], "detail": null}
     ],
     "fss_loan_types": {
       "CREDIT": ["제한 없음"],
@@ -84,7 +96,7 @@
     ],
     "kinfa_housing": {
       "word": "주거",
-      "buy_name_words": ["구입", "디딤돌", "보금자리", "모기지"],
+      "buy_name_words": ["구입", "디딤돌", "보금자리", "모기지", "적격대출", "주택담보"],
       "buy_chip": "주택 구입",
       "rent_chip": "전월세"
     },
@@ -93,6 +105,7 @@
       {"word": "운영자금", "chip": "사업 운영"},
       {"word": "소상공인", "chip": "사업 운영"},
       {"word": "협약보증", "chip": "사업 운영"},
+      {"word": "일반자금보증", "chip": "사업 운영"},
       {"word": "햇살론", "chip": "생활비"},
       {"word": "생계", "chip": "생활비"}
     ],
@@ -193,6 +206,7 @@
       {"word": "일시상환", "chip": "만기일시"},
       {"word": "일시 상환", "chip": "만기일시"},
       {"word": "만기일시", "chip": "만기일시"},
+      {"word": "기한연장", "chip": "만기일시"},
       {"word": "혼합", "chip": "기타"},
       {"word": "체증식", "chip": "기타"},
       {"word": "의무적", "chip": "기타"},
