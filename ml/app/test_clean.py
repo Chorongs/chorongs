@@ -174,14 +174,23 @@ def test_parse_kinfa_end_상시는_빈_값():
 
 # ---------- 신용 구간 금리 ----------
 
-def test_fill_credit_rates_범위_안_빈_칸은_신용_낮은_쪽_값으로_추정():
-    # Given: 구간 5 (세 번째 칸)만 빔
+def test_fill_credit_rates_범위_안_빈_칸은_양옆_사이_보간으로_추정():
+    # Given: 구간 5 (세 번째 칸)만 빔, 양옆 4.79와 5.25
     values = [4.6, 4.79, None, 5.25, None, None, None, None]
     # When
     rates = fill_credit_rates(values)
     # Then
     assert rates[2] == {"rate_kind": "CREDIT", "rate_key": "5",
-                        "rate_min": 5.25, "rate_max": 5.25, "rate_source": "ESTIMATED"}
+                        "rate_min": 5.02, "rate_max": 5.02, "rate_source": "ESTIMATED"}
+
+
+def test_fill_credit_rates_연속_2칸_빈_칸은_위치대로_나눠_보간():
+    # Given: 4.0과 7.0 사이 2칸이 빔
+    values = [4.0, None, None, 7.0, None, None, None, None]
+    # When
+    rates = fill_credit_rates(values)
+    # Then
+    assert [r["rate_min"] for r in rates] == [4.0, 5.0, 6.0, 7.0]
 
 
 def test_fill_credit_rates_범위_밖_빈_칸은_줄을_만들지_않음():

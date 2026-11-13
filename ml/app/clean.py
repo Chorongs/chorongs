@@ -259,7 +259,7 @@ def fill_credit_rates(values):
 
         - 공시 값은 DISCLOSED
         - 공시 범위 안 (처음 공시 칸 ~ 마지막 공시 칸) 빈 칸이 연속 FILL_MAX칸 이하면
-          신용 낮은 쪽 (오른쪽) 이웃 공시 값으로 채우고 ESTIMATED
+          양옆 공시 값 사이를 칸 위치로 선형 보간해 채우고 ESTIMATED (기획서 3-11, 05 노트북 평균 오차 0.41%p)
         - 범위 밖 빈 칸, 연속 FILL_MAX칸 넘는 빈 칸은 줄을 만들지 않음
     """
     known = [i for i, v in enumerate(values) if v is not None]
@@ -277,7 +277,8 @@ def fill_credit_rates(values):
         left = max(j for j in known if j < i)
         right = min(j for j in known if j > i)
         if right - left - 1 <= FILL_MAX:
-            rates.append(_rate("CREDIT", key, values[right], values[right], "ESTIMATED"))
+            rate = round(values[left] + (values[right] - values[left]) * (i - left) / (right - left), 2)
+            rates.append(_rate("CREDIT", key, rate, rate, "ESTIMATED"))
 
     return rates
 
