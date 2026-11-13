@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { postEligibility } from '../../api/productApi'
 import { useRecommendStore } from '../../store/useRecommendStore'
+import { Button } from '../../styles/common'
 
 // 판정 코드 → 화면 글자, 색 (판정 이유 문장은 서버가 보낸 그대로 표시)
 const RESULT_LABELS = {
@@ -140,10 +141,9 @@ function EligibilityNotice({ productId, productStatus }) {
     return (
       <Wrap aria-label="내 조건 안내">
         <Message>내 조건을 확인하지 못했어요</Message>
-        {/* TODO(UI-01): 공통 Button(작은 크기)으로 바꾸기 (공통 부품이 올라온 뒤 연결) */}
-        <button type="button" onClick={handleRetry}>
+        <Button $size="sm" $variant="outline" onClick={handleRetry}>
           다시 시도
-        </button>
+        </Button>
       </Wrap>
     )
   }

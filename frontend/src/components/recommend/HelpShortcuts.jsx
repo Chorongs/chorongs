@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import Icon from '../ui/Icon'
 
 // 도움말로 가는 알약 버튼 4개 (이동 주소는 화면 목록 순서대로)
 const HELPS = [
@@ -15,33 +16,59 @@ const SAMPLE_DOCS = ['신분증', '소득금액증명원', '재직증명서']
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 56px;
   font-family: var(--f-ui);
+
+  @media (max-width: 899px) {
+    gap: 28px;
+  }
 `
 
 const Intro = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
+
+  @media (max-width: 899px) {
+    gap: 12px;
+  }
 `
 
 const Title = styled.h2`
   margin: 0;
   color: var(--ink);
-  font-size: var(--fs-h1);
+  font-size: var(--fs-d1);
   font-weight: 800;
+  line-height: 1.22;
+  letter-spacing: -0.04em;
+
+  @media (max-width: 899px) {
+    font-size: var(--fs-h1);
+  }
 `
 
 const Lead = styled.p`
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--fs-base);
-  line-height: 1.6;
+  font-size: var(--fs-xl);
+  line-height: 1.7;
+
+  @media (max-width: 899px) {
+    font-size: var(--fs-lg);
+  }
 `
 
+// 넓은 화면에서만 줄바꿈 (좁은 화면에서는 자연스럽게 이어짐)
+const WideBr = styled.br`
+  @media (max-width: 899px) {
+    display: none;
+  }
+`
+
+// 왼쪽에 글 판, 오른쪽에 그림 칸 (그림 칸이 DOM 순서로는 먼저라 order로 뒤로)
 const Show = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
   gap: 28px;
 
   @media (max-width: 899px) {
@@ -50,27 +77,44 @@ const Show = styled.div`
   }
 `
 
+// 예시 카드 두 장을 같은 자리에 두고 엇갈리게 (좁은 화면에서는 위아래로)
 const Art = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  min-height: 320px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  order: 2;
+  min-height: 520px;
   padding: 28px;
+  overflow: hidden;
   border-radius: var(--r-lg);
   background: linear-gradient(135deg, var(--good-soft), var(--mist));
+
+  @media (max-width: 899px) {
+    order: 0;
+    gap: 12px;
+    min-height: 320px;
+    padding: 20px;
+  }
 `
 
 const SampleCard = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
+  grid-area: 1 / 1;
   width: min(360px, 100%);
-  padding: 20px 24px;
+  padding: 28px;
   border-radius: var(--r-lg);
   background: var(--paper);
   box-shadow: var(--shadow-pop);
+  transform: ${({ $isFirst }) =>
+    $isFirst ? 'translate(-90px, -115px) rotate(-3deg)' : 'translate(90px, 95px) rotate(2deg)'};
+
+  @media (max-width: 899px) {
+    grid-area: auto;
+    padding: 20px;
+    transform: none;
+  }
 `
 
 const SampleKind = styled.span`
@@ -87,7 +131,7 @@ const SampleName = styled.p`
 `
 
 const SampleText = styled.p`
-  margin: 0;
+  margin: -8px 0 0;
   color: var(--ink-2);
   font-size: var(--fs-md);
   line-height: 1.6;
@@ -112,10 +156,8 @@ const SampleItem = styled.li`
   font-size: var(--fs-md);
   font-weight: 700;
 
-  &::before {
-    content: '✓';
+  & [data-icon='check'] {
     color: var(--good);
-    font-weight: 900;
   }
 `
 
@@ -124,7 +166,7 @@ const Panel = styled.div`
   flex-direction: column;
   justify-content: space-between;
   gap: 28px;
-  padding: 40px 32px;
+  padding: 44px 40px;
   border-radius: var(--r-lg);
   background: var(--mist);
 
@@ -138,33 +180,50 @@ const PanelText = styled.p`
   color: var(--ink-2);
   font-size: var(--fs-xl);
   line-height: 1.6;
+
+  @media (max-width: 899px) {
+    font-size: var(--fs-lg);
+  }
 `
 
 const Pills = styled.nav`
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 `
 
+// 검정 알약: 다른 화면으로 가는 버튼이라 글자 뒤에 ↗ (공통 Button과 같은 규칙: arrow를 -45도)
 const Pill = styled(Link)`
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line-2);
+  gap: 6px;
+  height: 48px;
+  padding: 0 16px;
   border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink);
-  font-size: var(--fs-md);
-  font-weight: 700;
-  text-align: center;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--fs-base);
+  font-weight: 800;
+  white-space: nowrap;
   text-decoration: none;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background-color 0.15s;
 
   &:hover {
-    border-color: var(--brand);
-    background: var(--brand-soft);
+    background: var(--ink-2);
+  }
+
+  & [data-icon='arrow'] {
+    transform: rotate(-45deg);
+  }
+
+  @media (max-width: 899px) {
+    height: auto;
+    min-height: 48px;
+    padding: 8px 12px;
+    font-size: var(--fs-md);
+    line-height: 1.3;
+    white-space: normal;
   }
 `
 
@@ -177,12 +236,16 @@ function HelpShortcuts() {
   return (
     <Wrap aria-labelledby="help-title">
       <Intro>
-        <Title id="help-title">대출이 어렵다면?</Title>
+        <Title id="help-title">
+          대출이
+          <WideBr />
+          어렵다면?
+        </Title>
         <Lead>모르는 말과 준비할 서류부터 차근차근 알려드려요.</Lead>
       </Intro>
       <Show>
         <Art aria-hidden="true">
-          <SampleCard>
+          <SampleCard $isFirst>
             <SampleKind>대출 용어 사전</SampleKind>
             <SampleName>DSR</SampleName>
             <SampleText>1년 소득 중 모든 대출의 원금과 이자를 갚는 데 쓰는 비율이에요.</SampleText>
@@ -192,17 +255,24 @@ function HelpShortcuts() {
             <SampleName>직장인이라면</SampleName>
             <SampleList>
               {SAMPLE_DOCS.map((doc) => (
-                <SampleItem key={doc}>{doc}</SampleItem>
+                <SampleItem key={doc}>
+                  <Icon name="check" size={14} />
+                  {doc}
+                </SampleItem>
               ))}
             </SampleList>
           </SampleCard>
         </Art>
         <Panel>
-          <PanelText>어려운 말은 쉬운 말로, 준비할 서류는 내 상황에 맞게</PanelText>
+          <PanelText>
+            어려운 말은 쉬운 말로, <br />
+            준비할 서류는 내 상황에 맞게
+          </PanelText>
           <Pills aria-label="도움말 바로가기">
             {HELPS.map((help) => (
               <Pill key={help.to} to={help.to}>
                 {help.label}
+                <Icon name="arrow" size={16} />
               </Pill>
             ))}
           </Pills>

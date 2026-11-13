@@ -84,6 +84,9 @@ export const HOUSING_PURPOSES = ['전월세', '주택 구입'] // 이 용도는 
 export const MONTHS_OPTIONS_HOUSING = [60, 120, 180]
 export const MONTHS_OPTIONS_DEFAULT = [12, 36, 60]
 export const MONTHS_UNKNOWN = 0
+// 처음 골라 두는 기간(개월, 가안 기준): 전월세, 주택 구입은 120, 그 밖은 36
+export const MONTHS_DEFAULT = 36
+export const MONTHS_DEFAULT_HOUSING = 120
 
 // 빠른 금액 칩 (value는 만원 단위)
 export const QUICK_AMOUNT_OPTIONS = [

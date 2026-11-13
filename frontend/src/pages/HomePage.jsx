@@ -8,14 +8,18 @@ import ToolShortcuts from '../components/recommend/ToolShortcuts'
 const Page = styled.main`
   display: flex;
   flex-direction: column;
-  gap: 28px;
 `
 
+// 구역 사이 간격은 구역 위 여백으로 (가안: 위 120, 모바일 72)
 const RevealBox = styled.div`
-  padding: 28px 0;
+  padding-top: 120px;
   opacity: ${({ $isVisible }) => ($isVisible ? 1 : 0)};
-  transform: translateY(${({ $isVisible }) => ($isVisible ? '0' : '28px')});
+  transform: translateY(${({ $isVisible }) => ($isVisible ? '0' : '48px')});
   transition: opacity 0.7s, transform 0.7s;
+
+  @media (max-width: 899px) {
+    padding-top: 72px;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     opacity: 1;

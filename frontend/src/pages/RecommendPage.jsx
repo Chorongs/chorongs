@@ -2,6 +2,7 @@ import styled from 'styled-components'
 import RecommendResult from '../components/recommend/RecommendResult'
 import { useRecommendStore } from '../store/useRecommendStore'
 import useUiStore from '../store/useUiStore'
+import Icon from '../components/ui/Icon'
 import { Button, EmptyBox } from '../styles/common'
 
 const Page = styled.main`
@@ -47,6 +48,7 @@ function RecommendPage() {
         <Title>추천 결과</Title>
         {result && (
           <Button $variant="outline" onClick={() => openRecommend()}>
+            <Icon name="refresh" />
             다시 추천받기
           </Button>
         )}

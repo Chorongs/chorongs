@@ -6,6 +6,7 @@ import { Button, Card, Tag } from '../../styles/common'
 import Medal from '../common/Medal'
 import MoneyText from '../common/MoneyText'
 import RateText from '../common/RateText'
+import Icon from '../ui/Icon'
 
 const TOP_RANK = 3
 const MAN_WON = 10000 // 만원 → 원
@@ -59,18 +60,19 @@ const Top = styled.div`
   gap: 8px;
 `
 
-const RankText = styled.span`
+const RankText = styled.b`
   font-size: var(--fs-md);
   font-weight: 800;
 `
 
+// 일치도: 주황 알약 (가안)
 const MatchRate = styled.span`
-  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--brand-soft);
   color: var(--brand-text);
-  font-family: var(--f-num);
-  font-size: var(--fs-md);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+  font-weight: 800;
 `
 
 const Org = styled.span`
@@ -111,8 +113,12 @@ const MetricValue = styled.b`
   gap: 4px;
   color: ${({ $isRate }) => ($isRate ? 'var(--brand-text)' : 'inherit')};
   font-family: var(--f-num);
-  font-size: var(--fs-xl);
+  font-size: var(--fs-h2);
   font-weight: 700;
+
+  @media (max-width: 899px) {
+    font-size: var(--fs-h3);
+  }
 `
 
 const Memo = styled.span`
@@ -130,7 +136,7 @@ const Tags = styled.div`
 
 const Actions = styled.div`
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
 `
 
@@ -153,7 +159,7 @@ function LimitValue({ product }) {
     RC-08 추천 카드: 추천 상품 1개 요약
     - props: item (RecommendItemDTO: rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote, judgeTags)
     - 카드 아무 곳 클릭 (Enter) → 상품 상세 창 openProduct(id, 'recommend')
-    - [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
+    - [상세 보기] → 카드 클릭과 같음 (가안에 있는 버튼) / [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
     - 판단 태그는 서버가 보낸 글 그대로, 순서도 그대로 (서버가 주의 먼저 정렬). 서버 글은 글자로만 출력 (E1)
     - TODO(CM-06, CHORONG-43): 찜 버튼 LikeButton 연결 (상품명 줄 오른쪽, 클릭이 카드까지 안 퍼지게 e.stopPropagation)
     - TODO(ST-04, CHORONG-47): [+ 비교] 버튼을 [이자 계산] 옆에 연결 (useCompareStore.addTray(product), 클릭이 안 퍼지게)
@@ -173,6 +179,11 @@ function RecommendCard({ item }) {
   const handleKeyDown = (event) => {
     // 카드 안 버튼에서 누른 Enter는 그 버튼 몫
     if (event.key === 'Enter' && event.target === event.currentTarget) handleOpen()
+  }
+
+  const handleOpenClick = (event) => {
+    event.stopPropagation()
+    handleOpen()
   }
 
   const handleCalc = (event) => {
@@ -231,7 +242,11 @@ function RecommendCard({ item }) {
       )}
 
       <Actions>
+        <Button $size="sm" onClick={handleOpenClick}>
+          상세 보기
+        </Button>
         <Button $variant="outline" $size="sm" onClick={handleCalc}>
+          <Icon name="calc" size={16} />
           이자 계산
         </Button>
       </Actions>

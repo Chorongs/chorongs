@@ -8,6 +8,7 @@ import useUiStore from '../../store/useUiStore'
 import { Button, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import Disclaimer from '../common/Disclaimer'
+import Icon from '../ui/Icon'
 import RecommendCard from './RecommendCard'
 
 const TOP_COUNT = 3 // 1~3위는 위에 따로
@@ -34,9 +35,28 @@ const Wrap = styled.section`
 const Head = styled.div`
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
+  gap: 12px 20px;
+  margin-bottom: 4px;
+`
+
+const HeadMain = styled.div`
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+`
+
+const ResultTitle = styled.h2`
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 800;
+`
+
+const RestTitle = styled.h3`
+  margin: 16px 0 -4px;
+  font-size: var(--fs-xl);
+  font-weight: 800;
 `
 
 const ConditionTags = styled.div`
@@ -45,23 +65,35 @@ const ConditionTags = styled.div`
   gap: 6px;
 `
 
+// 안내 줄: 앞에 느낌표 아이콘 (가안). 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
 const Notes = styled.ul`
   margin: 0;
-  padding: 16px 18px;
+  padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  border-radius: var(--r-sm);
-  background: var(--mist);
-  color: var(--ink-2);
-  font-size: var(--fs-md);
+  gap: 8px;
 `
 
-const Excluded = styled.p`
-  margin: 0;
+const NoteLine = styled.li`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   color: var(--cocoa);
   font-size: var(--fs-sm);
+  line-height: 1.55;
+`
+
+const AlertMark = styled.svg`
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 `
 
 const CardGrid = styled.div`
@@ -157,6 +189,7 @@ function RecommendResult() {
   const restPageCount = Math.ceil(restItems.length / PAGE_SIZE)
   const visibleRest = restItems.slice(restPage * PAGE_SIZE, (restPage + 1) * PAGE_SIZE)
   const canSave = lastInput !== null && items.length > 0
+  const excludedTotal = excluded.reduce((sum, entry) => sum + entry.count, 0)
 
   const handleSave = async () => {
     if (isSaving) return
@@ -180,30 +213,50 @@ function RecommendResult() {
   return (
     <Wrap aria-label="추천 결과">
       <Head>
-        <ConditionTags>
-          {getConditionLabels(lastInput).map((label) => (
-            <Tag key={label}>{label}</Tag>
-          ))}
-        </ConditionTags>
+        <HeadMain>
+          <ResultTitle>
+            {items.length === 0
+              ? '조건에 맞는 상품을 찾지 못했어요'
+              : `조건에 맞는 대출 ${total}개가 추천 상품이에요`}
+          </ResultTitle>
+          <ConditionTags>
+            {getConditionLabels(lastInput).map((label) => (
+              <Tag key={label}>{label}</Tag>
+            ))}
+          </ConditionTags>
+        </HeadMain>
         {canSave && (
           <Button $variant="outline" $size="sm" disabled={isSaving} onClick={handleSave}>
+            <Icon name="doc" size={16} />
             결과 저장
           </Button>
         )}
       </Head>
 
-      {notes.length > 0 && (
+      {(notes.length > 0 || excluded.length > 0) && (
         <Notes>
           {notes.map((note) => (
-            <li key={note}>{note}</li>
+            <NoteLine key={note}>
+              <AlertMark viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7.5v5.5M12 16.5h.01" />
+              </AlertMark>
+              <span>{note}</span>
+            </NoteLine>
           ))}
+          {excluded.length > 0 && (
+            <NoteLine>
+              <AlertMark viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7.5v5.5M12 16.5h.01" />
+              </AlertMark>
+              <span>
+                제외한 상품 {excludedTotal}개:{' '}
+                {excluded.map((entry) => `${entry.reason} ${entry.count}개`).join(', ')}
+              </span>
+            </NoteLine>
+          )}
         </Notes>
-      )}
-
-      {excluded.length > 0 && (
-        <Excluded>
-          {excluded.map((entry) => `${entry.reason} ${entry.count}개`).join(' · ')}
-        </Excluded>
       )}
 
       {items.length === 0 ? (
@@ -226,11 +279,14 @@ function RecommendResult() {
             ))}
           </CardGrid>
           {visibleRest.length > 0 && (
-            <CardGrid>
-              {visibleRest.map((item) => (
-                <RecommendCard key={item.product.productId} item={item} />
-              ))}
-            </CardGrid>
+            <>
+              <RestTitle>다음 순위 {restItems.length}개</RestTitle>
+              <CardGrid>
+                {visibleRest.map((item) => (
+                  <RecommendCard key={item.product.productId} item={item} />
+                ))}
+              </CardGrid>
+            </>
           )}
           {restPageCount > 1 && (
             <Pager>

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { postRecommend } from '../api/recommendApi'
+import { MONTHS_DEFAULT } from '../constants/options'
 
 /*
     ST-03 추천 입력값, 결과
@@ -12,19 +13,21 @@ import { postRecommend } from '../api/recommendApi'
     - 입력값(소득, 신용 등)은 console 출력 금지 (E6)
 */
 
+// 처음 골라 두는 값은 가안 기준 (직장인, 청년, 생활비, 36개월, 701~800, 연체 없음, 낮은 금리). 칸은 모두 바꿀 수 있음
+// 소득, 기존 대출, 지역, 필요 금액은 비워 둠
 const initialInput = {
-  job: null,
-  ageGroup: null,
+  job: 'OFFICE',
+  ageGroup: 'YOUTH',
   region: null,
   income: null,
   debtMonthly: null,
   debtUnknown: false,
-  purpose: null,
+  purpose: '생활비',
   need: null,
-  months: null,
-  creditBand: null,
-  overdue: null,
-  priorities: [],
+  months: MONTHS_DEFAULT,
+  creditBand: 'BAND3',
+  overdue: false,
+  priorities: ['LOW_RATE'],
 }
 
 export const useRecommendStore = create(

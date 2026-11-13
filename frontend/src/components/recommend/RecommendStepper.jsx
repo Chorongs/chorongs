@@ -4,6 +4,7 @@ import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
 import { getAboutMeError, getCreditError, getMoneyError, isBlank } from '../../utils/validate'
+import Icon from '../ui/Icon'
 import StepAboutMe from './StepAboutMe'
 import RecommendDiagStep from './RecommendDiagStep'
 import StepCredit from './StepCredit'
@@ -15,7 +16,7 @@ const DIAG_FROM_STEP3 = 'step3'
 const STEPS = [
   { no: 1, title: '나에 대해' },
   { no: 2, title: '필요한 돈' },
-  { no: 3, title: '신용, 우선순위' },
+  { no: 3, title: '신용·우선순위' },
 ]
 
 // 1단계는 비워도 다음으로 감: 빈 연소득, 매달 갚는 대출('잘 모르겠어요' 제외)은 0으로 바꾼 뒤 검사
@@ -41,12 +42,12 @@ const Form = styled.form`
 
 const Head = styled.div`
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
 `
 
-const StepTitle = styled.h2`
+const StepTitle = styled.h3`
   margin: 0;
   color: var(--ink);
   font-size: var(--fs-h4);
@@ -56,35 +57,62 @@ const StepTitle = styled.h2`
 const StepCount = styled.span`
   color: var(--cocoa);
   font-family: var(--f-num);
-  font-size: var(--fs-md);
-  font-weight: 700;
+  font-size: var(--fs-base);
+  font-weight: 800;
+
+  & b {
+    color: var(--brand-text);
+  }
 `
 
-const StepTabs = styled.div`
-  display: flex;
-  gap: 8px;
+// 단계 진행 막대: 위에 5px 막대(지나온 단계와 지금 단계는 주황), 아래에 단계 이름
+const StepTabs = styled.ol`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 `
 
 const StepTab = styled.button.attrs({ type: 'button' })`
-  flex: 1;
-  height: 36px;
-  padding: 0 8px;
-  border: 1px solid ${({ $isActive }) => ($isActive ? 'var(--brand)' : 'var(--line-2)')};
-  border-radius: var(--r-sm);
-  background: ${({ $isActive }) => ($isActive ? 'var(--brand-soft)' : 'var(--paper)')};
-  color: ${({ $isActive }) => ($isActive ? 'var(--brand-text)' : 'var(--muted)')};
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: ${({ $isActive, $isDone }) => ($isActive ? 'var(--ink)' : $isDone ? 'var(--ink-2)' : 'var(--muted)')};
   font-size: var(--fs-sm);
-  font-weight: ${({ $isActive }) => ($isActive ? 700 : 600)};
+  font-weight: ${({ $isActive }) => ($isActive ? 800 : 700)};
   cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast);
+
+  &::before {
+    content: '';
+    display: block;
+    height: 5px;
+    border-radius: var(--r-xs);
+    background: ${({ $isActive, $isDone }) => ($isActive || $isDone ? 'var(--brand)' : 'var(--line-2)')};
+  }
 `
 
 const Buttons = styled.div`
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+
+  & > button {
+    height: 56px;
+  }
+
+  & > button:first-child {
+    padding: 0 22px;
+  }
 
   & > button:last-child {
-    flex: 1;
+    width: 100%;
+    font-size: var(--fs-xl);
   }
 `
 
@@ -178,8 +206,6 @@ function RecommendStepper({ onRun, isRunning, runError = null }) {
     setDiagFrom(null)
   }
 
-  const currentTitle = STEPS.find((item) => item.no === step).title
-
   if (diagFrom) {
     return <RecommendDiagStep openedFrom={diagFrom} onDone={handleDiagDone} />
   }
@@ -187,22 +213,24 @@ function RecommendStepper({ onRun, isRunning, runError = null }) {
   return (
     <Form ref={formRef} onSubmit={handleSubmit} noValidate aria-label="맞춤 추천 조건 입력">
       <Head>
-        <StepTitle>{currentTitle}</StepTitle>
+        <StepTitle>내 조건 알려 주기</StepTitle>
         <StepCount aria-label={`${LAST_STEP}단계 중 ${step}단계`}>
-          {step}/{LAST_STEP}
+          <b>{step}</b> / {LAST_STEP}
         </StepCount>
       </Head>
 
       <StepTabs>
         {STEPS.map((item) => (
-          <StepTab
-            key={item.no}
-            $isActive={item.no === step}
-            aria-current={item.no === step ? 'step' : undefined}
-            onClick={() => goToStep(item.no)}
-          >
-            {item.no}. {item.title}
-          </StepTab>
+          <li key={item.no}>
+            <StepTab
+              $isActive={item.no === step}
+              $isDone={item.no < step}
+              aria-current={item.no === step ? 'step' : undefined}
+              onClick={() => goToStep(item.no)}
+            >
+              {item.title}
+            </StepTab>
+          </li>
         ))}
       </StepTabs>
 
@@ -212,13 +240,22 @@ function RecommendStepper({ onRun, isRunning, runError = null }) {
       {step === LAST_STEP && runError && <InlineError>{runError.message}</InlineError>}
 
       <Buttons>
-        {step > 1 && (
-          <Button $variant="outline" $size="lg" onClick={() => goToStep(step - 1)}>
-            이전
-          </Button>
-        )}
+        <Button $variant="soft" $size="lg" disabled={step === 1} onClick={() => goToStep(step - 1)}>
+          이전
+        </Button>
         <Button type="submit" $size="lg" disabled={isRunning}>
-          {step < LAST_STEP ? '다음' : isRunning ? '추천 찾는 중…' : runError ? '다시 시도' : '추천 받기'}
+          {step < LAST_STEP ? (
+            '다음'
+          ) : isRunning ? (
+            '추천 찾는 중…'
+          ) : runError ? (
+            '다시 시도'
+          ) : (
+            <>
+              <Icon name="spark" />
+              추천 결과 보기
+            </>
+          )}
         </Button>
       </Buttons>
     </Form>
