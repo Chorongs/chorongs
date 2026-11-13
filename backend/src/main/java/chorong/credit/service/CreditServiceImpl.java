@@ -32,16 +32,17 @@ public class CreditServiceImpl implements CreditService {
 	private static final int UNKNOWN_CHOICE = 0;		// '잘 모르겠어요'
 
 	// 문항별 보기 개수 (인덱스 = 문항 번호 - 1, '잘 모르겠어요' 제외)
-	private static final int[] CHOICE_COUNT = {3, 4, 2, 4, 4, 6, 5, 3, 3, 4};
+	private static final int[] CHOICE_COUNT = {3, 4, 2, 4, 4, 6, 5, 3, 3, 5};
 	// '잘 모르겠어요'를 고를 수 있는 문항
 	private static final Set<Integer> UNKNOWN_ALLOWED = Set.of(6, 7, 8, 9, 10);
-	// 점수 0, 상태와 팁에서 참고로만 쓰는 문항 (대출 건수, 금융권, 대출 잔액)
+	// 점수 0, 상태와 팁에서 참고로만 쓰는 문항 (대출 건수, 금융권, 대출 잔액) -> 상태 앞에 '참고: '
 	private static final Set<Integer> REFERENCE_QUESTIONS = Set.of(4, 5, 6);
+	// 고른 보기로 상태를 정하는 문항: 참고 문항 + 점수 0이 가장 나쁜 보기라 점수로 못 가르는 문항 (카드 사용 비율, 거래 기간)
+	private static final Set<Integer> CHOICE_TIER_QUESTIONS = Set.of(4, 5, 6, 7, 10);
 
-	// 문항별 점수 (0~100) -> 상태: 70 이상 양호, 40 이상 보통, 그 밖은 주의
-	private static final int GOOD_MIN = 70;
-	private static final int NORMAL_MIN = 40;
-	private static final int MAX_ITEM_SCORE = 100;
+	// 문항별 점수는 선형 점수에 더해지는 값이라 0 이하 (0 = 감점 없음, FastAPI 점수표 기준)
+	// 감점 문항(1, 2, 3, 8, 9) 상태: 0 양호, -100 초과 보통, -100 이하 주의
+	private static final int CAUTION_MAX = -100;
 
 	private static final int TIER_GOOD = 0;
 	private static final int TIER_NORMAL = 1;
@@ -170,7 +171,7 @@ public class CreditServiceImpl implements CreditService {
 		return new FastApiScoreRequestDTO(items);
 	}
 
-	// 받은 값 확인 (B13): 점수 1~1000, 문항별 점수 0~100이 아니면 503. 문항 번호 -> 점수
+	// 받은 값 확인 (B13): 점수 1~1000이 아니거나 빈 값이 있으면 503. 문항 번호 -> 문항별 점수 (음수도 정상)
 	private Map<Integer, Integer> validateScoreResponse(FastApiScoreResponseDTO response) {
 		Integer score = response.getScore();
 		if (score == null || score < 1 || score > 1000 || response.getItemScores() == null) throw badScoreResponse();
@@ -178,7 +179,6 @@ public class CreditServiceImpl implements CreditService {
 		Map<Integer, Integer> itemScores = new HashMap<>();
 		for (FastApiScoreResponseDTO.ItemScoreItem item : response.getItemScores()) {
 			if (item == null || item.getQuestionNo() == null || item.getScore() == null) throw badScoreResponse();
-			if (item.getScore() < 0 || item.getScore() > MAX_ITEM_SCORE) throw badScoreResponse();
 			itemScores.put(item.getQuestionNo(), item.getScore());
 		}
 		return itemScores;
@@ -199,11 +199,12 @@ public class CreditServiceImpl implements CreditService {
 
 			if (isUnknown(questionNo, choices)) {
 				items.add(new CreditCheckResponseDTO.ItemItem(questionNo, UNKNOWN_STATUS, UNKNOWN_TIP));
-			} else if (REFERENCE_QUESTIONS.contains(questionNo)) {
-				// 점수 0: 고른 보기로 상태를 정하고 '참고'로 표시
-				int tier = referenceTier(questionNo, choices);
+			} else if (CHOICE_TIER_QUESTIONS.contains(questionNo)) {
+				// 고른 보기로 상태를 정함 (점수 0인 문항 4, 5, 6은 '참고'로 표시)
+				int tier = choiceTier(questionNo, choices);
+				String prefix = REFERENCE_QUESTIONS.contains(questionNo) ? REFERENCE_PREFIX : "";
 				items.add(new CreditCheckResponseDTO.ItemItem(questionNo,
-						REFERENCE_PREFIX + STATUS[tier], TIPS[questionNo - 1][tier]));
+						prefix + STATUS[tier], TIPS[questionNo - 1][tier]));
 			} else {
 				Integer itemScore = itemScores.get(questionNo);
 				if (itemScore == null) throw badScoreResponse();
@@ -214,24 +215,33 @@ public class CreditServiceImpl implements CreditService {
 		return items;
 	}
 
+	// 감점 문항: 감점 없음 양호, 감점이 크면 주의
 	private int scoreTier(int itemScore) {
-		if (itemScore >= GOOD_MIN) return TIER_GOOD;
-		if (itemScore >= NORMAL_MIN) return TIER_NORMAL;
+		if (itemScore >= 0) return TIER_GOOD;
+		if (itemScore > CAUTION_MAX) return TIER_NORMAL;
 		return TIER_CAUTION;
 	}
 
-	// 문항 4, 5, 6: 고른 보기로 상태를 정함 (보기 순서는 선택지 시트 기준)
-	private int referenceTier(int questionNo, List<Integer> choices) {
+	// 문항 4, 5, 6, 7, 10: 고른 보기로 상태를 정함 (보기 순서 = FastAPI credit.py OPTIONS)
+	private int choiceTier(int questionNo, List<Integer> choices) {
 		switch (questionNo) {
 			case 4:		// 0건, 1건, 2~3건, 4건 이상
 				return choices.get(0) == 4 ? TIER_CAUTION : TIER_GOOD;
-			case 5:		// 은행, 카드·캐피탈, 저축은행·상호금융, 대부업 (가장 위험한 금융권 기준)
+			case 5:		// 은행, 카드/캐피탈, 저축은행(상호금융 포함), 대부업 (가장 위험한 금융권 기준)
 				if (choices.contains(4)) return TIER_CAUTION;
 				if (choices.contains(3)) return TIER_NORMAL;
 				return TIER_GOOD;
-			default:	// 문항 6: 대출 없음, 1천만 미만, 1천~3천만, 3천~5천만, 5천~1억, 1억 이상
+			case 6:		// 없음, 1천 미만, 1천~3천, 3천~5천, 5천~1억, 1억 이상 (만원)
 				if (choices.get(0) == 6) return TIER_CAUTION;
 				if (choices.get(0) >= 4) return TIER_NORMAL;
+				return TIER_GOOD;
+			case 7:		// 카드 없음, 30 미만, 30~60, 60~90, 90 이상 (%)
+				if (choices.get(0) == 5) return TIER_CAUTION;
+				if (choices.get(0) == 1 || choices.get(0) == 4) return TIER_NORMAL;
+				return TIER_GOOD;
+			default:	// 문항 10: 1년 미만, 1~3년, 3~5년, 5~10년, 10년 이상
+				if (choices.get(0) == 1) return TIER_CAUTION;
+				if (choices.get(0) == 2) return TIER_NORMAL;
 				return TIER_GOOD;
 		}
 	}

@@ -69,7 +69,7 @@ class CreditServiceImplTest {
 		return request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 4);
 	}
 
-	/** 문항 1~10 모두 같은 점수를 돌려주는 FastAPI 응답 */
+	/** 문항 1~10 모두 같은 문항별 점수를 돌려주는 FastAPI 응답 (실제 값은 0 이하 감점, 0 = 감점 없음) */
 	private FastApiScoreResponseDTO scoreResponse(int score, int itemScore) {
 		List<FastApiScoreResponseDTO.ItemScoreItem> items = new ArrayList<>();
 		for (int questionNo = 1; questionNo <= 10; questionNo++) {
@@ -89,7 +89,7 @@ class CreditServiceImplTest {
 	@Test
 	void 점수에_맞는_구간을_돌려준다() {
 		// Given
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 
 		// When
 		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
@@ -101,7 +101,7 @@ class CreditServiceImplTest {
 	@Test
 	void 문항_10개의_상태와_팁을_순서대로_돌려준다() {
 		// Given
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 
 		// When
 		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
@@ -113,10 +113,36 @@ class CreditServiceImplTest {
 	}
 
 	@Test
-	void 문항별_점수가_낮으면_주의_높으면_양호() {
-		// Given: 문항 1은 10점(주의), 나머지는 100점(양호)
-		FastApiScoreResponseDTO scores = scoreResponse(500, 100);
-		scores.getItemScores().get(0).setScore(10);
+	void 감점이_없는_문항은_양호() {
+		// Given: 문항별 점수 모두 0
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
+
+		// Then
+		assertEquals("양호", response.getItems().get(0).getStatus());
+	}
+
+	@Test
+	void 감점이_작으면_보통() {
+		// Given: 문항 2 = -73 (FastAPI 점수표의 실제 값)
+		FastApiScoreResponseDTO scores = scoreResponse(750, 0);
+		scores.getItemScores().get(1).setScore(-73);
+		when(fastApiClient.scoreCredit(any())).thenReturn(scores);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
+
+		// Then
+		assertEquals("보통", response.getItems().get(1).getStatus());
+	}
+
+	@Test
+	void 감점이_크면_주의() {
+		// Given: 문항 1 = -133 (FastAPI 점수표의 실제 값)
+		FastApiScoreResponseDTO scores = scoreResponse(750, 0);
+		scores.getItemScores().get(0).setScore(-133);
 		when(fastApiClient.scoreCredit(any())).thenReturn(scores);
 
 		// When
@@ -124,13 +150,56 @@ class CreditServiceImplTest {
 
 		// Then
 		assertEquals("주의", response.getItems().get(0).getStatus());
-		assertEquals("양호", response.getItems().get(1).getStatus());
+	}
+
+	@Test
+	void 문항_7_카드_없음은_점수가_0이어도_보통() {
+		// Given: 카드 없음(1), 문항별 점수는 0
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
+		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 1, 1, 1, 4);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
+		assertEquals("보통", response.getItems().get(6).getStatus());
+	}
+
+	@Test
+	void 문항_10_금융거래_1년_미만은_점수가_0이어도_주의() {
+		// Given: 1년 미만(1), 문항별 점수는 0
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
+		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 1);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
+		assertEquals("주의", response.getItems().get(9).getStatus());
+	}
+
+	@Test
+	void 문항_10은_보기_5개_10년_이상까지_받는다() {
+		// Given: 10년 이상(5)
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
+		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 5);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
+		assertEquals("양호", response.getItems().get(9).getStatus());
+	}
+
+	@Test
+	void 문항_10에_보기_6을_보내면_400() {
+		assertInvalidInput(request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 6));
 	}
 
 	@Test
 	void 문항_4_5_6은_점수와_상관없이_고른_보기로_참고_상태를_정한다() {
 		// Given: FastAPI 점수는 0이지만 대출 4건 이상(문항 4), 대부업(문항 5), 1억원 이상(문항 6)
-		FastApiScoreResponseDTO scores = scoreResponse(500, 100);
+		FastApiScoreResponseDTO scores = scoreResponse(500, 0);
 		scores.getItemScores().get(3).setScore(0);
 		scores.getItemScores().get(4).setScore(0);
 		scores.getItemScores().get(5).setScore(0);
@@ -151,7 +220,7 @@ class CreditServiceImplTest {
 	@Test
 	void 문항_5가_없어도_빈_목록으로_FastAPI에_보낸다() {
 		// Given: 문항 5를 뺀 9문항
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 		CreditCheckRequestDTO request = validRequest();
 		request.getAnswers().removeIf(a -> a.getQuestionNo() == 5);
 
@@ -169,7 +238,7 @@ class CreditServiceImplTest {
 	@Test
 	void 문항_5는_여러_개를_고를_수_있다() {
 		// Given
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1, 2, 3), 2, 2, 1, 1, 4);
 
 		// When
@@ -194,7 +263,7 @@ class CreditServiceImplTest {
 	@Test
 	void 잘_모르겠어요가_있으면_정확도_낮음_true() {
 		// Given: 문항 7 = 0 (잘 모르겠어요)
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 0, 1, 1, 4);
 
 		// When
@@ -207,7 +276,7 @@ class CreditServiceImplTest {
 	@Test
 	void 잘_모르겠어요가_없으면_정확도_낮음_false() {
 		// Given
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 
 		// When
 		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
@@ -219,7 +288,7 @@ class CreditServiceImplTest {
 	@Test
 	void 잘_모르겠어요_문항은_확인_필요로_표시한다() {
 		// Given: 문항 7 = 0
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
 		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 0, 1, 1, 4);
 
 		// When
@@ -310,7 +379,7 @@ class CreditServiceImplTest {
 	@Test
 	void FastAPI_점수가_범위를_벗어나면_503() {
 		// Given: 점수 1001
-		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(1001, 100));
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(1001, 0));
 
 		// When
 		BusinessException e = assertThrows(BusinessException.class, () -> creditService.checkCredit(validRequest()));
@@ -322,7 +391,7 @@ class CreditServiceImplTest {
 	@Test
 	void FastAPI_문항별_점수가_빠지면_503() {
 		// Given: 문항 1 점수 없음
-		FastApiScoreResponseDTO scores = scoreResponse(850, 100);
+		FastApiScoreResponseDTO scores = scoreResponse(850, 0);
 		scores.getItemScores().remove(0);
 		when(fastApiClient.scoreCredit(any())).thenReturn(scores);
 
