@@ -1,5 +1,6 @@
 package chorong.product.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -142,5 +143,136 @@ class ProductServiceImplTest {
 
 		// Then
 		verify(productRateRepository).findByProductIdAndRateKind(PRODUCT_ID, RateKind.CREDIT);
+	}
+
+	// ---- COM-01 비교용 상품 1~2개 ----
+
+	// 숨김 상품 가짜 객체 (태그, 금리 조회 없이 응답되어 id 순서만 확인하기 쉬움)
+	private void givenHiddenProduct(Long id) {
+		LoanProduct product = mock(LoanProduct.class);
+		when(product.getProductId()).thenReturn(id);
+		when(product.getProductStatus()).thenReturn(ProductStatus.HIDDEN);
+		when(loanProductRepository.findById(id)).thenReturn(Optional.of(product));
+	}
+
+	@Test
+	void 비교용_id가_1개면_통과() {
+		// Given
+		List<Long> ids = List.of(1L);
+
+		// When, Then
+		assertDoesNotThrow(() -> ProductServiceImpl.validateCompareIds(ids));
+	}
+
+	@Test
+	void 비교용_id가_2개면_통과() {
+		// Given
+		List<Long> ids = List.of(1L, 2L);
+
+		// When, Then
+		assertDoesNotThrow(() -> ProductServiceImpl.validateCompareIds(ids));
+	}
+
+	@Test
+	void 비교용_id가_없으면_400() {
+		// Given
+		List<Long> ids = List.of();
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> ProductServiceImpl.validateCompareIds(ids));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비교용_id가_null이면_400() {
+		// Given
+		List<Long> ids = null;
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> ProductServiceImpl.validateCompareIds(ids));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비교용_id가_3개면_400() {
+		// Given
+		List<Long> ids = List.of(1L, 2L, 3L);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> ProductServiceImpl.validateCompareIds(ids));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비교용_id가_같은_상품_두_번이면_400() {
+		// Given
+		List<Long> ids = List.of(1L, 1L);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> ProductServiceImpl.validateCompareIds(ids));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비교용_id가_같은_상품_두_번이면_상품을_조회하지_않는다() {
+		// Given
+		List<Long> ids = List.of(1L, 1L);
+
+		// When
+		assertThrows(BusinessException.class, () -> productService.getCompareProducts(ids));
+
+		// Then
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void 비교용_id가_3개면_상품을_조회하지_않는다() {
+		// Given
+		List<Long> ids = List.of(1L, 2L, 3L);
+
+		// When
+		assertThrows(BusinessException.class, () -> productService.getCompareProducts(ids));
+
+		// Then
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void 비교용_상품은_요청한_id_순서대로_응답한다() {
+		// Given
+		givenHiddenProduct(2L);
+		givenHiddenProduct(1L);
+
+		// When
+		List<ProductDetailResponseDTO> result = productService.getCompareProducts(List.of(2L, 1L));
+
+		// Then
+		assertEquals(List.of(2L, 1L), result.stream().map(ProductDetailResponseDTO::getProductId).toList());
+	}
+
+	@Test
+	void 비교용_상품_중_없는_상품이_있으면_404() {
+		// Given
+		givenHiddenProduct(1L);
+		when(loanProductRepository.findById(999L)).thenReturn(Optional.empty());
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> productService.getCompareProducts(List.of(1L, 999L)));
+
+		// Then
+		assertEquals(ErrorCode.NOT_FOUND, e.getErrorCode());
 	}
 }

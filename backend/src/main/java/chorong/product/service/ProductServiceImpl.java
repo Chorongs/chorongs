@@ -24,6 +24,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
 
+	private static final int COMPARE_MIN = 1;
+	private static final int COMPARE_MAX = 2;
+
 	private final LoanProductRepository loanProductRepository;
 	private final TagRepository tagRepository;
 	private final ProductTagRepository productTagRepository;
@@ -47,5 +50,23 @@ public class ProductServiceImpl implements ProductService {
 		List<ProductRate> creditRates = productRateRepository.findByProductIdAndRateKind(id, RateKind.CREDIT);
 
 		return ProductDetailResponseDTO.from(product, tags, creditRates);
+	}
+
+	// COM-01: 상태별 응답(판매 종료는 상세 + 상태, 숨김은 번호/금융사/상품명/상태만)과 404는 getProduct와 같음
+	@Override
+	@Transactional(readOnly = true)
+	public List<ProductDetailResponseDTO> getCompareProducts(List<Long> ids) {
+		validateCompareIds(ids);
+		return ids.stream().map(this::getProduct).toList();
+	}
+
+	/** COM-01 처리 순서 1: 비교용 id는 1~2개만 허용 (없거나 3개 이상이면 400), 같은 상품 두 번도 400 */
+	static void validateCompareIds(List<Long> ids) {
+		if (ids == null || ids.size() < COMPARE_MIN || ids.size() > COMPARE_MAX) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT);
+		}
+		if (ids.stream().distinct().count() != ids.size()) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT);
+		}
 	}
 }
