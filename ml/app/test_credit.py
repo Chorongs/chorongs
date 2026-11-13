@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.credit import OPTIONS, SOURCE_COLUMNS, to_answers, to_finance
+from app.credit import OPTIONS, SOURCE_COLUMNS, middle_points, score_answers, to_answers, to_finance
 
 
 def _rows(*changes):
@@ -123,3 +123,120 @@ def test_to_finance_캐피탈_금액이_있으면_카드_캐피탈_이용():
     result = to_finance(df).iloc[0].to_dict()
     # Then
     assert result == {"은행": False, "카드/캐피탈": True, "저축은행(상호금융 포함)": False, "대부업": False}
+
+
+# ---------- 점수표로 점수 계산 ----------
+
+def _table():
+    """시험용 점수표: 문항 1(보기 3개), 2(보기 4개), 나머지 문항은 보기 1개 0점"""
+    questions = {f"Q{no}": {"options": ["가"], "points": [0], "unknown_points": 0}
+                 for no in (3, 4, 6, 7, 8, 9, 10)}
+    questions["Q1"] = {"options": ["없음", "1회", "2회 이상"], "points": [50, 0, -100], "unknown_points": 0}
+    questions["Q2"] = {"options": ["없음", "10일 미만", "10~29일", "30일 이상"],
+                       "points": [40, 20, 0, -60], "unknown_points": 10}
+    return {"base_points": 700,
+            "questions": questions,
+            "edges": {"linear": [500, 600, 700, 800, 900, 950], "score": [1, 600, 700, 800, 900, 1000]},
+            "caps": [{"question": "Q1", "options": ["1회"], "max_score": 800},
+                     {"question": "Q1", "options": ["2회 이상"], "max_score": 700}]}
+
+
+def _answers(**changes):
+    """문항 1~10 답 (기본: 모두 1번 보기, 문항 5는 빈 목록) + 바꿀 답"""
+    answers = {no: [1] for no in range(1, 11)}
+    answers[5] = []
+    for key, choices in changes.items():
+        answers[int(key[1:])] = choices
+    return answers
+
+
+def test_middle_points_보기가_홀수면_가운데_보기():
+    # Given
+    points = [50, 0, -100]
+    # When
+    result = middle_points(points)
+    # Then
+    assert result == 0
+
+
+def test_middle_points_보기가_짝수면_가운데_두_보기_평균():
+    # Given
+    points = [40, 20, 0, -60]
+    # When
+    result = middle_points(points)
+    # Then
+    assert result == 10
+
+
+def test_score_answers_선형_점수를_경계표로_NICE_점수에_맞춘다():
+    # Given
+    table = _table()
+    table["edges"] = {"linear": [500, 600, 700, 800, 900, 950], "score": [1, 600, 700, 800, 850, 1000]}
+    answers = _answers()            # 700 + 50 + 40 = 790 → 800 아래 구간
+    # When
+    score, _ = score_answers(table, answers)
+    # Then
+    assert score == 790
+
+
+def test_score_answers_경계표_끝을_넘으면_1000():
+    # Given
+    table = _table()
+    table["base_points"] = 2000
+    # When
+    score, _ = score_answers(table, _answers())
+    # Then
+    assert score == 1000
+
+
+def test_score_answers_잘_모르겠어요는_unknown_점수():
+    # Given
+    answers = _answers(Q2=[0])      # 700 + 50 + 10
+    # When
+    _, items = score_answers(_table(), answers)
+    # Then
+    assert items[2] == 10
+
+
+def test_score_answers_연체_1회를_고르면_최대_800점():
+    # Given
+    table = _table()
+    table["base_points"] = 900      # 900 + 0 + 40 = 940 → 경계표 980 → 상한 800
+    answers = _answers(Q1=[2])
+    # When
+    score, _ = score_answers(table, answers)
+    # Then
+    assert score == 800
+
+
+def test_score_answers_잘_모르겠어요는_상한에_안_걸린다():
+    # Given
+    table = _table()
+    table["base_points"] = 900      # 문항 1 모름 → 가운데 '1회' 점수 0, 선형 940 → 경계표 980, 상한 안 걸림
+    answers = _answers(Q1=[0])
+    # When
+    score, _ = score_answers(table, answers)
+    # Then
+    assert score == 980
+
+
+def test_score_answers_정해진_보기_번호가_아니면_오류():
+    # Given
+    answers = _answers(Q1=[4])
+    # When
+    try:
+        score_answers(_table(), answers)
+        raised = False
+    except ValueError:
+        raised = True
+    # Then
+    assert raised
+
+
+def test_score_answers_문항_5는_0점():
+    # Given
+    answers = _answers(Q5=[1, 2])
+    # When
+    _, items = score_answers(_table(), answers)
+    # Then
+    assert items[5] == 0

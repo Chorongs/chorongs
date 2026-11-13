@@ -5,12 +5,18 @@
     - OPTIONS: 문항별 보기 (화면 보기 순서 = 보기 번호 1, 2, ... / 0은 '잘 모르겠어요')
     - to_answers: 학원 합성 데이터 행 → 문항별 보기 (학습용, 02~04 노트북이 같이 씀)
     - to_finance: 문항 5 이용 금융권 (여러 개)
+    - score_answers: 점수표 파일로 점수 계산 (03 확인, 04 평가, /credit/score가 같이 씀)
     - 학습 입력과 서비스 입력이 같은 보기여야 점수가 맞음 (기획서 3-9) → 보기는 이 파일에만 정의
 
     단위는 학원 데이터 칸 사전(column_dictionary_207.csv) 기준
 """
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
+SCORE_TABLE_PATH = Path(__file__).resolve().parent / "artifacts" / "credit_score_table.json"   # 03 노트북이 만듦
 
 OPTIONS = {
     "Q1": ["없음", "1회", "2회 이상"],                                   # 1년 안 30일 이상 연체
@@ -95,3 +101,59 @@ def to_finance(df):
     """학원 데이터 행 → 문항 5 금융권별 이용 여부 (True/False, 여러 개 가능)"""
     return pd.DataFrame({name: (df[cols] > 0).any(axis=1) for name, cols in FINANCE_COLUMNS.items()},
                         index=df.index)
+
+
+# ---------- 점수표로 점수 계산 ----------
+
+UNKNOWN = 0     # '잘 모르겠어요' 보기 번호 (CREDIT-01)
+
+
+def middle_points(points):
+    """'잘 모르겠어요' 점수: 가운데 보기 점수, 보기 수가 짝수면 가운데 두 보기 평균 (2026-11-13 결정)"""
+    n = len(points)
+    if n % 2:
+        return points[n // 2]
+    return (points[n // 2 - 1] + points[n // 2]) / 2
+
+
+def load_score_table(path=SCORE_TABLE_PATH):
+    """점수표 파일 → dict"""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def score_answers(table, answers):
+    """
+        문항 답 → (점수 1~1000, 문항별 점수 {문항 번호: 점수})
+
+        - answers: {문항 번호(1~10): 보기 번호 목록}. 보기 번호는 1부터, 0은 '잘 모르겠어요' (FastApiScoreRequestDTO)
+        - 1. 선형 점수 = 기본 점수 + 보기 점수 합 ('잘 모르겠어요'는 그 문항의 unknown 점수, 문항 5는 0)
+        - 2. 경계표로 NICE 점수 축에 맞춤 (구간 안은 선형, 끝을 넘으면 1 또는 1000)
+        - 3. 상한: 실제로 고른 답이 상한 보기면 최대 점수로 낮춤 ('잘 모르겠어요'는 상한에 안 걸림)
+        - 정해진 보기 번호가 아니면 ValueError
+    """
+    questions = table["questions"]
+    linear = table["base_points"]
+    items, chosen = {}, {}
+
+    for no in range(1, 11):
+        q = questions.get(f"Q{no}")
+        choices = answers.get(no, [])
+        if q is None:                       # 문항 5: 점수 0, 상태와 팁에만 씀
+            items[no] = 0
+            continue
+        if len(choices) != 1 or not 0 <= choices[0] <= len(q["options"]):
+            raise ValueError(f"문항 {no} 보기 번호가 정해진 범위가 아님")
+        choice = choices[0]
+        points = q["unknown_points"] if choice == UNKNOWN else q["points"][choice - 1]
+        if choice != UNKNOWN:
+            chosen[f"Q{no}"] = q["options"][choice - 1]
+        linear += points
+        items[no] = int(round(points))
+
+    edges = table["edges"]
+    score = float(np.interp(linear, edges["linear"], edges["score"]))
+    for rule in table["caps"]:
+        if chosen.get(rule["question"]) in rule["options"]:
+            score = min(score, rule["max_score"])
+    return int(round(min(max(score, 1), 1000))), items
