@@ -1,5 +1,7 @@
 package chorong.common.config;
 
+import chorong.member.service.CustomOAuth2UserService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -14,16 +16,25 @@ import org.springframework.security.web.SecurityFilterChain;
  */
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
-
+	private final CustomOAuth2UserService customOAuth2UserService;
+	private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) {
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception{
 		http.csrf(AbstractHttpConfigurer::disable)
 			.formLogin(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.logout(AbstractHttpConfigurer::disable)
-			.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());	// 모든 주소 허용
-
+				.authorizeHttpRequests(auth -> auth
+						.requestMatchers("/", "/login/**", "/oauth2/**", "/css/**", "/js/**", "/images/**").permitAll()
+						// 그 외 모든 요청은 로그인(인증)된 사용자만 접근 가능
+						.anyRequest().authenticated())
+				//OAuth2 로그인 설정 및 서비스 연결
+				.oauth2Login(oauth2 -> oauth2
+						.userInfoEndpoint(userInfo -> userInfo
+								.userService(customOAuth2UserService))
+						.successHandler(oAuth2LoginSuccessHandler));
 		return http.build();
 	}
 }

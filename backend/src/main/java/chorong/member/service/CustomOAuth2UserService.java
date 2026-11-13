@@ -1,21 +1,20 @@
 package chorong.member.service;
 
 import chorong.member.dto.LoginRequestDTO;
+import chorong.member.dto.oautn2.PrincipalDetails;
 import chorong.member.entity.Member;
 import chorong.member.repository.MemberRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-
-import java.util.Collections;
+import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @RequiredArgsConstructor
+@Service
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private final MemberRepository memberRepository;
 
@@ -37,15 +36,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         Member member = MemberSave(dto);
 
-        // 6. 스프링 시큐리티의 세션에 담길 인증 객체를 만들어 반환
-        return new DefaultOAuth2User(
-                Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")),
-                oAuth2User.getAttributes(),
-                userNameAttributeName
-        );
+        //스프링 시큐리티의 세션에 담길 인증 객체를 만들어 반환
+        return new PrincipalDetails(member, oAuth2User.getAttributes());
     }
 
-    // 신규/기존 유저 분기 처리 전용 메서드
+    // 신규/기존 유저 분기 처리
     private Member MemberSave(LoginRequestDTO dto) {
 
 
@@ -59,6 +54,5 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             Member newMember = dto.toEntity();
             return memberRepository.save(newMember);
         }
-
     }
 }
