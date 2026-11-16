@@ -47,6 +47,24 @@ export function getLoanResult(product, amountMan, months) {
   return { status: 'OK', rate, ...payment }
 }
 
+// 두 상품이 들어왔을 때 금액은 두 상품 한도 이하로, 기간은 두 상품 최대 기간 안의 가장 긴 선택지로 (넘거나 선택지에 없을 때만)
+// input: { amount 만원, months 개월 } / termOptions: 두 상품이 겹치는 용도 기준 기간 선택지 (개월 배열)
+export function adjustCompareInput(input, productA, productB, termOptions) {
+  let { amount, months } = input
+
+  const limits = [productA, productB].map((product) => product.limitAmount).filter((limit) => isNumber(limit) && limit > 0)
+  if (limits.length > 0 && isNumber(amount) && amount > Math.min(...limits)) amount = Math.min(...limits)
+
+  const terms = [productA, productB].map((product) => product.termMax).filter((term) => isNumber(term) && term > 0)
+  const maxTerm = terms.length > 0 ? Math.min(...terms) : Infinity
+  if (!termOptions.includes(months) || months > maxTerm) {
+    const fit = termOptions.filter((term) => term <= maxTerm)
+    months = fit.length > 0 ? Math.max(...fit) : termOptions[0]
+  }
+
+  return { amount, months }
+}
+
 // 두 값 중 유리한 쪽: 두 값이 다 숫자이고 다를 때만 'A' 또는 'B', 아니면 null
 // isHigherBetter가 true면 큰 쪽, false면 작은 쪽이 유리
 function pickWinner(valueA, valueB, isHigherBetter) {

@@ -16,7 +16,7 @@ import useCompareStore, { getPurposes, hasSamePurpose } from '../store/useCompar
 import useUiStore from '../store/useUiStore'
 import { Button, EmptyBox } from '../styles/common'
 import { isNumberInRange } from '../utils/validate'
-import { getCompareWinners, getLoanResult } from '../utils/loanMath'
+import { adjustCompareInput, getCompareWinners, getLoanResult } from '../utils/loanMath'
 
 // CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도가 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
 //   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
@@ -110,24 +110,6 @@ function getSharedPurposes(products) {
   return lists.reduce((shared, list) => shared.filter((purpose) => list.includes(purpose)))
 }
 
-// 두 상품이 들어왔을 때 금액은 두 상품 한도 이하로, 기간은 두 상품 최대 기간 안의 가장 긴 선택지로 (넘거나 선택지에 없을 때만)
-function adjustInput(input, productA, productB) {
-  let { amount, months } = input
-
-  const limits = [productA, productB].map((product) => product.limitAmount).filter((limit) => typeof limit === 'number' && limit > 0)
-  if (limits.length > 0 && typeof amount === 'number' && amount > Math.min(...limits)) amount = Math.min(...limits)
-
-  const terms = [productA, productB].map((product) => product.termMax).filter((term) => typeof term === 'number' && term > 0)
-  const maxTerm = terms.length > 0 ? Math.min(...terms) : Infinity
-  const options = getTermOptions(getSharedPurposes([productA, productB]))
-  if (!options.includes(months) || months > maxTerm) {
-    const fit = options.filter((term) => term <= maxTerm)
-    months = fit.length > 0 ? Math.max(...fit) : options[0]
-  }
-
-  return { amount, months }
-}
-
 function ComparePage() {
   const pair = useCompareStore((state) => state.pair)
   const showToast = useUiStore((state) => state.showToast)
@@ -163,7 +145,8 @@ function ComparePage() {
         const { productA, productB } = getShownProducts(idA, idB, byId)
         if (!isOpen(productA) || !isOpen(productB)) return
         const current = inputRef.current
-        const next = adjustInput(current, productA, productB)
+        // 금액, 기간 자동 조정 계산은 utils/loanMath.js (테스트 있음)
+        const next = adjustCompareInput(current, productA, productB, getTermOptions(getSharedPurposes([productA, productB])))
         if (next.amount !== current.amount || next.months !== current.months) {
           setAmount(next.amount)
           setMonths(next.months)
