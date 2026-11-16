@@ -667,6 +667,18 @@ class RecommendRuleTest {
 	}
 
 	@Test
+	void 지원_대상_칩이_없으면_주의로_통과() {
+		// Given
+		List<Tag> tags = tagsWith(TagType.TARGET);
+
+		// When
+		Evaluation e = evaluate(product(), tags);
+
+		// Then
+		assertEquals(Judge.WARN, e.target);
+	}
+
+	@Test
 	void 청년은_직업과_상관없이_청년_학생_대상_통과() {
 		// Given
 		List<Tag> tags = tagsWith(TagType.TARGET, "청년/학생");

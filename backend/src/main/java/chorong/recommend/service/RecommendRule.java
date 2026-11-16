@@ -321,8 +321,11 @@ public class RecommendRule {
 		return purposes.contains(purpose) ? Judge.PASS : Judge.FAIL;
 	}
 
-	// 2 지원 대상: 직업별 대상과 하나라도 겹치면 통과
+	// 2 지원 대상: 직업별 대상과 하나라도 겹치면 통과, 칩 없음은 주의 (용도, 지역의 칩 없음과 같게)
 	private Judge judgeTarget(Candidate c, String job, boolean youth) {
+		List<String> targets = c.values(TagType.TARGET);
+		if (targets.isEmpty()) return Judge.WARN;
+
 		Set<String> allowed = new HashSet<>(List.of(TARGET_ALL, TARGET_LOW_CREDIT));
 		if ("OFFICE".equals(job)) allowed.add(TARGET_OFFICE);
 		if ("BIZ".equals(job)) allowed.add(TARGET_BIZ);
@@ -330,7 +333,7 @@ public class RecommendRule {
 
 		String detail = c.getProduct().getTargetDetail();
 		boolean farmProduct = detail != null && detail.contains(TARGET_DETAIL_FARM);
-		for (String target : c.values(TagType.TARGET)) {
+		for (String target : targets) {
 			if (allowed.contains(target)) return Judge.PASS;
 			if (TARGET_SPECIAL.equals(target) && "FARM".equals(job) && farmProduct) return Judge.PASS;
 		}
