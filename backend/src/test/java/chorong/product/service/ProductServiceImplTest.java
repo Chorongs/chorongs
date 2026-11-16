@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -203,6 +204,19 @@ class ProductServiceImplTest {
 	void 비교용_id가_3개면_400() {
 		// Given
 		List<Long> ids = List.of(1L, 2L, 3L);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> ProductServiceImpl.validateCompareIds(ids));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비교용_id_목록에_null이_섞이면_400() {
+		// Given
+		List<Long> ids = Arrays.asList(null, 1L);
 
 		// When
 		BusinessException e = assertThrows(BusinessException.class,

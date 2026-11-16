@@ -1,6 +1,7 @@
 package chorong.product.service;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,9 +61,12 @@ public class ProductServiceImpl implements ProductService {
 		return ids.stream().map(this::getProduct).toList();
 	}
 
-	/** COM-01 처리 순서 1: 비교용 id는 1~2개만 허용 (없거나 3개 이상이면 400), 같은 상품 두 번도 400 */
+	/** COM-01 처리 순서 1: 비교용 id는 1~2개만 허용 (없거나 3개 이상이면 400), 빈 값(ids=,1)과 같은 상품 두 번도 400 */
 	static void validateCompareIds(List<Long> ids) {
 		if (ids == null || ids.size() < COMPARE_MIN || ids.size() > COMPARE_MAX) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT);
+		}
+		if (ids.stream().anyMatch(Objects::isNull)) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT);
 		}
 		if (ids.stream().distinct().count() != ids.size()) {

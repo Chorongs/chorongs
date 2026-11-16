@@ -16,7 +16,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import chorong.common.exception.GlobalExceptionHandler;
 import chorong.product.dto.ProductDetailResponseDTO;
+import chorong.product.repository.LoanProductRepository;
+import chorong.product.repository.ProductRateRepository;
+import chorong.product.repository.ProductTagRepository;
+import chorong.product.repository.TagRepository;
 import chorong.product.service.ProductService;
+import chorong.product.service.ProductServiceImpl;
 
 /*
  * COM-01 GET /api/products?ids= 주소 테스트 (B2)
@@ -33,6 +38,64 @@ class ProductControllerTest {
 		mockMvc = MockMvcBuilders.standaloneSetup(new ProductController(productService))
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.build();
+	}
+
+	// ---- 공격 요청: 실제 ProductServiceImpl을 붙여 개수, 중복, 빈 값 검사가 주소까지 이어지는지 확인 ----
+
+	private MockMvc realServiceMockMvc(LoanProductRepository loanProductRepository) {
+		ProductServiceImpl realService = new ProductServiceImpl(loanProductRepository,
+				mock(TagRepository.class), mock(ProductTagRepository.class), mock(ProductRateRepository.class));
+		return MockMvcBuilders.standaloneSetup(new ProductController(realService))
+				.setControllerAdvice(new GlobalExceptionHandler())
+				.build();
+	}
+
+	@Test
+	void ids가_3개면_400이고_상품을_조회하지_않는다() throws Exception {
+		// Given
+		LoanProductRepository loanProductRepository = mock(LoanProductRepository.class);
+
+		// When, Then
+		realServiceMockMvc(loanProductRepository).perform(get("/api/products").param("ids", "1,2,3"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void ids에_같은_번호가_두_번이면_400이고_상품을_조회하지_않는다() throws Exception {
+		// Given
+		LoanProductRepository loanProductRepository = mock(LoanProductRepository.class);
+
+		// When, Then
+		realServiceMockMvc(loanProductRepository).perform(get("/api/products").param("ids", "1,1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void ids에_빈_값이_섞이면_400이고_상품을_조회하지_않는다() throws Exception {
+		// Given
+		LoanProductRepository loanProductRepository = mock(LoanProductRepository.class);
+
+		// When, Then
+		realServiceMockMvc(loanProductRepository).perform(get("/api/products").param("ids", ",1"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void ids가_비어_있으면_400이고_상품을_조회하지_않는다() throws Exception {
+		// Given
+		LoanProductRepository loanProductRepository = mock(LoanProductRepository.class);
+
+		// When, Then
+		realServiceMockMvc(loanProductRepository).perform(get("/api/products").param("ids", ""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		verifyNoInteractions(loanProductRepository);
 	}
 
 	@Test
