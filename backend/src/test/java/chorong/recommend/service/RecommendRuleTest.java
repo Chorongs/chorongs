@@ -120,6 +120,34 @@ class RecommendRuleTest {
 		return evaluate(product, tags, request());
 	}
 
+	// ---- 후보 복사 저장 (backend/Skills.md SpotBugs 제외 구역) ----
+
+	@Test
+	void 후보를_만든_뒤_원본_태그_목록을_바꿔도_후보의_태그는_그대로() {
+		// Given
+		List<Tag> tags = passTags();
+		Candidate candidate = new Candidate(product(), tags, List.of());
+
+		// When
+		tags.clear();
+
+		// Then
+		assertEquals(5, candidate.getTags().size());
+	}
+
+	@Test
+	void 후보를_만든_뒤_원본_구간_금리_목록을_바꿔도_후보의_금리는_그대로() {
+		// Given
+		List<ProductRate> rates = new ArrayList<>(List.of(rate("5", "4.10", "5.20", RateSource.DISCLOSED)));
+		Candidate candidate = new Candidate(product(), passTags(), rates);
+
+		// When
+		rates.clear();
+
+		// Then
+		assertEquals(1, candidate.getCreditRates().size());
+	}
+
 	// ---- 월 상환 ----
 
 	@Test

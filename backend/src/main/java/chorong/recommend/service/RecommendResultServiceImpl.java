@@ -96,17 +96,25 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 		}
 		Map<Long, List<Tag>> tagsByProduct = tagsByProduct(productIds);
 
-		// saveId로 묶음 (최신 저장 먼저, 행 순서 그대로)
-		Map<Long, SavedRecommendResponseDTO.SaveItem> saves = new LinkedHashMap<>();
+		// saveId로 묶음 (최신 저장 먼저, 행 순서 그대로). 묶음별 상품 목록을 다 모은 뒤 DTO에 담음 (DTO 목록에 add 안 함)
+		Map<Long, RecommendResult> firstRows = new LinkedHashMap<>();
+		Map<Long, List<SavedRecommendResponseDTO.ProductItem>> productsBySave = new LinkedHashMap<>();
 		for (RecommendResult row : rows) {
 			LoanProduct product = productById.get(row.getProductId());
 			if (product == null) continue;
-			SavedRecommendResponseDTO.SaveItem save = saves.computeIfAbsent(row.getSaveId(),
-					id -> new SavedRecommendResponseDTO.SaveItem(id, row.getConditionLabel(), row.getCreatedAt(), new ArrayList<>()));
-			save.getProducts().add(new SavedRecommendResponseDTO.ProductItem(row.getRankNo(),
-					ProductSummaryDTO.from(product, tagsByProduct.getOrDefault(product.getProductId(), List.of()))));
+			firstRows.putIfAbsent(row.getSaveId(), row);
+			productsBySave.computeIfAbsent(row.getSaveId(), id -> new ArrayList<>())
+					.add(new SavedRecommendResponseDTO.ProductItem(row.getRankNo(),
+							ProductSummaryDTO.from(product, tagsByProduct.getOrDefault(product.getProductId(), List.of()))));
 		}
-		return new SavedRecommendResponseDTO(new ArrayList<>(saves.values()));
+
+		List<SavedRecommendResponseDTO.SaveItem> saves = new ArrayList<>();
+		for (Map.Entry<Long, List<SavedRecommendResponseDTO.ProductItem>> entry : productsBySave.entrySet()) {
+			RecommendResult first = firstRows.get(entry.getKey());
+			saves.add(new SavedRecommendResponseDTO.SaveItem(entry.getKey(), first.getConditionLabel(),
+					first.getCreatedAt(), entry.getValue()));
+		}
+		return new SavedRecommendResponseDTO(saves);
 	}
 
 	@Override
