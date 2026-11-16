@@ -25,3 +25,15 @@ export const REPAY_METHOD_CODE = {
   원금균등: 'EQUAL_P',
   만기일시: 'BULLET',
 }
+
+// 상환 기간 선택지 (개월): 전월세, 주택 구입은 60/120/180, 그 밖 용도는 12/36/60
+export const LONG_TERM_PURPOSES = ['전월세', '주택 구입']
+export const SHORT_TERM_MONTHS = [12, 36, 60]
+export const LONG_TERM_MONTHS = [60, 120, 180]
+
+// 용도 목록(두 상품이 겹치는 용도)이 전부 장기 용도일 때만 장기 선택지
+export function getTermOptions(purposes) {
+  const list = purposes ?? []
+  const isLong = list.length > 0 && list.every((purpose) => LONG_TERM_PURPOSES.includes(purpose))
+  return isLong ? LONG_TERM_MONTHS : SHORT_TERM_MONTHS
+}

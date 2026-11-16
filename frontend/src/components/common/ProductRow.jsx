@@ -1,7 +1,10 @@
-import styled from 'styled-components'
+import { useLocation } from 'react-router-dom'
+import styled, { css } from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
+import useCompareStore, { getComparePage, getTraySlot, hasSamePurpose } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
-import { Tag } from '../../styles/common'
+import { CompareButton, Tag } from '../../styles/common'
+import Icon from '../ui/Icon'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
 
@@ -9,21 +12,47 @@ import RateText from './RateText'
 // 줄 아무 곳 클릭, Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
 // TODO(CM-06, CHORONG-43): 찜 버튼 LikeButton 연결 (클릭이 줄까지 안 퍼지게 e.stopPropagation)
-// TODO(ST-04, CHORONG-47): [+ 비교] 버튼과 useCompareStore 연결 (폭 480 이하에서는 숨김)
-//   두 버튼이 올라오면 오른쪽에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)에서 1행 오른쪽으로 보낸다.
+// [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
+//   오른쪽에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
+//   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도가 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
 const Row = styled.article`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px 128px;
+  grid-template-columns: minmax(0, 1fr) 168px 128px${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
   gap: 20px;
   align-items: center;
   padding: 20px 2px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
+  ${({ $isInCmp }) =>
+    $isInCmp &&
+    css`
+      margin: 6px -16px;
+      padding: 20px 16px;
+      border-radius: var(--r-md);
+      border-bottom-color: transparent;
+      background: var(--brand-soft);
+    `}
+  ${({ $isNo }) =>
+    $isNo &&
+    css`
+      & > :not([data-compare-cell]) {
+        opacity: 0.5;
+      }
+    `}
   @container plist (max-width: 720px) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
     gap: 2px 12px;
     align-items: start;
     padding: 18px 0;
+    ${({ $isInCmp }) =>
+      $isInCmp &&
+      css`
+        margin: 6px -10px;
+        padding: 16px 10px;
+      `}
+  }
+  @container plist (max-width: 480px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 `
 
@@ -100,6 +129,29 @@ const MetricValue = styled.b`
   }
 `
 
+const CompareCell = styled.div`
+  @container plist (max-width: 720px) {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  @container plist (max-width: 480px) {
+    display: none;
+  }
+`
+
+const CompareBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: var(--fs-2xs);
+  font-weight: 800;
+  vertical-align: 1px;
+`
+
 const Memo = styled.span`
   color: var(--cocoa);
   font-family: var(--f-ui);
@@ -125,9 +177,23 @@ const ACCENT_FEATURES = ['NO_PREPAY_FEE', 'POLICY']
 
 function ProductRow({ product, from = null }) {
   const openProduct = useUiStore((state) => state.openProduct)
+  const { pathname } = useLocation()
+  // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 자금 용도가 안 겹치면 '비교 불가'
+  const trayLabel = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
+  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && !hasSamePurpose(state.tray[0], product))
+  const addTray = useCompareStore((state) => state.addTray)
+  const hasCompare = getComparePage(pathname) !== null
+  // 비교 안 하는 화면(랭킹 등)에서는 담긴 표시도 안 함
+  const traySlot = hasCompare ? trayLabel : null
   const featureTags = (product.features ?? []).slice(0, 2)
 
   const handleOpen = () => openProduct(product.productId, from)
+
+  // 이미 담긴 상품이면 빼기. 안 맞는 상품이면 addTray가 이유를 알림. 클릭이 줄(상세 창 열기)까지 안 퍼지게 한다.
+  const handleCompare = (event) => {
+    event.stopPropagation()
+    addTray(product)
+  }
 
   const handleKeyDown = (event) => {
     // 줄 안의 버튼에서 누른 Enter는 그 버튼 몫
@@ -135,9 +201,20 @@ function ProductRow({ product, from = null }) {
   }
 
   return (
-    <Row role="button" tabIndex={0} onClick={handleOpen} onKeyDown={handleKeyDown}>
+    <Row
+      role="button"
+      tabIndex={0}
+      $hasCompare={hasCompare}
+      $isInCmp={Boolean(traySlot)}
+      $isNo={hasCompare && isNo}
+      onClick={handleOpen}
+      onKeyDown={handleKeyDown}
+    >
       <Info>
-        <Org>{product.companyName}</Org>
+        <Org>
+          {product.companyName}
+          {traySlot && <CompareBadge>비교 {traySlot}에 담음</CompareBadge>}
+        </Org>
         <Name>{product.productName}</Name>
         {featureTags.length > 0 && (
           <Tags>
@@ -161,6 +238,21 @@ function ProductRow({ product, from = null }) {
           <LimitCell product={product} />
         </MetricValue>
       </Metric>
+      {hasCompare && (
+        <CompareCell data-compare-cell>
+          <CompareButton
+            $size="sm"
+            $variant="outline"
+            $state={traySlot ? 'in' : isNo ? 'no' : undefined}
+            aria-pressed={Boolean(traySlot)}
+            onClick={handleCompare}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            {traySlot && <Icon name="check" size={15} />}
+            {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+          </CompareButton>
+        </CompareCell>
+      )}
     </Row>
   )
 }

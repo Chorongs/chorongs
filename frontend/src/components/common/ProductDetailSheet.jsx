@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
+import useCompareStore, { getComparePage, getTraySlot, hasSamePurpose } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, IconButton, Tag } from '../../styles/common'
+import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
@@ -21,7 +22,7 @@ import RateText from './RateText'
 // TODO(CM-08, CHORONG-45): '내 조건 안내' EligibilityNotice (3칸 아래, useRecommendStore의 입력값이 올라온 뒤)
 // TODO(RC-09, CHORONG-45): 추천 이유 ReasonList (sheetFrom이 'recommend'일 때 3칸 아래, productId를 넘겨 표시)
 // TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
-// TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
+// [+ 비교]: 비교함에 담기 (addTray가 true면 창 닫기, false면 그대로). 맞춤 추천, 상품 찾기 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
 // TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
 // TODO(CM-16, CHORONG-52): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // TODO(ST-03, CHORONG-45): [이자 계산] 금액은 useRecommendStore의 lastInput.need와 한도 중 작은 값 (지금은 기본값 1,000만원)
@@ -166,10 +167,10 @@ const ExternalLink = styled.a`
   font-weight: 700;
 `
 
-// 지금은 [이자 계산] 하나라 한 칸. 찜하기, + 비교가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
+// [+ 비교]가 있으면 2칸, 없으면 1칸. 찜하기가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
 const Actions = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(${({ $count }) => $count}, minmax(0, 1fr));
   gap: 8px;
 `
 
@@ -300,6 +301,13 @@ function CloseButton({ onClose }) {
 
 function ProductDetail({ product, onClose }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const sheetFrom = useUiStore((state) => state.sheetFrom)
+  const addTray = useCompareStore((state) => state.addTray)
+  // 비교함에서 A, B 어느 칸인지 / 비교함 첫 상품과 용도가 안 겹치면 '비교 불가' (상품 한 줄과 같은 표시)
+  const traySlot = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
+  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && !hasSamePurpose(state.tray[0], product))
+  const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking'
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (
@@ -329,6 +337,10 @@ function ProductDetail({ product, onClose }) {
   const hasRate = product.rateMin != null || product.rateMax != null
 
   const handleCalc = () => navigate('/calc', { state: buildCalcState(product) })
+
+  const handleCompare = () => {
+    if (addTray(product)) onClose()
+  }
 
   return (
     <Body>
@@ -399,7 +411,18 @@ function ProductDetail({ product, onClose }) {
         </SectionBox>
       ))}
 
-      <Actions>
+      <Actions $count={hasCompare ? 2 : 1}>
+        {hasCompare && (
+          <CompareButton
+            $variant="outline"
+            $state={traySlot ? 'in' : isNo ? 'no' : undefined}
+            aria-pressed={Boolean(traySlot)}
+            onClick={handleCompare}
+          >
+            {traySlot && <Icon name="check" size={15} />}
+            {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+          </CompareButton>
+        )}
         <Button onClick={handleCalc}>
           이자 계산
           <Icon name="arrow" size={13} />

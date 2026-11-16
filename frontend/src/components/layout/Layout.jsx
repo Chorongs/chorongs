@@ -1,7 +1,9 @@
-import { useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import useCompareStore, { getComparePage } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
+import CompareTray from '../common/CompareTray'
 import ProductDetailSheet from '../common/ProductDetailSheet'
 import Toast from '../ui/Toast'
 import Footer from './Footer'
@@ -11,11 +13,10 @@ import MobileTabBar from './MobileTabBar'
 
 // LY-03 공통 틀: 상단바, 본문(Outlet), 푸터, 하단 탭바(모바일) 배치
 // 화면 위에 뜨는 것(전체 메뉴, 알림)은 여기서 한 번만 그린다. (화면마다 따로 만들지 않음)
-// TODO(CM-09, CHORONG-47): 비교함 CompareTray가 올라오면 여기서 그린다.
+// 비교함에 상품이 있으면 담기 시작한 화면(맞춤 추천 또는 상품 찾기) 밖으로 이동하지 못하게 막고 안내 알림을 띄운다. (되돌아가는 방식)
 // TODO(CM-17, CHORONG-43): 로그인 안내 창이 올라오면 여기서 그리고, 열려 있을 때 뒤 화면 스크롤을 잠근다. (상세 창은 ProductDetailSheet, 전체 메뉴는 MobileMenu가 잠금)
 // TODO(RC-14, CHORONG-45): 맞춤 추천 창 RecommendDialog가 올라오면 여기서 그린다. (열림 상태는 useUiStore의 recommendOpen, recommendSkipGate, 열려 있을 때 뒤 화면 스크롤 잠금은 RecommendDialog가 함)
 // TODO(LY-09, CHORONG-63): 상시 도우미 HelperPanel이 올라오면 여기서 그린다.
-// TODO(ST-04, CHORONG-47): useCompareStore가 올라오면 '담기 시작한 화면 밖 이동 막기(안내 알림)'를 넣는다.
 const Shell = styled.div`
   display: flex;
   flex-direction: column;
@@ -56,10 +57,27 @@ const Main = styled.main`
 `
 
 function Layout() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
+  const navigate = useNavigate()
   const closeMenu = useUiStore((state) => state.closeMenu)
   const closeProduct = useUiStore((state) => state.closeProduct)
   const closeRecommend = useUiStore((state) => state.closeRecommend)
+  const showToast = useUiStore((state) => state.showToast)
+  // 비교함 때문에 허용된 마지막 주소 (막았을 때 여기로 되돌아감, 상품 찾기 조건은 ? 뒤에 있어 search까지 기억)
+  const lastAllowedRef = useRef(null)
+
+  // 비교함 이동 막기: 담기 시작한 화면과 다른 화면 묶음으로 가면 되돌림 (랭킹 등 비교 안 하는 화면도 막음)
+  useEffect(() => {
+    const { tray, from } = useCompareStore.getState()
+    const isBlocked = tray.length > 0 && from !== null && getComparePage(pathname) !== getComparePage(from)
+    if (isBlocked) {
+      navigate(lastAllowedRef.current ?? from, { replace: true })
+      showToast(`${getComparePage(from) === 'recommend' ? '추천 결과' : '상품 찾기'}에서 담은 비교함이 있어요. [비교하기]를 누르거나 비교함을 비운 뒤 이동해 주세요`)
+      useCompareStore.getState().shakeTray()
+    } else {
+      lastAllowedRef.current = `${pathname}${search}`
+    }
+  }, [pathname, search, navigate, showToast])
 
   // 화면 이동 시 열린 메뉴, 상품 상세 창, 추천 창 닫기, 스크롤 맨 위로
   useEffect(() => {
@@ -80,6 +98,7 @@ function Layout() {
       <MobileTabBar />
       <MobileMenu />
       <ProductDetailSheet />
+      <CompareTray />
       <Toast />
     </Shell>
   )

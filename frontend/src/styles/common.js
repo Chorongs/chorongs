@@ -217,3 +217,40 @@ export const EmptyBox = styled.div`
   font-size: var(--fs-md);
   text-align: center;
 `
+
+// 비교 A/B 칸 딱지 (비교함, 비교 화면, 사이드바 공통): $slot 'A'(주황) / 'B'(파랑), $size 크기 px (기본 30, 작으면 모서리 8)
+const slotFontSize = (size) => (size >= 30 ? 'var(--fs-base)' : size >= 22 ? 'var(--fs-xs)' : 'var(--fs-2xs)')
+
+export const SlotBadge = styled.span`
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: ${({ $size = 30 }) => $size}px;
+  height: ${({ $size = 30 }) => $size}px;
+  border-radius: ${({ $size = 30 }) => ($size >= 30 ? 'var(--r-sm)' : 'var(--r-xs)')};
+  background: ${({ $slot }) => ($slot === 'B' ? 'var(--viz-1)' : 'var(--viz-2)')};
+  color: #fff;
+  font-family: var(--f-num);
+  font-size: ${({ $size = 30 }) => slotFontSize($size)};
+  font-weight: 900;
+`
+
+// [+ 비교] 버튼 (상품 한 줄, 상품 상세 창 공통): $state 'in' 담김(연주황 바탕 + 주황 테두리) / 'no' 비교 불가(흐린 글자 + 점선)
+export const CompareButton = styled(Button)`
+  ${({ $state }) =>
+    $state === 'in' &&
+    css`
+      border-color: var(--brand);
+      background: var(--brand-soft);
+      color: var(--brand-text);
+      &:hover:not(:disabled) {
+        background: var(--brand-soft);
+      }
+    `}
+  ${({ $state }) =>
+    $state === 'no' &&
+    css`
+      border-style: dashed;
+      color: var(--muted);
+    `}
+`
