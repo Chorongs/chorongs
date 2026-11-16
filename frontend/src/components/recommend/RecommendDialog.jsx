@@ -53,6 +53,12 @@ function RecommendDialogBody() {
     }
   }, [])
 
+  // 서버 대답을 기다리는 동안은 닫지 못하게 함 (닫으면 대답이 온 뒤 다른 화면에서 갑자기 이동함)
+  const handleClose = () => {
+    if (isRunning) return
+    closeRecommend()
+  }
+
   const handleRun = async () => {
     if (isRunning) return
     setIsRunning(true)
@@ -68,10 +74,10 @@ function RecommendDialogBody() {
   }
 
   return (
-    <Modal isOpen onClose={closeRecommend} label="캐링 추천" showClose={false}>
+    <Modal isOpen onClose={handleClose} label="캐링 추천" showClose={false}>
       <Head>
         <Title>캐링 추천</Title>
-        <IconButton aria-label="닫기" onClick={closeRecommend}>
+        <IconButton aria-label="닫기" disabled={isRunning} onClick={handleClose}>
           <Icon name="close" />
         </IconButton>
       </Head>
@@ -86,7 +92,7 @@ function RecommendDialogBody() {
     - 열림은 useUiStore(recommendOpen, closeRecommend). 여는 곳은 openRecommend(skipGate)
     - 제목 '캐링 추천' + 닫기 / '잠깐' 창(RC-13) → 3단계 입력(RC-03)
     - 마지막 단계에서 추천 실행(API-06) → 성공하면 창을 닫고 /recommend로 이동. 실패하면 창을 닫지 않고 3단계 아래에 문구 + [다시 시도] (E3)
-    - 닫기: X, Esc, 바깥 누르기 (입력값은 그대로 남음). 열려 있는 동안 뒤 화면 스크롤 잠금
+    - 닫기: X, Esc, 바깥 누르기 (입력값은 그대로 남음). 추천 실행 중에는 닫기 막음. 열려 있는 동안 뒤 화면 스크롤 잠금
     - 입력값 console 출력 금지 (E6)
 */
 function RecommendDialog() {

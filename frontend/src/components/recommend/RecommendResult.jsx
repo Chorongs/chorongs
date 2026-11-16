@@ -5,7 +5,7 @@ import { postSavedRecommend } from '../../api/myApi'
 import { JOB_OPTIONS, MONTHS_UNKNOWN } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Tag } from '../../styles/common'
+import { Button, Panel, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import Disclaimer from '../common/Disclaimer'
 import Icon from '../ui/Icon'
@@ -17,9 +17,12 @@ const MAX_RESULT_COUNT = 30 // 서버가 보내는 최대 개수. 남은 상품�
 
 const DISCLAIMER_TEXT = '실제 심사가 아닌 참고용이에요. 예상 금리는 공시된 금리 범위를 기준으로 해요.'
 
-// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록)
+// 서민금융진흥원 누리집 (0건 안내의 상담 안내에서 새 창으로)
+const KINFA_URL = 'https://www.kinfa.or.kr/main.do'
+
+// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록, 버튼 글자는 가안 기준)
 const EMPTY_SHORTCUTS = [
-  { label: '상품 찾기', to: '/search' },
+  { label: '상세 검색으로 찾기', to: '/search' },
   { label: '신용 셀프 진단', to: '/diagnosis/credit' },
   { label: '대출 랭킹', to: '/ranking' },
 ]
@@ -123,36 +126,28 @@ const Notice = styled.p`
   text-align: center;
 `
 
-const EmptyArea = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 36px 20px;
-  border: 1px dashed var(--line-2);
-  border-radius: var(--r-md);
-  color: var(--cocoa);
-  font-size: var(--fs-md);
-  text-align: center;
+// 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼 (가안)
+const EmptyText = styled.p`
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.6;
+
+  & b {
+    color: var(--ink);
+  }
 `
 
-const Shortcuts = styled.div`
+const EmptyButtons = styled.div`
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
+  margin-top: 16px;
 `
 
-const ShortcutLink = styled(Link)`
-  color: var(--ink-2);
-  font-weight: 700;
+const OrgLink = styled.a`
+  color: inherit;
   text-decoration: underline;
-`
-
-const PhoneLink = styled.a`
-  color: var(--ink-2);
-  font-weight: 700;
-  text-decoration: underline;
+  text-underline-offset: 3px;
 `
 
 // 입력 조건 태그 (소득, 신용 같은 민감한 값은 보이지 않음)
@@ -180,10 +175,20 @@ function RecommendResult() {
 
   const [restPage, setRestPage] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
+  // 새 추천 결과가 오면 쪽 넘김을 1쪽으로 되돌림 (이전 결과의 3쪽이 남아 목록이 비는 것 방지)
+  const [shownResult, setShownResult] = useState(result)
+  if (result !== shownResult) {
+    setShownResult(result)
+    setRestPage(0)
+  }
 
   if (!result) return null
 
-  const { total, excluded, notes, hint, items } = result
+  // 서버가 빼고 보낸 칸은 빈 값으로 (화면이 깨지지 않게)
+  const { total = 0, hint = null } = result
+  const excluded = result.excluded ?? []
+  const notes = result.notes ?? []
+  const items = result.items ?? []
   const topItems = items.filter((item) => item.rankNo <= TOP_COUNT)
   const restItems = items.filter((item) => item.rankNo > TOP_COUNT)
   const restPageCount = Math.ceil(restItems.length / PAGE_SIZE)
@@ -220,8 +225,8 @@ function RecommendResult() {
               : `조건에 맞는 대출 ${total}개가 추천 상품이에요`}
           </ResultTitle>
           <ConditionTags>
-            {getConditionLabels(lastInput).map((label) => (
-              <Tag key={label}>{label}</Tag>
+            {getConditionLabels(lastInput).map((label, index) => (
+              <Tag key={`${index}-${label}`}>{label}</Tag>
             ))}
           </ConditionTags>
         </HeadMain>
@@ -233,10 +238,10 @@ function RecommendResult() {
         )}
       </Head>
 
-      {(notes.length > 0 || excluded.length > 0) && (
+      {items.length > 0 && (notes.length > 0 || excluded.length > 0) && (
         <Notes>
-          {notes.map((note) => (
-            <NoteLine key={note}>
+          {notes.map((note, index) => (
+            <NoteLine key={`${index}-${note}`}>
               <AlertMark viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 7.5v5.5M12 16.5h.01" />
@@ -260,17 +265,25 @@ function RecommendResult() {
       )}
 
       {items.length === 0 ? (
-        <EmptyArea>
-          {hint && <p>{hint}</p>}
-          <Shortcuts>
+        <Panel>
+          {hint && <EmptyText>{hint}</EmptyText>}
+          <EmptyText>
+            {!hint && '용도나 금액을 바꿔 보거나, '}신용점수 기준이 없는 <b>정책·서민금융</b> 상품을{' '}
+            살펴보세요.{' '}
+            <OrgLink href={KINFA_URL} target="_blank" rel="noopener noreferrer">
+              서민금융진흥원(1397)
+            </OrgLink>
+            에서 무료 상담도 받을 수 있어요.
+          </EmptyText>
+          <EmptyButtons>
             {EMPTY_SHORTCUTS.map((shortcut) => (
-              <ShortcutLink key={shortcut.to} to={shortcut.to}>
+              <Button key={shortcut.to} as={Link} to={shortcut.to} $variant="outline" $size="sm">
                 {shortcut.label}
-              </ShortcutLink>
+                <Icon name="arrow" />
+              </Button>
             ))}
-            <PhoneLink href="tel:1397">서민금융진흥원 1397</PhoneLink>
-          </Shortcuts>
-        </EmptyArea>
+          </EmptyButtons>
+        </Panel>
       ) : (
         <>
           <CardGrid>

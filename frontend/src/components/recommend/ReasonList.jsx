@@ -61,8 +61,8 @@ function ReasonList({ productId }) {
         <MatchRate>조건 일치도 {item.matchRate}%</MatchRate>
       </Head>
       <Reasons>
-        {item.reasons.map((reason) => (
-          <li key={reason}>{reason}</li>
+        {item.reasons.map((reason, index) => (
+          <li key={`${index}-${reason}`}>{reason}</li>
         ))}
       </Reasons>
     </Wrap>

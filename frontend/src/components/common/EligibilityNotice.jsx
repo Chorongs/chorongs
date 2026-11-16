@@ -160,20 +160,29 @@ function EligibilityNotice({ productId, productStatus }) {
       </Head>
       {reasons.length > 0 && (
         <ReasonList>
-          {reasons.map((reason) => (
-            <li key={reason}>{reason}</li>
+          {reasons.map((reason, index) => (
+            <li key={`${index}-${reason}`}>{reason}</li>
           ))}
         </ReasonList>
       )}
       {result === 'PASS' && (
         <>
+          {/* 금리나 월 상환액이 없는 상품은 그 줄만 건너뜀 */}
           <Numbers>
-            <dt>예상 금리</dt>
-            <dd>
-              연 {estRateMin.toFixed(2)}~{estRateMax.toFixed(2)}%{rateEstimated ? ' (추정)' : ''}
-            </dd>
-            <dt>예상 월 상환</dt>
-            <dd>{monthlyPayment.toLocaleString('ko-KR')}원</dd>
+            {estRateMin != null && estRateMax != null && (
+              <>
+                <dt>예상 금리</dt>
+                <dd>
+                  연 {estRateMin.toFixed(2)}~{estRateMax.toFixed(2)}%{rateEstimated ? ' (추정)' : ''}
+                </dd>
+              </>
+            )}
+            {monthlyPayment != null && (
+              <>
+                <dt>예상 월 상환</dt>
+                <dd>{monthlyPayment.toLocaleString('ko-KR')}원</dd>
+              </>
+            )}
           </Numbers>
           {calcNote && <Note>{calcNote}</Note>}
         </>

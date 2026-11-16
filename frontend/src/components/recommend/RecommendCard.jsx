@@ -3,45 +3,14 @@ import styled from 'styled-components'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, Tag } from '../../styles/common'
+import { getCalcState } from '../../utils/recommend'
 import Medal from '../common/Medal'
 import MoneyText from '../common/MoneyText'
 import RateText from '../common/RateText'
 import Icon from '../ui/Icon'
 
 const TOP_RANK = 3
-const MAN_WON = 10000 // 만원 → 원
 const CALC_PATH = '/calc'
-
-const isPositiveNumber = (value) => typeof value === 'number' && value > 0
-
-// [이자 계산]으로 계산기(CA-01)에 넘길 값. 값이 없는 칸은 빼고 보냄 (계산기 기본값을 쓰게)
-// - 금액(원): 필요 금액(lastInput.need)과 한도 중 작은 값 (만원 x 10,000)
-// - 기간(개월): 갚을 기간과 최대 기간(termMax) 중 짧은 값. '잘 모르겠어요'(0)이면 안 넘김
-// - 금리: 예상 금리 가운데 값
-// - 방식: 상품 상환 방식(REPAY 태그)이 만기일시만이면 BULLET, 그 밖은 EQUAL_PI (추천 월 상환과 같은 기준)
-const getCalcState = (item, lastInput) => {
-  const { product, estRateMin, estRateMax } = item
-  const state = {}
-
-  const amounts = [lastInput?.need, product.limitAmount].filter(isPositiveNumber)
-  if (amounts.length > 0) state.loanAmount = Math.min(...amounts) * MAN_WON
-
-  if (isPositiveNumber(lastInput?.months)) {
-    state.loanMonths = Math.min(...[lastInput.months, product.termMax].filter(isPositiveNumber))
-  }
-
-  const rates = [estRateMin, estRateMax].filter((rate) => typeof rate === 'number')
-  if (rates.length > 0) {
-    const mean = rates.reduce((sum, rate) => sum + rate, 0) / rates.length
-    state.interestRate = Math.round(mean * 100) / 100
-  }
-
-  const repayTags = (product.tags ?? []).filter((tag) => tag.tagType === 'REPAY')
-  const isBulletOnly = repayTags.length > 0 && repayTags.every((tag) => tag.tagValue === '만기일시')
-  state.repayMethod = isBulletOnly ? 'BULLET' : 'EQUAL_PI'
-
-  return state
-}
 
 const Wrap = styled(Card)`
   display: flex;
@@ -166,7 +135,8 @@ function LimitValue({ product }) {
     - TODO(RC-08): judgeTags가 글자 배열이라고 가정 (BE DTO 확인 필요)
 */
 function RecommendCard({ item }) {
-  const { rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote, judgeTags } = item
+  const { rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote } = item
+  const judgeTags = item.judgeTags ?? []
   const navigate = useNavigate()
   const openProduct = useUiStore((state) => state.openProduct)
   const lastInput = useRecommendStore((state) => state.lastInput)

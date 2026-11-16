@@ -1,6 +1,7 @@
 import { Link, NavLink, matchPath, useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import { NAV_MENU } from '../../constants/menu'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 
 // LY-05 상단 메뉴: 주요 메뉴 7개. NavLink로 이동하고 하위 주소도 현재 메뉴로 표시
@@ -9,8 +10,9 @@ import useUiStore from '../../store/useUiStore'
 // 하위 메뉴 펼침은 1180px 이상에서만 (더 좁으면 펼치지 않음)
 // 펼침 여부는 Header가 관리 (isMegaOpen, onMegaChange) - 펼친 배경판도 Header가 그린다.
 // 캐링 추천: 추천받기 전이면 추천 창 열기 (주소 그대로), 받은 뒤면 /recommend 이동
-// TODO(ST-03, CHORONG-45): useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾸고, 받은 뒤 메뉴 이름을 '추천 결과'로 보인다.
+// hasResult: useRecommendStore의 result 유무 (받은 뒤에는 메뉴 이름이 '추천 결과')
 const MEGA_MIN_WIDTH = 1180
+const RESULT_MENU_LABEL = '추천 결과'
 
 const canExpand = () => window.matchMedia(`(min-width: ${MEGA_MIN_WIDTH}px)`).matches
 const Nav = styled.nav`
@@ -102,7 +104,7 @@ const SubLink = styled(Link)`
 function GlobalNav({ isMegaOpen, onMegaChange }) {
   const { pathname } = useLocation()
   const openRecommend = useUiStore((state) => state.openRecommend)
-  const hasResult = false
+  const hasResult = useRecommendStore((state) => state.result !== null)
 
   const handleExpand = () => {
     if (canExpand()) onMegaChange(true)
@@ -126,7 +128,7 @@ function GlobalNav({ isMegaOpen, onMegaChange }) {
             data-active={item.match ? Boolean(matchPath({ path: item.match, end: false }, pathname)) : undefined}
             onClick={(event) => handleItemClick(event, item)}
           >
-            {item.label}
+            {item.isRecommend && hasResult ? RESULT_MENU_LABEL : item.label}
           </StyledNavLink>
           {item.children && (
             <Sub $isOpen={isMegaOpen}>
