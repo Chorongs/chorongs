@@ -4,12 +4,14 @@ import styled from 'styled-components'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
+import ReasonList from '../recommend/ReasonList'
 import { Button, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
 import Disclaimer from './Disclaimer'
+import EligibilityNotice from './EligibilityNotice'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
 
@@ -18,8 +20,6 @@ import RateText from './RateText'
 // 열려 있는 동안 뒤 화면 스크롤을 잠근다.
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
-// TODO(CM-08, CHORONG-45): '내 조건 안내' EligibilityNotice (3칸 아래, useRecommendStore의 입력값이 올라온 뒤)
-// TODO(RC-09, CHORONG-45): 추천 이유 ReasonList (sheetFrom이 'recommend'일 때 3칸 아래, productId를 넘겨 표시)
 // TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
 // TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
 // TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
@@ -300,6 +300,7 @@ function CloseButton({ onClose }) {
 
 function ProductDetail({ product, onClose }) {
   const navigate = useNavigate()
+  const sheetFrom = useUiStore((state) => state.sheetFrom)
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (
@@ -369,6 +370,9 @@ function ProductDetail({ product, onClose }) {
           </TileValue>
         </Tile>
       </Tiles>
+
+      <EligibilityNotice productId={product.productId} productStatus={product.productStatus} />
+      {sheetFrom === 'recommend' && <ReasonList productId={product.productId} />}
 
       {product.grouped && <Hint>조합마다 금리 다름, 가까운 취급기관 문의</Hint>}
 

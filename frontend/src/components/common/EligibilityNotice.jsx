@@ -11,13 +11,14 @@ const RESULT_LABELS = {
   FAIL: '미충족',
 }
 
+// 바탕: 평소 연한 주황, 주의나 미충족이면 연한 노랑 (가안)
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px 18px;
   border-radius: var(--r-sm);
-  background: var(--mist);
+  background: ${({ $result }) => ($result === 'WARN' || $result === 'FAIL' ? 'var(--warn-soft)' : 'var(--brand-soft)')};
   font-family: var(--f-ui);
   font-size: var(--fs-md);
   color: var(--ink);
@@ -152,7 +153,7 @@ function EligibilityNotice({ productId, productStatus }) {
     done.data
 
   return (
-    <Wrap aria-label="내 조건 안내">
+    <Wrap aria-label="내 조건 안내" $result={result}>
       <Head>
         <Title>내 조건으로 신청할 수 있을까요?</Title>
         <Badge $result={result}>{RESULT_LABELS[result] ?? result}</Badge>

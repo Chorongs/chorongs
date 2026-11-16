@@ -5,7 +5,7 @@ const Wrap = styled.section`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px 18px;
+  padding: 12px 16px;
   border-radius: var(--r-sm);
   background: var(--mist);
   font-family: var(--f-ui);
@@ -14,9 +14,8 @@ const Wrap = styled.section`
 
 const Head = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: baseline;
+  gap: 8px;
 `
 
 const Title = styled.h3`
@@ -25,22 +24,21 @@ const Title = styled.h3`
   font-weight: 800;
 `
 
+// 제목 옆 작은 글 '조건 일치도 N%' (가안)
 const MatchRate = styled.span`
-  color: var(--brand-text);
-  font-family: var(--f-num);
-  font-size: var(--fs-md);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  color: var(--cocoa);
+  font-size: var(--fs-sm);
 `
 
 const Reasons = styled.ul`
   margin: 0;
-  padding-left: 20px;
+  padding-left: 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   color: var(--ink-2);
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
 `
 
 /*
@@ -60,7 +58,7 @@ function ReasonList({ productId }) {
     <Wrap aria-label="추천 이유">
       <Head>
         <Title>추천 이유</Title>
-        <MatchRate>일치도 {item.matchRate}%</MatchRate>
+        <MatchRate>조건 일치도 {item.matchRate}%</MatchRate>
       </Head>
       <Reasons>
         {item.reasons.map((reason) => (
