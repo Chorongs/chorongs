@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { CREDIT_BAND_LABEL } from '../../constants/options'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, EmptyBox } from '../../styles/common'
 import { formatDate } from '../../utils/format'
@@ -10,11 +11,9 @@ import Modal from '../ui/Modal'
 
 // MY-09 내 진단 리포트: 저장한 신용 구간 + 진단 시각 / [이 구간으로 추천받기] / [삭제]
 // 삭제 → 확인 후 API-25 DELETE / 없으면(204) 빈 상태 + '신용 셀프 진단 하기' (E11)
-// TODO(ST-03, CR-03, CHORONG-45 김채희): [이 구간으로 추천받기]는 CR-03과 같음.
-//   useRecommendStore가 올라오면 setInput({ creditBand })를 넣고, 추천받기 전이면 추천 창 + '{구간} 구간을 3단계에 골라 뒀어요' 알림,
-//   받은 뒤면 run() → /recommend + '{구간} 구간으로 추천했어요' 알림. (지금은 추천 창을 1단계부터 여는 것만)
-// TODO(SCR-09, CHORONG-51 김진석): '신용 셀프 진단 하기'가 가는 /diagnosis/credit 화면은 DiagnosisPage가 올라오면 열림
-// TODO(API-25, CHORONG-53 BE): 진단 리포트 API가 올라오면 그대로 동작
+// [이 구간으로 추천받기]는 CR-03과 같음: 추천 입력의 신용 구간을 이 구간으로 채움 →
+//   추천받기 전이면 추천 창을 '잠깐' 창 없이 1단계부터 열고 '{구간} 구간을 3단계에 골라 뒀어요' 알림 (나머지 입력은 이용자가 채움)
+//   / 받은 뒤면 그 구간으로 다시 추천 실행 → /recommend + '{구간} 구간으로 추천했어요' 알림. 실행 중 버튼 잠금 (E5), 실패하면 알림 (E3)
 const Head = styled.h2`
   margin-bottom: 20px;
   font-size: var(--fs-h4);
@@ -61,10 +60,36 @@ function DiagnosisReport() {
   const navigate = useNavigate()
   const openRecommend = useUiStore((state) => state.openRecommend)
   const showToast = useUiStore((state) => state.showToast)
+  const hasRecommendResult = useRecommendStore((state) => state.result !== null)
+  const setRecommendInput = useRecommendStore((state) => state.setInput)
+  const runRecommend = useRecommendStore((state) => state.run)
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState({ status: 'loading', report: null })
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [isPending, setIsPending] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
+
+  // [이 구간으로 추천받기] (CR-03과 같음)
+  const handleRecommend = async (creditBand) => {
+    if (isRunning) return
+    const bandLabel = CREDIT_BAND_LABEL[creditBand] ?? creditBand
+    setRecommendInput({ creditBand })
+    if (!hasRecommendResult) {
+      openRecommend(true)
+      showToast(`${bandLabel} 구간을 3단계에 골라 뒀어요`)
+      return
+    }
+    setIsRunning(true)
+    try {
+      await runRecommend()
+      navigate('/recommend')
+      showToast(`${bandLabel} 구간으로 추천했어요`)
+    } catch {
+      showToast('추천을 불러오지 못했어요. 다시 시도해 주세요')
+    } finally {
+      setIsRunning(false)
+    }
+  }
 
   useEffect(() => {
     let isCancelled = false
@@ -127,7 +152,9 @@ function DiagnosisReport() {
         <Band>{CREDIT_BAND_LABEL[result.report.creditBand] ?? result.report.creditBand}</Band>
         <Meta>{formatDate(result.report.createdAt)} 진단</Meta>
         <Actions>
-          <Button onClick={() => openRecommend(true)}>이 구간으로 추천받기</Button>
+          <Button onClick={() => handleRecommend(result.report.creditBand)} disabled={isRunning}>
+            이 구간으로 추천받기
+          </Button>
           <Button $variant="outline" onClick={() => setIsConfirmOpen(true)}>
             삭제
           </Button>

@@ -10,7 +10,7 @@ import Modal from '../ui/Modal'
 // MY-02 프로필, 요약 숫자 (한눈에 보기): 닉네임, 로그인 방법 / 찜, 최근 본, 비교 내역, 계산 기록 개수 (누르면 그 항목)
 // 개수 불러오기 실패 → 숫자 자리 '-' (E3)
 // 로그아웃 → LY-08과 같은 확인 창, 처리 (확인 → API-16 + sessionStorage 비우기 → 안내 창 → 닫으면 새로고침하며 메인)
-// TODO(API-51, CHORONG-42 BE): MY 요약 API는 오늘 서버 범위 밖이라 지금은 숫자 자리가 '-'
+// TODO(API-51, CHORONG-42 BE): MY 요약 API가 아직 서버에 없어 지금은 숫자 자리가 '-' (서버가 올라오면 그대로 동작)
 const COUNTS = [
   { key: 'wishCount', label: '찜한 대출', to: '/my/liked' },
   { key: 'recentViewCount', label: '최근 본 대출', to: '/my/recent' },

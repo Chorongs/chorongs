@@ -8,7 +8,7 @@ import MySection from './MySection'
 // MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / 지우기
 // 줄 X → API-21 DELETE /{productId} / 지우기 → API-21 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
-// TODO(API-21, CHORONG-42 BE): 최근 본 대출 API는 오늘 서버 범위 밖이라 지금은 실패 문구가 뜸
+// TODO(API-21, CHORONG-42 BE): 최근 본 대출 API가 아직 서버에 없어 지금은 실패 문구가 뜸 (서버가 올라오면 그대로 동작)
 const StatusLine = styled.div`
   display: flex;
   gap: 6px;

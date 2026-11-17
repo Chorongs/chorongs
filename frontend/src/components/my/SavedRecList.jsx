@@ -10,7 +10,6 @@ import MySection from './MySection'
 // '결과 다시 보기' → 그때 상품을 최신 정보로 펼쳐 보임 (서버가 지금 상품 정보를 줌, API-38 GET)
 // 삭제 → 줄 X 그 저장 1건, 지우기 전체 (API-38 DELETE) / 알림은 MySection (MY-03)
 // 판매 끝난 상품 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' / 예상 금리, 월 상환 같은 개인 수치는 다시 안 보여줌
-// TODO(API-38, CHORONG-44 BE): 추천 결과 저장 API가 develop에 올라오면 그대로 동작 (응답 saves 칸 기준)
 const Card = styled.div`
   display: flex;
   flex-direction: column;

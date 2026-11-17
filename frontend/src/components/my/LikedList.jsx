@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Tag } from '../../styles/common'
 import ProductRow from '../common/ProductRow'
@@ -12,7 +13,7 @@ import MySection from './MySection'
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
 // 찜 목록 응답은 공통 PageInfo { list, total, page, size } (2026-11-17 백엔드 담당 결정)
 // TODO(API-20, CHORONG-42 BE): 찜 API는 아직 서버에 없음. 올라오면 응답이 위 모양인지 확인
-// TODO(ST-03, CHORONG-45 김채희): '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음. useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾼다.
+// '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음: 추천받기 전이면 추천 창, 받은 뒤면 /recommend (hasResult = useRecommendStore result 유무)
 const PAGE_SIZE = 20
 
 const StatusLine = styled.div`
@@ -33,7 +34,7 @@ function LikedList() {
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState({ status: 'loading', items: [], total: 0 })
   const [isMoreLoading, setIsMoreLoading] = useState(false)
-  const hasResult = false
+  const hasResult = useRecommendStore((state) => state.result !== null)
 
   useEffect(() => {
     let isCancelled = false

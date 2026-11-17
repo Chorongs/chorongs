@@ -9,7 +9,7 @@ import MySection from './MySection'
 // 맞춤 추천 입력은 기록 안 함 (기록 저장은 상품 찾기 화면이 함)
 // TODO(MY-06, SR, CHORONG-64 조빌립): 칩 누르면 상세 검색 /search?{조건}, 간편 검색 /search/simple?kw= 로 다시 검색.
 //   searchCondition(조건 JSON 글) 모양은 상품 찾기가 postSearch로 저장할 때 정해짐 → 정해지면 주소 값을 붙인다. (지금은 그 화면으로 이동만)
-// TODO(API-22, CHORONG-42 BE): 최근 검색 API는 오늘 서버 범위 밖이라 지금은 실패 문구가 뜸
+// TODO(API-22, CHORONG-42 BE): 최근 검색 API가 아직 서버에 없어 지금은 실패 문구가 뜸 (서버가 올라오면 그대로 동작)
 function SearchHistoryList() {
   const navigate = useNavigate()
   const [attempt, setAttempt] = useState(0)

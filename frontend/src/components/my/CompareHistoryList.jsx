@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import useCompareStore from '../../store/useCompareStore'
 import { Button, Tag } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import MySection from './MySection'
@@ -9,9 +10,8 @@ import MySection from './MySection'
 // MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / 지우기
 // 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / 지우기 → API-23 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료, 숨긴 상품이 있으면 딱지 + 안내
-// TODO(ST-04, CHORONG-47 조빌립): '다시 비교'는 useCompareStore.setPair(productA.productId, productB.productId) 후 /compare.
-//   useCompareStore가 올라오면 setPair를 연결한다. (지금은 /compare 이동만)
-// TODO(API-23, CHORONG-42 BE): 비교 내역 API는 오늘 서버 범위 밖이라 지금은 실패 문구가 뜸
+// '다시 비교' → useCompareStore.setPair(productA.productId, productB.productId) 후 /compare (ST-04)
+// TODO(API-23, CHORONG-42 BE): 비교 내역 API가 아직 서버에 없어 지금은 실패 문구가 뜸 (서버가 올라오면 그대로 동작)
 const Row = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -66,8 +66,15 @@ function ProductName({ product }) {
 
 function CompareHistoryList() {
   const navigate = useNavigate()
+  const setPair = useCompareStore((state) => state.setPair)
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState({ status: 'loading', items: [] })
+
+  // '다시 비교': 비교 화면 두 칸을 이 조합으로 채우고 이동 (MY-07)
+  const handleCompareAgain = (item) => {
+    setPair(item.productA.productId, item.productB.productId)
+    navigate('/compare')
+  }
 
   useEffect(() => {
     let isCancelled = false
@@ -118,7 +125,7 @@ function CompareHistoryList() {
           <Meta>{formatDate(item.comparedAt)} 저장</Meta>
           {hasUnavailable && <Warn>판매가 끝났거나 지금은 볼 수 없는 상품이 있어요</Warn>}
         </Pair>
-        <Button $size="sm" $variant="outline" onClick={() => navigate('/compare')}>
+        <Button $size="sm" $variant="outline" onClick={() => handleCompareAgain(item)}>
           다시 비교
         </Button>
       </Row>
