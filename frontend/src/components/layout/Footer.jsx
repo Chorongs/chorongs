@@ -6,7 +6,8 @@ import TermsDialog from '../common/TermsDialog'
 
 // LY-13 푸터: 로고 / 링크 / 서비스 고지 / 데이터 출처 (관리자 링크 없음)
 // 모양은 시안과 같게: 연회색 바탕, 위쪽에 로고 + 한 줄 소개 + 링크, 아래에 고지 글
-// '이용약관', '개인정보 수집/이용' 링크 → 약관 창 TermsDialog (CM-21)
+// '이용약관', '개인정보 처리방침' 링크 → 약관 창 TermsDialog (CM-21)
+// (링크 이름은 명세서 LY-13 '개인정보 수집/이용' 대신 회원 관리 기획서 6-1 '개인정보 처리방침'. 2026-11-17 사용자 결정)
 const Wrap = styled.footer`
   border-top: 1px solid var(--line);
   background: var(--mist);
@@ -97,7 +98,7 @@ function Footer() {
           </Brand>
           <Links aria-label="하단 링크">
             <TermsButton onClick={() => setTermsKind('service')}>이용약관</TermsButton>
-            <TermsButton onClick={() => setTermsKind('privacy')}>개인정보 수집/이용</TermsButton>
+            <TermsButton onClick={() => setTermsKind('privacy')}>개인정보 처리방침</TermsButton>
             <Link to="/help/faq">자주 묻는 질문</Link>
             <Link to="/help/illegal">불법 금융 대응</Link>
             <Link to="/help/terms">용어 사전</Link>

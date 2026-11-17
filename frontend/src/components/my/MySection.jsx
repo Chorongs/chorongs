@@ -6,7 +6,9 @@ import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 
 // MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 '지우기'(전체) / 목록(줄마다 X) 또는 빈 상태
-// 줄 X → onRemove(item) + '{구역 이름}에서 지웠어요' / '지우기' → 확인 창 → onClearAll() + '{구역 이름}을(를) 지웠어요'
+// 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 지웠어요' / '지우기' → 확인 창 → onClearAll() + '{구역 이름}을(를) 지웠어요'
+// (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7. 2026-11-17 사용자 결정)
+// TODO(MY-03, CHORONG-43 Tong B): 11-18 이후 개선: 여러 개 골라 지우기 등 지우기 편의 기능 (중간 시연 뒤)
 // title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록)
 // onRemove, onClearAll을 안 넘기면 X, '지우기'를 안 그림 (찜한 대출) / isInline: 줄 대신 칩처럼 옆으로 (최근 검색)
 // status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
@@ -75,6 +77,17 @@ const DialogText = styled.p`
   font-weight: 700;
 `
 
+// 지울 기록 이름 (확인 창 안, 길면 2줄에서 자름)
+const DialogTarget = styled.p`
+  display: -webkit-box;
+  overflow: hidden;
+  margin: -12px 0 20px;
+  color: var(--cocoa);
+  font-size: var(--fs-md);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+`
+
 const DialogActions = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -107,6 +120,8 @@ function MySection({
 }) {
   const showToast = useUiStore((state) => state.showToast)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
+  // 줄 X로 지울 기록 (null이면 확인 창 닫힘)
+  const [removeTarget, setRemoveTarget] = useState(null)
   const [isPending, setIsPending] = useState(false)
 
   const handleRemove = async (item) => {
@@ -114,6 +129,7 @@ function MySection({
     try {
       await onRemove(item)
       showToast(`${title}에서 지웠어요`)
+      setRemoveTarget(null)
     } catch (error) {
       if (error.response?.status !== 401) showToast('지우지 못했어요. 다시 시도해 주세요')
     } finally {
@@ -155,7 +171,7 @@ function MySection({
           <Item key={getKey(item)} $isInline={isInline}>
             <ItemBody>{renderItem(item)}</ItemBody>
             {onRemove && (
-              <IconButton aria-label={`${getItemLabel(item)} 지우기`} onClick={() => handleRemove(item)} disabled={isPending}>
+              <IconButton aria-label={`${getItemLabel(item)} 지우기`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
                 <Icon name="close" size={16} />
               </IconButton>
             )}
@@ -196,6 +212,19 @@ function MySection({
             취소
           </Button>
           <Button onClick={handleClearAll} disabled={isPending}>
+            지우기
+          </Button>
+        </DialogActions>
+      </Modal>
+
+      <Modal isOpen={removeTarget !== null} onClose={() => setRemoveTarget(null)} label={`${title}에서 지우기`} width={380} showClose={false}>
+        <DialogText>이 기록을 지울까요?</DialogText>
+        {removeTarget !== null && <DialogTarget>{getItemLabel(removeTarget)}</DialogTarget>}
+        <DialogActions>
+          <Button $variant="outline" onClick={() => setRemoveTarget(null)}>
+            취소
+          </Button>
+          <Button onClick={() => handleRemove(removeTarget)} disabled={isPending}>
             지우기
           </Button>
         </DialogActions>
