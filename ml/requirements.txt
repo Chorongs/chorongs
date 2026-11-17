@@ -2,3 +2,6 @@ fastapi[standard]
 pandas
 scikit-learn
 pytest
+requests
+sqlalchemy
+oracledb

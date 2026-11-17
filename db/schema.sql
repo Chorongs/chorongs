@@ -125,7 +125,7 @@ COMMENT ON COLUMN admin_token.token_history IS '발급일시 (SYSDATE). 2시간 
 CREATE TABLE loan_product (
     product_id         NUMBER GENERATED ALWAYS AS IDENTITY,
     source             VARCHAR2(10)        NOT NULL,
-    source_code        VARCHAR2(60)        NOT NULL,
+    source_code        VARCHAR2(210 CHAR)  NOT NULL,
     company_name       VARCHAR2(100 CHAR)  NOT NULL,
     product_name       VARCHAR2(200 CHAR)  NOT NULL,
     loan_type          VARCHAR2(10)        NOT NULL,                        
@@ -178,7 +178,7 @@ CREATE TABLE loan_product (
 COMMENT ON TABLE  loan_product IS '대출 상품 (서민금융진흥원 + 금융감독원 통합)';
 COMMENT ON COLUMN loan_product.product_id       IS '자동 증가(IDENTITY). 다른 표에서 이 번호로 상품을 가리켜요';
 COMMENT ON COLUMN loan_product.source           IS 'KINFA 서민금융진흥원 / FSS 금융감독원';
-COMMENT ON COLUMN loan_product.source_code      IS 'KINFA는 seq, FSS는 fin_co_no || ''_'' || fin_prdt_cd (사이 _ 필수). FSS 개인신용은 뒤에 ''_'' || crdt_prdt_type 추가(같은 상품코드가 마이너스한도/카드론으로 나뉘는 경우 1개). 신협 묶음은 032000 + 상품명. 최대 약 40자. unique(source, loan_type, source_code). 다시 불러올 때 같은 상품인지 가르는 열쇠';
+COMMENT ON COLUMN loan_product.source_code      IS 'KINFA는 seq, FSS는 fin_co_no || ''_'' || fin_prdt_cd (사이 _ 필수). FSS 개인신용은 뒤에 ''_'' || crdt_prdt_type 추가(같은 상품코드가 마이너스한도/카드론으로 나뉘는 경우 1개). 신협 묶음은 032000 + 상품명. 최대 약 207자. unique(source, loan_type, source_code). 다시 불러올 때 같은 상품인지 가르는 열쇠';
 COMMENT ON COLUMN loan_product.company_name     IS 'KINFA ofrinstnm / FSS kor_co_nm';
 COMMENT ON COLUMN loan_product.product_name     IS 'KINFA finprdnm / FSS fin_prdt_nm';
 COMMENT ON COLUMN loan_product.loan_type        IS '대출 종류 코드. CREDIT 신용 / RENT 전세 / MORTGAGE 주택담보 / BIZ 개인사업자 / KINFA 서민금융 (랭킹 대출 종류 필터, 추천 상품 종류별 규칙에 사용)';
