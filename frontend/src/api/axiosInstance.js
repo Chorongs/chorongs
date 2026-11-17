@@ -8,6 +8,31 @@ const api = axios.create({
   withCredentials: true, // 로그인 세션 쿠키를 서버 요청에 같이 보냄 (E14)
 })
 
+// '준비 중' (문서_반영_목록 Q5, 시연 전 일괄 처리, CHORONG-43): 아직 서버에 없는 API는 보내지 않고 바로 실패로 돌려줌
+// 쓰는 쪽은 error.isPreparing이면 실패 문구 대신 PREPARING_TEXT를 보여 줌. API가 서버에 올라오면 그 줄만 지운다
+export const PREPARING_TEXT = '아직 준비 중인 서비스예요'
+const PREPARING_APIS = [
+  /^\/api\/me\/likes(\/|$)/, // API-20 찜 (CHORONG-42)
+  /^\/api\/me\/recent-views(\/|$)/, // API-21 최근 본 (CHORONG-42)
+  /^\/api\/me\/searches(\/|$)/, // API-22 최근 검색 (CHORONG-42)
+  /^\/api\/me\/compares(\/|$)/, // API-23 비교 내역 (CHORONG-42)
+  /^\/api\/me\/calcs(\/|$)/, // API-24 계산 기록 (CHORONG-48)
+  /^\/api\/me$/, // API-28 회원 정보 수정, 탈퇴 (CHORONG-42)
+  /^\/api\/me\/summary$/, // API-51 MY 요약 (CHORONG-42)
+  /^\/api\/products\/[^/]+\/views$/, // API-05 상품 조회 기록 (실패해도 안내 안 함)
+]
+
+api.interceptors.request.use((config) => {
+  const url = config.url ?? ''
+  if (PREPARING_APIS.some((pattern) => pattern.test(url))) {
+    const error = new Error(PREPARING_TEXT)
+    error.isPreparing = true
+    error.config = config
+    return Promise.reject(error)
+  }
+  return config
+})
+
 // 로그인 풀림(401) 공통 처리 (E4)
 api.interceptors.response.use(
   (response) => response,

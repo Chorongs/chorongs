@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
+import { PREPARING_TEXT } from '../../api/axiosInstance'
 import * as myApi from '../../api/myApi'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
@@ -16,7 +17,7 @@ import Modal from '../ui/Modal'
 // 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜 → 오류 문구 (E2) / 400 → 서버 문구
 // 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 후 [탈퇴하기] → sessionStorage 비움
 //   → 안내 창 → 닫으면 새로고침하며 메인(/)으로 (로그아웃과 같은 방식, 2026-11-17 사용자 결정) / 누르는 중 잠금 (E5)
-// TODO(API-28, CHORONG-42 BE): 회원 정보 수정, 탈퇴 API가 아직 서버에 없어 지금은 실패 문구가 뜸 (서버가 올라오면 그대로 동작)
+// TODO(API-28, CHORONG-42 BE): 회원 정보 수정, 탈퇴 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 // 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
 //   - 생년월일: 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate). 달력도 1900-01-01부터 오늘까지만
@@ -195,7 +196,8 @@ function MemberInfo() {
       setNickname(updated.memberNickname)
       showToast('회원 정보를 저장했어요')
     } catch (err) {
-      if (err.response?.status === 400) setError(err.response.data?.message ?? BIRTH_ERROR)
+      if (err.isPreparing) setError(PREPARING_TEXT)
+      else if (err.response?.status === 400) setError(err.response.data?.message ?? BIRTH_ERROR)
       else if (err.response?.status !== 401) setError('저장하지 못했어요.\n다시 시도해 주세요')
     } finally {
       setIsSaving(false)
@@ -219,8 +221,8 @@ function MemberInfo() {
       useCompareStore.getState().setPair(null, null)
       sessionStorage.clear()
       setWithdrawStep('done')
-    } catch {
-      setWithdrawError('탈퇴하지 못했어요.\n다시 시도해 주세요')
+    } catch (error) {
+      setWithdrawError(error.isPreparing ? PREPARING_TEXT : '탈퇴하지 못했어요.\n다시 시도해 주세요')
     } finally {
       setIsWithdrawing(false)
     }

@@ -232,7 +232,8 @@ function useSectionData(load, pickItems, isEnabled, reloadKey) {
       })
       .catch((error) => {
         if (isCancelled) return
-        setState({ status: error.response?.status === 401 ? 'guest' : 'error', items: [] })
+        // 401(비회원), 준비 중(서버 API 없음, Q5)이면 그 구역을 숨김
+        setState({ status: error.response?.status === 401 || error.isPreparing ? 'guest' : 'error', items: [] })
       })
     return () => {
       isCancelled = true

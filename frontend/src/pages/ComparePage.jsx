@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import styled from 'styled-components'
+import { PREPARING_TEXT } from '../api/axiosInstance'
 import * as myApi from '../api/myApi'
 import * as productApi from '../api/productApi'
 import CompareCard from '../components/compare/CompareCard'
@@ -317,7 +318,8 @@ function ComparePage() {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      if (status === 409) showToast('이미 저장한 조합이에요')
+      if (error.isPreparing) showToast(PREPARING_TEXT)
+      else if (status === 409) showToast('이미 저장한 조합이에요')
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)

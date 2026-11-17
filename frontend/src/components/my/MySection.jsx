@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import styled from 'styled-components'
+import { PREPARING_TEXT } from '../../api/axiosInstance'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton } from '../../styles/common'
 import Icon from '../ui/Icon'
@@ -11,7 +12,7 @@ import Modal from '../ui/Modal'
 // TODO(MY-03, CHORONG-43 Tong B): 11-18 이후 개선: 여러 개 골라 지우기 등 지우기 편의 기능 (중간 시연 뒤)
 // title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록)
 // onRemove, onClearAll을 안 넘기면 X, '지우기'를 안 그림 (찜한 대출) / isInline: 줄 대신 칩처럼 옆으로 (최근 검색)
-// status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
+// status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'preparing' 서버 API가 아직 없음 → '아직 준비 중인 서비스예요' (Q5) / 'done' 목록 또는 빈 상태 (E11)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
 const Wrap = styled.section`
   display: flex;
@@ -153,6 +154,8 @@ function MySection({
   let body
   if (status === 'loading') {
     body = <Status role="status">불러오는 중이에요</Status>
+  } else if (status === 'preparing') {
+    body = <EmptyBox>{PREPARING_TEXT}</EmptyBox>
   } else if (status === 'error') {
     body = (
       <EmptyBox>

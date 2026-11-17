@@ -48,9 +48,9 @@ function LikedList() {
           total: data?.total ?? 0,
         }))
       })
-      .catch(() => {
+      .catch((error) => {
         // 더 보기 실패는 받은 목록을 그대로 두고 [더 보기]만 다시 누를 수 있게
-        if (!isCancelled) setResult((prev) => (page === 1 ? { status: 'error', items: [], total: 0 } : prev))
+        if (!isCancelled) setResult((prev) => (page === 1 ? { status: error.isPreparing ? 'preparing' : 'error', items: [], total: 0 } : prev))
       })
       .finally(() => {
         if (!isCancelled) setIsMoreLoading(false)
