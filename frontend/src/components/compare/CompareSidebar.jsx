@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import useAuthStore from '../../store/useAuthStore'
 import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import useMyStore from '../../store/useMyStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, SlotBadge } from '../../styles/common'
 import { formatRate } from '../../utils/format'
@@ -12,9 +14,9 @@ import Icon from '../ui/Icon'
 // 다른 한 상품과 자금 용도나 상환 방식이 안 겹치는 카드는 흐리게 + '용도가(상환 방식이) 달라 비교 불가', 누르면 안 담고 경고 (E15)
 // 찜, 최근 본은 회원만: 요청이 401이면 그 구역을 숨긴다. 목록을 못 받으면 그 구역만 실패 문구 (E3). 구역이 모두 비면 사이드바째 숨김
 // 판매 종료, 숨김 상품은 목록에서 뺀다 (관리자가 상태를 바꾸면 안 나옴, 상태 ON만 보임)
-// TODO(ST-01, CHORONG-43): useAuthStore가 올라오면 status가 'member'일 때만 찜을 요청한다. (지금은 401로 비회원을 알아냄) 비회원이 요청하면 401로 로그인 안내 창이 열리니 그때 회원일 때만 요청하게 바꾼다.
-// TODO(MEM-08, CHORONG-42): 최근 본은 비회원도 보게 하는 규칙(11-17 결정)이라, 서버가 비회원에게도 200을 주면 401로 숨기던 것을 없앤다.
-// TODO(ST-02, CHORONG-43): useMyStore의 likedIds가 올라오면 찜이 바뀔 때 찜 구역을 다시 받는다. (지금은 열 때 한 번)
+// 찜, 최근 본은 회원(useAuthStore status 'member')일 때만 요청한다. 비회원이 요청하면 401로 로그인 안내 창이 열리므로 (CHORONG-43에서 연결)
+// 찜이 바뀌면(useMyStore likedIds) 찜 구역을 다시 받는다 (CHORONG-43에서 연결)
+// TODO(MEM-08, CHORONG-42): 최근 본은 비회원도 보게 하는 규칙(11-17 결정)이라, 서버가 비회원에게도 200을 주면 최근 본 요청의 회원 조건(isMember)과 401로 숨기던 것을 없앤다.
 // TODO(ST-03, CHORONG-45): '추천 상품' 구역 (useRecommendStore의 result.items, 카드에 '일치도 N%' 딱지, 비회원도 가능, 새 API 없음)을 찜 구역 위에 넣는다. (일치도 딱지 모양은 test-compare 브랜치의 CompareSidebar에 만들어 둠)
 const PAGE_SIZE = 3
 
@@ -193,12 +195,17 @@ const Flip = styled.span`
 // 판매 종료(CLOSED), 숨김(HIDDEN) 상품은 비교할 수 없으니 빼고 게시(ON) 상품만 둔다.
 const isOnProduct = (product) => Boolean(product) && product.productStatus === 'ON'
 
+// 회원이 아닐 때(비회원, 로그인 확인 중) 구역 상태: 요청하지 않고 숨김
+const GUEST_STATE = { status: 'guest', items: [] }
+
 // 구역 하나의 목록 받기: { status: loading / ok / error / guest (401), items: 상품 요약 목록 }
-function useSectionData(load) {
+// isEnabled: false면 요청하지 않고 guest / reloadKey: 바뀌면 다시 받음 (찜 구역은 likedIds)
+function useSectionData(load, isEnabled, reloadKey) {
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState({ status: 'loading', items: [] })
 
   useEffect(() => {
+    if (!isEnabled) return
     let isCancelled = false
     load()
       .then((data) => {
@@ -215,14 +222,14 @@ function useSectionData(load) {
     return () => {
       isCancelled = true
     }
-  }, [load, attempt])
+  }, [load, attempt, isEnabled, reloadKey])
 
   const retry = () => {
     setState({ status: 'loading', items: [] })
     setAttempt((count) => count + 1)
   }
 
-  return [state, retry]
+  return [isEnabled ? state : GUEST_STATE, retry]
 }
 
 function isShown(state) {
@@ -332,8 +339,10 @@ function CompareSidebar({ slotProducts, onPicked }) {
   const putPair = useCompareStore((state) => state.putPair)
   const canCompare = useCompareStore((state) => state.canCompare)
   const showToast = useUiStore((state) => state.showToast)
-  const [likes, retryLikes] = useSectionData(myApi.getLikes)
-  const [recents, retryRecents] = useSectionData(myApi.getRecentViews)
+  const isMember = useAuthStore((state) => state.status === 'member')
+  const likedIds = useMyStore((state) => state.likedIds)
+  const [likes, retryLikes] = useSectionData(myApi.getLikes, isMember, likedIds)
+  const [recents, retryRecents] = useSectionData(myApi.getRecentViews, isMember)
 
   if (!isShown(likes) && !isShown(recents)) return null
 

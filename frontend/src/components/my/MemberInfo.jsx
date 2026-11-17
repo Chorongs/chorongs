@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
+import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError } from '../../styles/common'
@@ -219,8 +220,10 @@ function MemberInfo() {
     setWithdrawError('')
     try {
       await myApi.deleteMe()
-      // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()') 뒤 이 탭의 임시 저장값 전부 비움
+      // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()'), 비교함, 비교 화면 두 상품 비우기 (ST-04) 뒤 이 탭의 임시 저장값 전부 비움
       useRecommendStore.getState().clear()
+      useCompareStore.getState().clearTray()
+      useCompareStore.getState().setPair(null, null)
       sessionStorage.clear()
       setWithdrawStep('done')
     } catch {

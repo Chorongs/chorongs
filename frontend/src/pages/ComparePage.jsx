@@ -25,6 +25,7 @@ import {
   getMethodPlan,
   REPAY_METHODS,
 } from '../utils/loanMath'
+import requireLogin from '../utils/requireLogin'
 
 // CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도가 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
 //   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
@@ -32,8 +33,7 @@ import {
 // [결과 저장] → API-23 (회원). 같은 조합은 409 '이미 저장한 조합' 안내, 요청 중 버튼 잠금 (E5)
 // A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌
 // 금액, 기간이 비면 오류 문구 + 결과(카드, 판정, 비교표) 숨김
-// TODO(CM-17, CM-22, CHORONG-43): requireLogin이 올라오면 [결과 저장]을 requireLogin(저장, '비교 결과 저장은 회원 전용이에요.')으로 감싼다.
-//   지금은 요청을 보내고 401이면 같은 문구를 알림으로 보여 준다.
+// [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '비교 결과 저장은 회원 전용이에요.' (CM-17, CM-22, CHORONG-43에서 연결)
 // TODO(ST-03, CHORONG-45): 처음 넣는 금액, 기간은 맞춤 추천에서 입력한 값(useRecommendStore의 lastInput need, months)을 getCompareDefaults의 마지막 값으로 넘긴다. (지금은 없음으로 넘겨 두 상품의 최대 한도, 최대 기간으로 시작)
 // 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
 // 상품을 받기 전에 잠깐 보이는 값만 아래 기본값
@@ -283,7 +283,7 @@ function ComparePage() {
   }
 
   // [결과 저장] (API-23): 같은 조합은 409
-  const handleSave = async () => {
+  const saveResult = async () => {
     if (isSaving || !isComparable) return
     setIsSaving(true)
     try {
@@ -291,14 +291,17 @@ function ComparePage() {
       showToast('비교 결과를 저장했어요. MY의 비교 내역에서 다시 볼 수 있어요')
     } catch (error) {
       const status = error.response?.status
-      if (status === 401) showToast('비교 결과 저장은 회원 전용이에요. 로그인해 주세요')
-      else if (status === 409) showToast('이미 저장한 조합이에요')
+      // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
+      if (status === 401) return
+      if (status === 409) showToast('이미 저장한 조합이에요')
       else showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
   }
 
+  // 비회원이면 저장 대신 로그인 안내 창 (CM-22, 문구는 CM-17 '비교 결과 저장')
+  const handleSave = () => requireLogin(saveResult, '비교 결과 저장은 회원 전용이에요.')
 
   // 한 칸: 상품이 있으면 간단한 카드(숨김 상품은 안내 카드), 없으면 빈 칸
   const renderSlot = (slot, product, keepProduct) =>
