@@ -5,6 +5,7 @@ import { putCreditReport } from '../../api/myApi'
 import { CREDIT_BAND_LABEL, CREDIT_QUESTIONS } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, Tag } from '../../styles/common'
+import requireLogin from '../../utils/requireLogin'
 import ScoreGauge from '../chart/ScoreGauge'
 import TipList from '../common/TipList'
 import Accordion from '../ui/Accordion'
@@ -123,19 +124,23 @@ function CreditResultCard({ result, onRetry, onContinue }) {
     navigate(`/search?credit=${bandText},${encodeURIComponent('신용 무관')}`)
   }
 
-  // [결과 저장]: 구간 + 시각만 보냄 (E5 저장 중 버튼 잠금)
-  // TODO(CM-17, CM-22, CHORONG-43): 비회원이면 요청 전에 requireLogin으로 로그인 안내 창을 띄운다.
-  const handleSave = async () => {
+  // [결과 저장]: 구간만 보냄, 진단 시각은 서버가 정함 (E5 저장 중 버튼 잠금)
+  const saveResult = async () => {
     setIsSaving(true)
     try {
       await putCreditReport(creditBand)
       showToast('진단 결과를 저장했어요')
-    } catch {
+    } catch (error) {
+      // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
+      if (error.response?.status === 401) return
       showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
   }
+
+  // 비회원이면 저장 대신 로그인 안내 창 (CM-22, 문구는 CM-17 '진단 결과 저장', CHORONG-43에서 연결)
+  const handleSave = () => requireLogin(saveResult, '진단 결과 저장은 회원 전용이에요.')
 
   return (
     <Wrap>

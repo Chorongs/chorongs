@@ -127,7 +127,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
   const questionRefs = useRef({})
 
   // 답은 이 탭에만 임시 저장
-  // TODO(ST-01, CHORONG-43): 로그아웃, 탈퇴 때 sessionStorage 'creditAnswers'를 지우는 쪽을 연결한다.
+  // 로그아웃, 탈퇴 때는 useAuthStore.logout(), MemberInfo가 이 탭의 sessionStorage를 통째로 비워 함께 지워짐 (ST-01, CHORONG-43)
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(answers))
   }, [answers])
