@@ -41,6 +41,11 @@ const useUiStore = create(
       loginDialogText: '',
       openLoginDialog: (text) => set({ loginDialogOpen: true, loginDialogText: text }),
 
+      // 로그아웃 창 (LY-08 계정 메뉴, MY-02 한눈에 보기가 같이 씀): 열면 '로그아웃할까요?' 확인부터. Layout이 한 번만 그림 (UI-15)
+      logoutOpen: false,
+      openLogout: () => set({ logoutOpen: true }),
+      closeLogout: () => set({ logoutOpen: false }),
+
       // 알림: { id, message } / 같은 글이 다시 와도 id가 달라 시간을 다시 셈
       toast: null,
       showToast: (message) => {
