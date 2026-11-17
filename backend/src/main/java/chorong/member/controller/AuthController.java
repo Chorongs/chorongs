@@ -42,7 +42,7 @@ public class AuthController {
     }
 
     /** MEM-03 내 정보 확인 */
-    @GetMapping("/my")
+    @GetMapping("/me")
     public ResponseEntity<ApiResponse<MemberResponseDTO>> getMe(HttpServletRequest request) {
         return ResponseEntity.ok(ApiResponse.success(authService.getMe(request.getSession(false))));
     }
