@@ -47,3 +47,20 @@ export function formatDate(value) {
   if (!matched) return EMPTY
   return `${matched[1]}.${matched[2]}.${matched[3]}`
 }
+
+// 중도상환수수료: 0 → '없음', 숫자 → '최대 n%', 값 없음 → '기관 문의'
+export function formatPrepayFee(prepayFeeMax) {
+  const number = toNumber(prepayFeeMax)
+  if (number === null) return '기관 문의'
+  return number === 0 ? '없음' : `최대 ${formatRate(number)}%`
+}
+
+// 범위 글: 둘 다 있으면 'a ~ b', 한쪽만 있으면 '이상', '이하', 둘 다 없으면 '정보 없음' (prefix 예: '만 ', suffix 예: '세')
+export function formatRange(min, max, prefix = '', suffix = '') {
+  const low = toNumber(min)
+  const high = toNumber(max)
+  if (low !== null && high !== null) return `${prefix}${low}${suffix} ~ ${prefix}${high}${suffix}`
+  if (low !== null) return `${prefix}${low}${suffix} 이상`
+  if (high !== null) return `${prefix}${high}${suffix} 이하`
+  return '정보 없음'
+}
