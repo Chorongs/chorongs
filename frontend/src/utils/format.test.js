@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatMoney, formatNumber, formatRate } from './format'
+import { formatDate, formatMoney, formatNumber, formatPrepayFee, formatRange, formatRate } from './format'
 
 describe('formatNumber', () => {
   it('천 단위 쉼표를 붙인다', () => {
@@ -132,5 +132,64 @@ describe('formatDate', () => {
     const result = formatDate(value)
     // Then
     expect(result).toBe('-')
+  })
+})
+
+describe('formatPrepayFee', () => {
+  it('0이면 없음', () => {
+    // Given
+    const value = 0
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('없음')
+  })
+
+  it('숫자면 최대 n%', () => {
+    // Given
+    const value = 1.5
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('최대 1.50%')
+  })
+
+  it('값이 없으면 기관 문의', () => {
+    // Given
+    const value = null
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('기관 문의')
+  })
+})
+
+describe('formatRange', () => {
+  it('둘 다 있으면 a ~ b', () => {
+    // Given
+    const min = 19
+    const max = 34
+    // When
+    const result = formatRange(min, max, '만 ', '세')
+    // Then
+    expect(result).toBe('만 19세 ~ 만 34세')
+  })
+
+  it('최소만 있으면 이상', () => {
+    // Given
+    const min = 600
+    // When
+    const result = formatRange(min, null, '', '점')
+    // Then
+    expect(result).toBe('600점 이상')
+  })
+
+  it('둘 다 없으면 정보 없음', () => {
+    // Given
+    const min = null
+    // When
+    const result = formatRange(min, null)
+    // Then
+    expect(result).toBe('정보 없음')
   })
 })

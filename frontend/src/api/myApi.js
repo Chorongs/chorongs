@@ -1,11 +1,23 @@
 import api from './axiosInstance'
 
-// 내 정보 관련 서버 요청. 본문 { success, data }의 data만 꺼내 돌려준다.
+// 내 정보(회원) 관련 서버 요청. 본문 { success, data }의 data만 꺼내 돌려준다.
+// 지금은 비교 화면(CP-01, 07)이 쓰는 API-20, 21, 23과 추천이 쓰는 API-38, 25만 있다. 나머지는 쓰는 이슈(CHORONG-43 등)에서 추가한다.
 
-// API-25 진단 리포트 저장 (구간 + 시각만, 점수와 답은 보내지 않음, 회원당 1개 덮어씀)
-export async function putCreditReport(creditBand) {
-  const response = await api.put('/api/me/reports/credit', { creditBand })
+// API-20 찜 목록 (data.items: createdAt, product = ProductSummaryDTO, 최신순). 찜은 최대 30개라 한 번에 받는다.
+export async function getLikes() {
+  const response = await api.get('/api/me/likes', { params: { size: 30 } })
   return response.data.data
+}
+
+// API-21 최근 본 대출 (data.items: 최근 10개 viewedAt, product = ProductSummaryDTO)
+export async function getRecentViews() {
+  const response = await api.get('/api/me/recent-views')
+  return response.data.data
+}
+
+// API-23 비교 결과 저장 (201). 같은 조합은 409 CONFLICT
+export async function postCompare(productAId, productBId) {
+  await api.post('/api/me/compares', { productAId, productBId })
 }
 
 // API-38 추천 결과 저장 (POST): purpose, need, months, job + 순위대로 productIds만 보냄
@@ -20,4 +32,10 @@ export const postSavedRecommend = async (payload) => {
 export const getCreditReport = async () => {
   const response = await api.get('/api/me/reports/credit')
   return response.status === 204 ? null : response.data.data
+}
+
+// API-25 진단 리포트 저장 (PUT): 구간 + 시각만, 점수와 답은 보내지 않음, 회원당 1개 덮어씀
+export async function putCreditReport(creditBand) {
+  const response = await api.put('/api/me/reports/credit', { creditBand })
+  return response.data.data
 }
