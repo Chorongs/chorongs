@@ -45,13 +45,16 @@ const MAX_AMOUNT_MAN = 100000
 // 상환 방식 글 (코드 → 글, '~로' 붙은 글)
 const METHOD_LABEL = Object.fromEntries(REPAY_METHODS.map((item) => [item.code, item.label]))
 const METHOD_WITH_RO = { EQUAL_PI: '원리금균등으로', EQUAL_P: '원금균등으로', BULLET: '만기일시로' }
-const MONTHLY_MEANING = { EQUAL_P: '원금균등의 월 상환액은 첫 달', BULLET: '만기일시의 월 상환액은 매달 내는 이자' }
 
-// 계산 기준 안내: 상환 방식을 어떻게 정했는지와 그 이유
-function getCalcNote(plan) {
-  const base = '금리는 범위의 중간값으로 계산해요.'
-  if (!plan) return base
-  if (plan.mode === 'choose') return `${base} 고른 상환 방식으로 두 상품을 똑같이 계산해요. 월 상환액은 원금균등이면 첫 달, 만기일시면 매달 이자예요.`
+// 계산 기준 안내: 줄마다 { text, strong } (strong = 상환 방식을 어떻게 정했는지, 눈에 띄게)
+// (월 상환액의 뜻 '첫 달', '매달 이자'는 비교표 월 상환 옆에 붙어 있어 여기서는 뺌)
+function getCalcLines(plan) {
+  const lines = [{ text: '금리는 범위의 중간값으로 계산해요.', strong: false }]
+  if (!plan) return lines
+  if (plan.mode === 'choose') {
+    lines.push({ text: '고른 상환 방식으로 두 상품을 똑같이 계산해요.', strong: true })
+    return lines
+  }
   if (plan.mode === 'fixed') {
     const label = METHOD_LABEL[plan.method]
     const because = {
@@ -60,13 +63,24 @@ function getCalcNote(plan) {
       both: `두 상품 모두 ${label}만 가능해서`,
       common: `두 상품이 모두 가능한 방식이 ${label}뿐이라서`,
     }[plan.limitedBy]
-    const meaning = MONTHLY_MEANING[plan.method]
-    return `${base} ${because} ${METHOD_WITH_RO[plan.method]} 계산했어요.${meaning ? ` ${meaning}이에요.` : ''}`
+    lines.push({ text: `${because} ${METHOD_WITH_RO[plan.method]} 계산했어요.`, strong: true })
+    return lines
   }
-  return `${base} 두 상품이 모두 가능한 상환 방식이 없어서 A는 ${METHOD_WITH_RO[plan.methodA]}, B는 ${METHOD_WITH_RO[plan.methodB]} 각각 계산했어요. 방식이 달라 월 상환액은 유리 판정에 넣지 않아요. 원금균등의 월 상환액은 첫 달, 만기일시는 매달 내는 이자예요.`
+  lines.push({
+    text: `두 상품이 모두 가능한 상환 방식이 없어서 A는 ${METHOD_WITH_RO[plan.methodA]}, B는 ${METHOD_WITH_RO[plan.methodB]} 각각 계산했어요.`,
+    strong: true,
+  })
+  lines.push({ text: '방식이 달라 월 상환액은 유리 판정에 넣지 않아요.', strong: false })
+  return lines
 }
-const AMOUNT_BASIS = { recommend: '맞춤 추천 입력값', limit: '두 상품의 최대 한도', fallback: '기본 1,000만원' }
-const MONTHS_BASIS = { recommend: '맞춤 추천 입력값', term: '두 상품의 최대 기간', fallback: '첫 선택지' }
+
+// 처음 넣은 금액, 기간이 어디서 왔는지 한 문장으로
+const AMOUNT_BASIS = { recommend: '맞춤 추천에서 입력한 금액으로', limit: '두 상품의 최대 한도로', fallback: '기본 1,000만원으로' }
+const MONTHS_BASIS = { recommend: '맞춤 추천에서 입력한 기간으로', term: '두 상품의 최대 기간으로', fallback: '첫 번째 선택지로' }
+function getBasisText(basis) {
+  if (basis.amount === 'recommend' && basis.months === 'recommend') return '처음 금액과 기간은 맞춤 추천에서 입력한 값으로 넣었어요.'
+  return `처음 금액은 ${AMOUNT_BASIS[basis.amount]}, 기간은 ${MONTHS_BASIS[basis.months]} 넣었어요.`
+}
 
 // 화면 설명: 입력줄 바로 아래
 const Desc = styled.p`
@@ -75,12 +89,20 @@ const Desc = styled.p`
   font-size: var(--fs-md);
 `
 
-// 계산 기준 안내 + 시작 값 근거: 카드 바로 위
-const CalcNote = styled.p`
-  margin-top: 8px;
+// 계산 기준 안내 + 시작 값 근거: 카드 바로 위, 줄마다 따로 (상환 방식을 정한 줄만 강조)
+const CalcNote = styled.div`
+  margin-top: 12px;
   color: var(--cocoa);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
+  font-size: var(--fs-md);
+`
+
+const CalcLine = styled.p`
+  ${({ $strong }) =>
+    $strong &&
+    `
+    color: var(--ink);
+    font-weight: 700;
+  `}
 `
 
 const Slots = styled.div`
@@ -403,7 +425,14 @@ function ComparePage() {
       />
       <Desc>자금 용도가 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
       {isComparable && (
-        <CalcNote>{`${getCalcNote(plan)}${basis ? ` 시작 값: 금액은 ${AMOUNT_BASIS[basis.amount]}, 기간은 ${MONTHS_BASIS[basis.months]}.` : ''}`}</CalcNote>
+        <CalcNote>
+          {getCalcLines(plan).map((line) => (
+            <CalcLine key={line.text} $strong={line.strong}>
+              {line.text}
+            </CalcLine>
+          ))}
+          {basis && <CalcLine>{getBasisText(basis)}</CalcLine>}
+        </CalcNote>
       )}
       {body}
       <NoteBox>
