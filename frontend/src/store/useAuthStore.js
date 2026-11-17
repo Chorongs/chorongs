@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import * as authApi from '../api/authApi'
 import useMyStore from './useMyStore'
+import { useRecommendStore } from './useRecommendStore'
 
 // ST-01 로그인 정보 (저장 안 함: 로그인은 서버 쿠키 세션, E14)
 // user: { memberNickname, loginType, birthYear, birthDay } (비회원 null) / status: checking, guest, member
@@ -38,6 +39,8 @@ const useAuthStore = create((set) => ({
     } catch {
       // 실패해도 아래에서 비움
     }
+    // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()') 뒤 이 탭의 임시 저장값 전부 비움
+    useRecommendStore.getState().clear()
     sessionStorage.clear()
   },
 }))
