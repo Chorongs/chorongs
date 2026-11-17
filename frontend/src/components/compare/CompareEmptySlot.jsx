@@ -14,7 +14,7 @@ const Wrap = styled.div`
   gap: 8px;
   min-height: 260px;
   padding: 28px 20px;
-  border: 2px dashed var(--line-2);
+  border: 1px dashed var(--line-2);
   border-radius: var(--r-lg);
   background: var(--paper);
   color: var(--cocoa);
