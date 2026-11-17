@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
+import { getCreditReport } from '../../api/myApi'
 import {
   CREDIT_BAND_OPTIONS,
   OVERDUE_OPTIONS,
   PRIORITY_MAX,
   PRIORITY_OPTIONS,
 } from '../../constants/options'
+import useAuthStore from '../../store/useAuthStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import {
   ChipGrid,
@@ -87,8 +90,8 @@ const getBandHint = (creditBand, diagBand) => {
     - props: error ({ field, message } 또는 null, 부른 쪽에서 [추천 받기] 검사에 걸린 칸), onOpenDiag ('모르면 셀프 진단' 누름)
     - 신용 구간은 진단(RC-13)에서 왔으면 store에 이미 들어 있어 미리 선택되어 보임
     - 구간 아래 안내는 이 탭의 진단 구간(diagBand)과 비교
-    - TODO(ST-01, CHORONG-43 Tong-B): 진단 구간이 없으면 회원은 저장한 진단 구간(API-25 myApi.getCreditReport, 창 열 때 1번)을 씀.
-      useAuthStore가 올라오면 회원일 때만 부르기 (비회원이 부르면 401 안내 창이 뜸)
+    - 이 탭의 진단 구간이 없으면 회원은 저장한 진단 구간(API-25 myApi.getCreditReport)과 비교. 창 열 때 1번, 회원일 때만 부름 (비회원이 부르면 401 안내 창이 뜸).
+      못 불러오면 기본 안내 그대로 (따로 안내 안 함) (CHORONG-43에서 연결)
     - 가장 중요한 것은 3개까지 (4번째를 고르면 ChipGroup이 알림), 하나도 안 고르면 실행 안 됨 (검사는 RecommendStepper)
     - 정확한 점수는 받지 않음 (구간만), 입력값 console 출력 금지 (E6)
 */
@@ -96,9 +99,25 @@ function StepCredit({ error, onOpenDiag }) {
   const input = useRecommendStore((state) => state.input)
   const diagBand = useRecommendStore((state) => state.diagBand)
   const setInput = useRecommendStore((state) => state.setInput)
+  const isMember = useAuthStore((state) => state.status === 'member')
+  // 저장한 진단 구간 (API-25, 회원만). 없거나 못 불러오면 null
+  const [savedBand, setSavedBand] = useState(null)
+
+  useEffect(() => {
+    if (diagBand || !isMember) return
+    let isCancelled = false
+    getCreditReport()
+      .then((report) => {
+        if (!isCancelled) setSavedBand(report?.creditBand ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [diagBand, isMember])
 
   const errorOf = (field) => (error?.field === field ? error.message : '')
-  const bandHint = getBandHint(input.creditBand, diagBand)
+  const bandHint = getBandHint(input.creditBand, diagBand ?? savedBand)
 
   return (
     <FormStack>
