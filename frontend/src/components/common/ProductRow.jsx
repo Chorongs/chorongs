@@ -167,10 +167,10 @@ const CompareBadge = styled.span`
   display: inline-flex;
   align-items: center;
   margin-left: 8px;
-  padding: 1px 8px;
+  padding: 4px 8px;
   border-radius: var(--r-pill);
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   font-size: var(--fs-2xs);
   font-weight: 800;
   vertical-align: 1px;

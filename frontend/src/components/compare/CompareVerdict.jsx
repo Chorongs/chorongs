@@ -10,11 +10,11 @@ const Wrap = styled.section`
   flex-wrap: wrap;
   align-items: center;
   gap: 16px 28px;
-  padding: 22px 26px;
+  padding: 20px 28px;
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   @media (max-width: 899px) {
-    padding: 18px 20px;
+    padding: 16px 20px;
   }
 `
 
