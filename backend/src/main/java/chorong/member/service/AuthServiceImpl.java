@@ -45,6 +45,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void savePendingSignup(HttpSession session, SocialUserDTO social) {
+        session.removeAttribute(SessionConst.LOGIN_MEMBER);
         social.setPendingAt(LocalDateTime.now());
         session.setAttribute(SessionConst.PENDING_SIGNUP, social);
     }
