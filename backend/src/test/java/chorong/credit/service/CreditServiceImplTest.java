@@ -69,6 +69,11 @@ class CreditServiceImplTest {
 		return request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 4);
 	}
 
+	/** 정상 답 목록 (고친 뒤 DTO에 담아 쓰는 용도, DTO에서 꺼낸 목록은 바꾸지 않음) */
+	private List<CreditCheckRequestDTO.AnswerItem> validAnswers() {
+		return new ArrayList<>(validRequest().getAnswers());
+	}
+
 	/** 문항 1~10 모두 같은 문항별 점수를 돌려주는 FastAPI 응답 (실제 값은 0 이하 감점, 0 = 감점 없음) */
 	private FastApiScoreResponseDTO scoreResponse(int score, int itemScore) {
 		List<FastApiScoreResponseDTO.ItemScoreItem> items = new ArrayList<>();
@@ -221,11 +226,11 @@ class CreditServiceImplTest {
 	void 문항_5가_없어도_빈_목록으로_FastAPI에_보낸다() {
 		// Given: 문항 5를 뺀 9문항
 		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
-		CreditCheckRequestDTO request = validRequest();
-		request.getAnswers().removeIf(a -> a.getQuestionNo() == 5);
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.removeIf(a -> a.getQuestionNo() == 5);
 
 		// When
-		creditService.checkCredit(request);
+		creditService.checkCredit(new CreditCheckRequestDTO(answers));
 
 		// Then
 		ArgumentCaptor<FastApiScoreRequestDTO> captor = ArgumentCaptor.forClass(FastApiScoreRequestDTO.class);
@@ -233,6 +238,24 @@ class CreditServiceImplTest {
 		FastApiScoreRequestDTO sent = captor.getValue();
 		assertEquals(10, sent.getAnswers().size());
 		assertEquals(List.of(), sent.getAnswers().get(4).getChoices());
+	}
+
+	@Test
+	void FastAPI에_보낸_보기_목록은_요청_원본을_바꿔도_그대로다() {
+		// Given: 바꿀 수 있는 보기 목록 (문항 1 = [1])
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, 0));
+		List<Integer> originalChoices = new ArrayList<>(List.of(1));
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.set(0, new CreditCheckRequestDTO.AnswerItem(1, originalChoices));
+		creditService.checkCredit(new CreditCheckRequestDTO(answers));
+		ArgumentCaptor<FastApiScoreRequestDTO> captor = ArgumentCaptor.forClass(FastApiScoreRequestDTO.class);
+		verify(fastApiClient).scoreCredit(captor.capture());
+
+		// When: 호출이 끝난 뒤 원본 목록을 바꿈
+		originalChoices.add(3);
+
+		// Then
+		assertEquals(List.of(1), captor.getValue().getAnswers().get(0).getChoices());
 	}
 
 	@Test
@@ -320,41 +343,41 @@ class CreditServiceImplTest {
 	@Test
 	void 문항_5_말고_필수_문항이_빠지면_400() {
 		// Given: 문항 1을 뺀 9문항
-		CreditCheckRequestDTO request = validRequest();
-		request.getAnswers().removeIf(a -> a.getQuestionNo() == 1);
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.removeIf(a -> a.getQuestionNo() == 1);
 
 		// When, Then
-		assertInvalidInput(request);
+		assertInvalidInput(new CreditCheckRequestDTO(answers));
 	}
 
 	@Test
 	void 같은_문항을_두_번_보내면_400() {
 		// Given
-		CreditCheckRequestDTO request = validRequest();
-		request.getAnswers().add(answer(1, 2));
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.add(answer(1, 2));
 
 		// When, Then
-		assertInvalidInput(request);
+		assertInvalidInput(new CreditCheckRequestDTO(answers));
 	}
 
 	@Test
 	void 없는_문항_번호는_400() {
 		// Given
-		CreditCheckRequestDTO request = validRequest();
-		request.getAnswers().add(answer(11, 1));
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.add(answer(11, 1));
 
 		// When, Then
-		assertInvalidInput(request);
+		assertInvalidInput(new CreditCheckRequestDTO(answers));
 	}
 
 	@Test
 	void 단일_문항에_보기를_여러_개_보내면_400() {
 		// Given: 문항 1에 보기 2개
-		CreditCheckRequestDTO request = validRequest();
-		request.getAnswers().set(0, new CreditCheckRequestDTO.AnswerItem(1, List.of(1, 2)));
+		List<CreditCheckRequestDTO.AnswerItem> answers = validAnswers();
+		answers.set(0, new CreditCheckRequestDTO.AnswerItem(1, List.of(1, 2)));
 
 		// When, Then
-		assertInvalidInput(request);
+		assertInvalidInput(new CreditCheckRequestDTO(answers));
 	}
 
 	@Test
@@ -391,9 +414,9 @@ class CreditServiceImplTest {
 	@Test
 	void FastAPI_문항별_점수가_빠지면_503() {
 		// Given: 문항 1 점수 없음
-		FastApiScoreResponseDTO scores = scoreResponse(850, 0);
-		scores.getItemScores().remove(0);
-		when(fastApiClient.scoreCredit(any())).thenReturn(scores);
+		List<FastApiScoreResponseDTO.ItemScoreItem> itemScores = new ArrayList<>(scoreResponse(850, 0).getItemScores());
+		itemScores.remove(0);
+		when(fastApiClient.scoreCredit(any())).thenReturn(new FastApiScoreResponseDTO(850, itemScores));
 
 		// When
 		BusinessException e = assertThrows(BusinessException.class, () -> creditService.checkCredit(validRequest()));

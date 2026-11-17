@@ -166,7 +166,8 @@ public class CreditServiceImpl implements CreditService {
 	private FastApiScoreRequestDTO toScoreRequest(Map<Integer, List<Integer>> answers) {
 		List<FastApiScoreRequestDTO.AnswerItem> items = new ArrayList<>();
 		for (int questionNo = 1; questionNo <= QUESTION_COUNT; questionNo++) {
-			items.add(new FastApiScoreRequestDTO.AnswerItem(questionNo, answers.get(questionNo)));
+			// 요청 DTO의 목록을 그대로 넘기지 않고 복사해 담음 (원본이 바뀌어도 FastAPI 요청은 그대로)
+			items.add(new FastApiScoreRequestDTO.AnswerItem(questionNo, List.copyOf(answers.get(questionNo))));
 		}
 		return new FastApiScoreRequestDTO(items);
 	}
