@@ -5,7 +5,7 @@ import { formatMoney, formatPrepayFee, formatRate } from '../../utils/format'
 import Icon from '../ui/Icon'
 
 // CP-05 비교표: 항목별 A/B 비교. 시안과 같게 가운데 항목 이름, 왼쪽 A(주황 막대), 오른쪽 B(파랑 막대)로 마주 봄
-// 유리한 쪽에 '유리' 딱지 + 진한 가로 막대. 월 상환, 총이자는 금리 중간값 + 원리금균등으로 계산한 값 (utils/loanMath.js, 부모가 계산해서 resultA, resultB로 줌)
+// 유리한 쪽에 '유리' 딱지 + 진한 가로 막대. 월 상환, 총이자는 금리 중간값 + 각 상품의 상환 방식(원리금균등, 원금균등, 만기일시)으로 계산한 값 (utils/loanMath.js, 부모가 계산해서 resultA, resultB로 줌)
 // 값 없음 → '정보 없음' (유리 판정에서 뺌) / 월 상환, 총이자를 못 구하면 '계산 불가' / 한도가 금액이 아닌 상품은 유형 글 (tags의 AMOUNT)
 const Legend = styled.div`
   display: flex;
@@ -148,6 +148,12 @@ function numberCell(num, format, na) {
   return isNumber(num) ? { num, text: format(num) } : { num: null, text: na }
 }
 
+// 월 상환 글: 원금균등은 '첫 달', 만기일시는 '매달 이자'를 뒤에 붙임 (방식마다 월 상환의 뜻이 다름)
+const MONTHLY_NOTE = { EQUAL_P: ' (첫 달)', BULLET: ' (매달 이자)' }
+const naText = (result) => (result.status === 'UNSUPPORTED_METHOD' ? '이 방식은 지원 안 해요' : '계산 불가')
+const monthlyCell = (result) =>
+  numberCell(result.monthly, (value) => `${formatMoney(value, '원')}${MONTHLY_NOTE[result.method] ?? ''}`, naText(result))
+
 function buildRows(productA, productB, resultA, resultB, amountMan, months) {
   const rate = (value) => `${formatRate(value)}%`
   return [
@@ -197,15 +203,15 @@ function buildRows(productA, productB, resultA, resultB, amountMan, months) {
       label: '예상 월 상환액',
       sub: `${months}개월 기준`,
       key: 'monthly',
-      a: numberCell(resultA.monthly, (value) => formatMoney(value, '원'), '계산 불가'),
-      b: numberCell(resultB.monthly, (value) => formatMoney(value, '원'), '계산 불가'),
+      a: monthlyCell(resultA),
+      b: monthlyCell(resultB),
     },
     {
       label: '총이자',
       sub: `${formatMoney(amountMan)} 기준`,
       key: 'totalInterest',
-      a: numberCell(resultA.totalInterest, (value) => formatMoney(value, '원'), '계산 불가'),
-      b: numberCell(resultB.totalInterest, (value) => formatMoney(value, '원'), '계산 불가'),
+      a: numberCell(resultA.totalInterest, (value) => formatMoney(value, '원'), naText(resultA)),
+      b: numberCell(resultB.totalInterest, (value) => formatMoney(value, '원'), naText(resultB)),
     },
   ]
 }

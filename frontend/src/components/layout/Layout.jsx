@@ -16,7 +16,8 @@ import MobileTabBar from './MobileTabBar'
 // 비교함에 상품이 있으면 담기 시작한 화면(맞춤 추천 또는 상품 찾기) 밖으로 이동하지 못하게 막고 안내 알림을 띄운다. (되돌아가는 방식)
 // TODO(CM-17, CHORONG-43): 로그인 안내 창이 올라오면 여기서 그리고, 열려 있을 때 뒤 화면 스크롤을 잠근다. (상세 창은 ProductDetailSheet, 전체 메뉴는 MobileMenu가 잠금)
 // TODO(RC-14, CHORONG-45): 맞춤 추천 창 RecommendDialog가 올라오면 여기서 그린다. (열림 상태는 useUiStore의 recommendOpen, recommendSkipGate, 열려 있을 때 뒤 화면 스크롤 잠금은 RecommendDialog가 함)
-// TODO(LY-09, CHORONG-63): 상시 도우미 HelperPanel이 올라오면 여기서 그린다.
+// 본문 오른쪽에는 300px 칸(#page-side)이 있다: 화면(예: 대출 비교의 '비교할 상품 고르기')이 portal로 내용을 끼워 넣고, 칸이 비어 있으면 안 보인다. (1180 미만은 본문 아래)
+// TODO(LY-09, CHORONG-63): 상시 도우미 HelperPanel이 올라오면 #page-side 칸 안, 끼워 넣은 내용 아래에 그린다. (칸은 도우미가 열려 있거나 끼워 넣은 내용이 있을 때 보이게 바꾼다)
 const Shell = styled.div`
   display: flex;
   flex-direction: column;
@@ -41,7 +42,9 @@ const SkipLink = styled.a`
 
 // 본문 최대 너비 1304, 좌우 여백 16 (768 이상 32) / 본문 위 40, 아래 120 (모바일: 위 24, 아래는 탭바 66 + 56)
 const Main = styled.main`
+  display: grid;
   flex: 1;
+  grid-template-columns: minmax(0, 1fr);
   width: min(100% - 32px, 1304px);
   margin: 0 auto;
   padding: 40px 0 120px;
@@ -51,10 +54,37 @@ const Main = styled.main`
   @media (min-width: 768px) {
     width: min(100% - 64px, 1304px);
   }
+  /* 오른쪽 칸에 내용이 있을 때만 2열 (본문 + 300, 사이 간격 48) */
+  @media (min-width: 1180px) {
+    &:has(> aside:not(:empty)) {
+      grid-template-columns: minmax(0, 1fr) 300px;
+      column-gap: 48px;
+      align-items: start;
+    }
+  }
   @media (max-width: 899px) {
     padding: 24px 0 calc(66px + 56px + env(safe-area-inset-bottom));
   }
 `
+
+// 본문 칸 (오른쪽 칸과 나란히 놓기 위해 감쌈)
+const Content = styled.div`
+  min-width: 0;
+`
+
+// 본문 오른쪽 칸: 화면이 내용을 끼워 넣는 자리 (위: 화면 내용, 아래: 상시 도우미)
+const Side = styled.aside`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  &:empty {
+    display: none;
+  }
+`
+
+// 비교함을 담기 시작한 화면 묶음 이름 (이동을 막을 때 알림 글)
+const COMPARE_PAGE_LABEL = { recommend: '추천 결과', search: '상품 찾기', liked: '찜한 대출' }
 
 function Layout() {
   const { pathname, search } = useLocation()
@@ -72,7 +102,7 @@ function Layout() {
     const isBlocked = tray.length > 0 && from !== null && getComparePage(pathname) !== getComparePage(from)
     if (isBlocked) {
       navigate(lastAllowedRef.current ?? from, { replace: true })
-      showToast(`${getComparePage(from) === 'recommend' ? '추천 결과' : '상품 찾기'}에서 담은 비교함이 있어요. [비교하기]를 누르거나 비교함을 비운 뒤 이동해 주세요`)
+      showToast(`${COMPARE_PAGE_LABEL[getComparePage(from)] ?? '상품 찾기'}에서 담은 비교함이 있어요. [비교하기]를 누르거나 비교함을 비운 뒤 이동해 주세요`)
       useCompareStore.getState().shakeTray()
     } else {
       lastAllowedRef.current = `${pathname}${search}`
@@ -92,7 +122,10 @@ function Layout() {
       <SkipLink href="#main">본문 바로가기</SkipLink>
       <Header />
       <Main id="main" tabIndex={-1}>
-        <Outlet />
+        <Content>
+          <Outlet />
+        </Content>
+        <Side id="page-side" />
       </Main>
       <Footer />
       <MobileTabBar />

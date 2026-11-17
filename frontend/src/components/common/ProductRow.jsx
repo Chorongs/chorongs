@@ -1,7 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
-import useCompareStore, { getComparePage, getTraySlot, hasSamePurpose } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { CompareButton, Tag } from '../../styles/common'
 import Icon from '../ui/Icon'
@@ -14,7 +14,7 @@ import RateText from './RateText'
 // TODO(CM-06, CHORONG-43): 찜 버튼 LikeButton 연결 (클릭이 줄까지 안 퍼지게 e.stopPropagation)
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
 //   오른쪽에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
-//   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도가 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
+//   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
 const Row = styled.article`
   display: grid;
   grid-template-columns: minmax(0, 1fr) 168px 128px${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
@@ -180,9 +180,9 @@ function ProductRow({ product, from = null }) {
   const { pathname } = useLocation()
   // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 자금 용도가 안 겹치면 '비교 불가'
   const trayLabel = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
-  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && !hasSamePurpose(state.tray[0], product))
+  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
   const addTray = useCompareStore((state) => state.addTray)
-  const hasCompare = getComparePage(pathname) !== null
+  const hasCompare = getComparePage(pathname) !== null && product.productStatus === 'ON'
   // 비교 안 하는 화면(랭킹 등)에서는 담긴 표시도 안 함
   const traySlot = hasCompare ? trayLabel : null
   const featureTags = (product.features ?? []).slice(0, 2)

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import * as myApi from '../api/myApi'
 import * as productApi from '../api/productApi'
@@ -16,7 +17,14 @@ import useCompareStore, { getPurposes, hasSamePurpose } from '../store/useCompar
 import useUiStore from '../store/useUiStore'
 import { Button, EmptyBox } from '../styles/common'
 import { isNumberInRange } from '../utils/validate'
-import { adjustCompareInput, getCompareWinners, getLoanResult } from '../utils/loanMath'
+import {
+  adjustCompareInput,
+  getCompareDefaults,
+  getCompareWinners,
+  getLoanResult,
+  getMethodPlan,
+  REPAY_METHODS,
+} from '../utils/loanMath'
 
 // CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도가 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
 //   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
@@ -26,23 +34,53 @@ import { adjustCompareInput, getCompareWinners, getLoanResult } from '../utils/l
 // 금액, 기간이 비면 오류 문구 + 결과(카드, 판정, 비교표) 숨김
 // TODO(CM-17, CM-22, CHORONG-43): requireLogin이 올라오면 [결과 저장]을 requireLogin(저장, '비교 결과 저장은 회원 전용이에요.')으로 감싼다.
 //   지금은 요청을 보내고 401이면 같은 문구를 알림으로 보여 준다.
-const DEFAULT_AMOUNT_MAN = 2000
+// TODO(ST-03, CHORONG-45): 처음 넣는 금액, 기간은 맞춤 추천에서 입력한 값(useRecommendStore의 lastInput need, months)을 getCompareDefaults의 마지막 값으로 넘긴다. (지금은 없음으로 넘겨 두 상품의 최대 한도, 최대 기간으로 시작)
+// 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
+// 상품을 받기 전에 잠깐 보이는 값만 아래 기본값
+const DEFAULT_AMOUNT_MAN = 1000
 const DEFAULT_MONTHS = 36
 const MAX_AMOUNT_MAN = 100000
 
-// 오른쪽에 비교할 상품 고르기(300), 좁은 화면(1180 미만)에서는 결과 아래
-const Shell = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  @media (min-width: 1180px) {
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 48px;
-    align-items: start;
+// 처음 넣은 금액, 기간의 근거 글 (사용자가 값을 바꾸면 사라짐)
+// 상환 방식 글 (코드 → 글, '~로' 붙은 글)
+const METHOD_LABEL = Object.fromEntries(REPAY_METHODS.map((item) => [item.code, item.label]))
+const METHOD_WITH_RO = { EQUAL_PI: '원리금균등으로', EQUAL_P: '원금균등으로', BULLET: '만기일시로' }
+const MONTHLY_MEANING = { EQUAL_P: '원금균등의 월 상환액은 첫 달', BULLET: '만기일시의 월 상환액은 매달 내는 이자' }
+
+// 계산 기준 안내: 상환 방식을 어떻게 정했는지와 그 이유
+function getCalcNote(plan) {
+  const base = '금리는 범위의 중간값으로 계산해요.'
+  if (!plan) return base
+  if (plan.mode === 'choose') return `${base} 고른 상환 방식으로 두 상품을 똑같이 계산해요. 월 상환액은 원금균등이면 첫 달, 만기일시면 매달 이자예요.`
+  if (plan.mode === 'fixed') {
+    const label = METHOD_LABEL[plan.method]
+    const because = {
+      A: `A가 ${label}만 가능해서`,
+      B: `B가 ${label}만 가능해서`,
+      both: `두 상품 모두 ${label}만 가능해서`,
+      common: `두 상품이 모두 가능한 방식이 ${label}뿐이라서`,
+    }[plan.limitedBy]
+    const meaning = MONTHLY_MEANING[plan.method]
+    return `${base} ${because} ${METHOD_WITH_RO[plan.method]} 계산했어요.${meaning ? ` ${meaning}이에요.` : ''}`
   }
+  return `${base} 두 상품이 모두 가능한 상환 방식이 없어서 A는 ${METHOD_WITH_RO[plan.methodA]}, B는 ${METHOD_WITH_RO[plan.methodB]} 각각 계산했어요. 방식이 달라 월 상환액은 유리 판정에 넣지 않아요. 원금균등의 월 상환액은 첫 달, 만기일시는 매달 내는 이자예요.`
+}
+const AMOUNT_BASIS = { recommend: '맞춤 추천 입력값', limit: '두 상품의 최대 한도', fallback: '기본 1,000만원' }
+const MONTHS_BASIS = { recommend: '맞춤 추천 입력값', term: '두 상품의 최대 기간', fallback: '첫 선택지' }
+
+// 화면 설명: 입력줄 바로 아래
+const Desc = styled.p`
+  margin-top: 16px;
+  color: var(--cocoa);
+  font-size: var(--fs-md);
 `
 
-const Main = styled.div`
-  min-width: 0;
+// 계산 기준 안내 + 시작 값 근거: 카드 바로 위
+const CalcNote = styled.p`
+  margin-top: 8px;
+  color: var(--cocoa);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
 `
 
 const Slots = styled.div`
@@ -101,6 +139,19 @@ function getShownProducts(idA, idB, byId) {
   return { productA, productB }
 }
 
+// Layout 오른쪽 칸 찾기 (바뀌지 않는 DOM 값이라 구독할 것은 없음)
+const subscribeNothing = () => () => {}
+const getSideEl = () => document.getElementById('page-side')
+
+// 화면 폭 1180px 이상이면 사이드바가 오른쪽 칸, 미만이면 판정 요약과 비교표 사이 (창을 줄이거나 늘리면 바로 바뀜)
+const WIDE_QUERY = '(min-width: 1180px)'
+const subscribeWide = (onChange) => {
+  const media = window.matchMedia(WIDE_QUERY)
+  media.addEventListener('change', onChange)
+  return () => media.removeEventListener('change', onChange)
+}
+const getIsWide = () => window.matchMedia(WIDE_QUERY).matches
+
 const isOpen = (product) => Boolean(product) && product.productStatus !== 'HIDDEN'
 
 // 비교에 쓰는 상품들의 겹치는 자금 용도 (한 상품이면 그 상품 용도)
@@ -117,17 +168,38 @@ function ComparePage() {
 
   const [amount, setAmount] = useState(DEFAULT_AMOUNT_MAN)
   const [months, setMonths] = useState(DEFAULT_MONTHS)
+  const [basis, setBasis] = useState(null)
+  const [method, setMethod] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   // 받은 결과에 어느 조합, 몇 번째 시도였는지 같이 적어 두면 '불러오는 중'을 따로 저장하지 않고 알 수 있다.
   const [result, setResult] = useState({ key: null, products: [], isFailed: false })
   const topRef = useRef(null)
+  // Layout 오른쪽 칸(#page-side). 서버 렌더에는 없고, 화면에 붙은 뒤에 DOM에서 찾음
+  const sideEl = useSyncExternalStore(subscribeNothing, getSideEl, () => null)
+  const isWide = useSyncExternalStore(subscribeWide, getIsWide, () => true)
   const inputRef = useRef({ amount, months })
+  const hasStartedRef = useRef(false)
 
   // 응답 안에서 가장 최근 입력값을 읽기 위한 복사 (조정 때 알림을 띄울지 판단)
   useEffect(() => {
     inputRef.current = { amount, months }
   })
+
+  // 사용자가 직접 바꾸면 처음 값은 끝 (이후 상품을 바꿔도 사용자 값은 한도, 기간에 맞게만 조정)
+  const handleAmountChange = (value) => {
+    hasStartedRef.current = true
+    setBasis(null)
+    setAmount(value)
+  }
+  const handleMethodChange = (value) => {
+    setMethod(value)
+  }
+  const handleMonthsChange = (value) => {
+    hasStartedRef.current = true
+    setBasis(null)
+    setMonths(value)
+  }
 
   const key = `${idA}-${idB}-${attempt}`
 
@@ -145,8 +217,18 @@ function ComparePage() {
         const { productA, productB } = getShownProducts(idA, idB, byId)
         if (!isOpen(productA) || !isOpen(productB)) return
         const current = inputRef.current
-        // 금액, 기간 자동 조정 계산은 utils/loanMath.js (테스트 있음)
-        const next = adjustCompareInput(current, productA, productB, getTermOptions(getSharedPurposes([productA, productB])))
+        const options = getTermOptions(getSharedPurposes([productA, productB]))
+        // 처음 두 상품이 들어왔을 때: 맞춤 추천 입력값 → 없으면 최대 한도, 최대 기간으로 시작 (알림 없이 근거 글만)
+        if (!hasStartedRef.current) {
+          hasStartedRef.current = true
+          const start = getCompareDefaults(productA, productB, options, null)
+          setAmount(start.amount)
+          setMonths(start.months)
+          setBasis({ amount: start.amountSource, months: start.monthsSource })
+          return
+        }
+        // 그 뒤 상품이 바뀌면 입력값을 한도, 기간에 맞게만 조정 (utils/loanMath.js, 테스트 있음)
+        const next = adjustCompareInput(current, productA, productB, options)
         if (next.amount !== current.amount || next.months !== current.months) {
           setAmount(next.amount)
           setMonths(next.months)
@@ -177,9 +259,17 @@ function ComparePage() {
 
   const isComparable = isOpen(productA) && isOpen(productB)
   const isReady = isAmountValid && isMonthsValid
-  const loanA = isReady ? getLoanResult(productA, amount, months) : { status: 'UNAVAILABLE' }
-  const loanB = isReady ? getLoanResult(productB, amount, months) : { status: 'UNAVAILABLE' }
-  const winners = getCompareWinners(productA, productB, loanA, loanB)
+  // 상환 방식: 두 상품이 모두 가능한 방식으로 정함 (2개 이상이면 칩으로 고름, 1개면 그 방식으로 고정, 없으면 상품마다 따로)
+  const plan = isComparable ? getMethodPlan(productA, productB) : null
+  const chosenMethod = plan?.mode === 'choose' ? (plan.options.includes(method) ? method : plan.options[0]) : null
+  const methodOf = {
+    A: plan?.mode === 'choose' ? chosenMethod : plan?.mode === 'fixed' ? plan.method : plan?.methodA,
+    B: plan?.mode === 'choose' ? chosenMethod : plan?.mode === 'fixed' ? plan.method : plan?.methodB,
+  }
+  const methodOptions = plan?.mode === 'choose' ? plan.options.map((code) => ({ value: code, label: METHOD_LABEL[code] })) : []
+  const loanA = isReady ? getLoanResult(productA, amount, months, methodOf.A) : { status: 'UNAVAILABLE' }
+  const loanB = isReady ? getLoanResult(productB, amount, months, methodOf.B) : { status: 'UNAVAILABLE' }
+  const winners = getCompareWinners(productA, productB, loanA, loanB, plan?.mode !== 'separate')
 
   // 빈 칸에서 상품 찾기로 갈 때 남기는 상품 (남은 쪽이 숨김 상품이면 없는 것으로)
   const keepForA = isOpen(productB) ? productB : null
@@ -209,6 +299,7 @@ function ComparePage() {
     }
   }
 
+
   // 한 칸: 상품이 있으면 간단한 카드(숨김 상품은 안내 카드), 없으면 빈 칸
   const renderSlot = (slot, product, keepProduct) =>
     product ? (
@@ -216,6 +307,21 @@ function ComparePage() {
     ) : (
       <CompareEmptySlot slot={slot} keepProduct={keepProduct} />
     )
+
+  // 비교할 상품 고르기: 넓은 화면은 Layout 오른쪽 칸(도우미 위), 좁은 화면은 카드, 판정 요약과 비교표 사이
+  const sidebar = (
+    <CompareSidebar
+      slotProducts={{ A: isOpen(productA) ? productA : null, B: isOpen(productB) ? productB : null }}
+      onPicked={handlePicked}
+    />
+  )
+
+  // 판정 요약 (A 0 : B 2): 넓은 화면은 카드 바로 아래, 좁은 화면은 비교할 상품 고르기 아래
+  const verdict = (
+    <VerdictBox>
+      <CompareVerdict winners={winners} resultA={loanA} resultB={loanB} amountMan={amount} months={months} />
+    </VerdictBox>
+  )
 
   let body
   if (isLoading) {
@@ -237,21 +343,29 @@ function ComparePage() {
     )
   } else if (!isComparable) {
     body = (
-      <Slots>
-        {renderSlot('A', productA, keepForA)}
-        {renderSlot('B', productB, keepForB)}
-      </Slots>
+      <>
+        <Slots>
+          {renderSlot('A', productA, keepForA)}
+          {renderSlot('B', productB, keepForB)}
+        </Slots>
+        {!isWide && sidebar}
+      </>
     )
   } else if (isReady) {
     body = (
       <>
         <Slots>
-          <CompareCard slot="A" product={productA} amountMan={amount} months={months} />
-          <CompareCard slot="B" product={productB} amountMan={amount} months={months} />
+          <CompareCard slot="A" product={productA} amountMan={amount} months={months} method={methodOf.A} />
+          <CompareCard slot="B" product={productB} amountMan={amount} months={months} method={methodOf.B} />
         </Slots>
-        <VerdictBox>
-          <CompareVerdict winners={winners} resultA={loanA} resultB={loanB} amountMan={amount} months={months} />
-        </VerdictBox>
+        {isWide ? (
+          verdict
+        ) : (
+          <>
+            {sidebar}
+            {verdict}
+          </>
+        )}
         <CompareTable
           productA={productA}
           productB={productB}
@@ -274,35 +388,32 @@ function ComparePage() {
 
   return (
     <div ref={topRef}>
-      <PageHeader
-        crumbs={['대출 비교']}
-        title="대출 비교"
-        description="자금 용도가 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요."
+      <PageHeader crumbs={['대출 비교']} title="대출 비교" />
+      <CompareInput
+        amount={amount}
+        months={months}
+        method={chosenMethod}
+        termOptions={termOptions}
+        methodOptions={methodOptions}
+        amountError={amountError}
+        monthsError={monthsError}
+        onAmountChange={handleAmountChange}
+        onMonthsChange={handleMonthsChange}
+        onMethodChange={handleMethodChange}
       />
-      <Shell>
-        <Main>
-          <CompareInput
-            amount={amount}
-            months={months}
-            termOptions={termOptions}
-            amountError={amountError}
-            monthsError={monthsError}
-            onAmountChange={setAmount}
-            onMonthsChange={setMonths}
-          />
-          {body}
-          <NoteBox>
-            <Disclaimer>
-              금리만 보고 고르지 마세요. 실제 금리는 신용점수와 심사에 따라 달라지고, 중도상환수수료와 신청 자격도 함께 봐야
-              해요.
-            </Disclaimer>
-          </NoteBox>
-        </Main>
-        <CompareSidebar
-          slotProducts={{ A: isOpen(productA) ? productA : null, B: isOpen(productB) ? productB : null }}
-          onPicked={handlePicked}
-        />
-      </Shell>
+      <Desc>자금 용도가 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
+      {isComparable && (
+        <CalcNote>{`${getCalcNote(plan)}${basis ? ` 시작 값: 금액은 ${AMOUNT_BASIS[basis.amount]}, 기간은 ${MONTHS_BASIS[basis.months]}.` : ''}`}</CalcNote>
+      )}
+      {body}
+      <NoteBox>
+        <Disclaimer>
+          금리만 보고 고르지 마세요. 실제 금리는 신용점수와 심사에 따라 달라지고, 중도상환수수료와 신청 자격도 함께 봐야
+          해요.
+        </Disclaimer>
+      </NoteBox>
+      {/* 넓은 화면(1180 이상): Layout 오른쪽 칸(도우미 위)에 끼워 넣음 */}
+      {isWide && sideEl && createPortal(sidebar, sideEl)}
     </div>
   )
 }

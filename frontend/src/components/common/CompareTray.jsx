@@ -7,7 +7,7 @@ import Icon from '../ui/Icon'
 
 // CM-09 비교함: 비교할 상품 2개를 담아 두는 떠 있는 바 (Layout에서 한 번만 그림). 모양은 시안과 같게: 어두운 바, 가운데
 // 비어 있으면, 비교 화면(/compare)에서는 안 보임. [비교하기] → 두 상품을 비교 화면 상품(pair)으로 옮기고 /compare 이동, 비교함은 비움
-// 담는 규칙(같은 용도끼리만, 3번째는 B 바꾸기)은 useCompareStore.addTray가 한다.
+// 담는 규칙(자금 용도와 상환 방식이 겹치는 상품끼리만, 3번째는 B 바꾸기)은 useCompareStore.addTray가 한다.
 // 담기 시작한 화면 밖으로 이동하려다 막히면(Layout) 바를 한 번 흔든다. (useCompareStore의 shakeCount)
 const shake = keyframes`
   0%, 100% {

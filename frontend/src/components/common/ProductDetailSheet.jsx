@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
-import useCompareStore, { getComparePage, getTraySlot, hasSamePurpose } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
@@ -306,8 +306,8 @@ function ProductDetail({ product, onClose }) {
   const addTray = useCompareStore((state) => state.addTray)
   // 비교함에서 A, B 어느 칸인지 / 비교함 첫 상품과 용도가 안 겹치면 '비교 불가' (상품 한 줄과 같은 표시)
   const traySlot = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
-  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && !hasSamePurpose(state.tray[0], product))
-  const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking'
+  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
+  const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking' && product.productStatus === 'ON'
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (

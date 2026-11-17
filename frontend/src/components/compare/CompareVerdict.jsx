@@ -62,6 +62,7 @@ const REASON_TEXT = {
   OVER_LIMIT: '입력한 금액이나 기간이 한도를 넘어서',
   OVER_TERM: '입력한 금액이나 기간이 한도를 넘어서',
   INVALID: '입력값으로는 계산할 수 없어서',
+  UNSUPPORTED_METHOD: '고른 상환 방식을 지원하지 않아서',
 }
 
 function countWins(winners, slot) {
