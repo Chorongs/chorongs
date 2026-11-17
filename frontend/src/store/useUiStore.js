@@ -36,6 +36,11 @@ const useUiStore = create(
       openRecommend: (skipGate = false) => set({ recommendOpen: true, recommendSkipGate: skipGate }),
       closeRecommend: () => set({ recommendOpen: false, recommendSkipGate: false }),
 
+      // 로그인 안내 창 (CM-17): 상황 글과 함께 엶 (requireLogin, 401). 닫을 때는 쓰는 쪽에서 setState({ loginDialogOpen: false })
+      loginDialogOpen: false,
+      loginDialogText: '',
+      openLoginDialog: (text) => set({ loginDialogOpen: true, loginDialogText: text }),
+
       // 알림: { id, message } / 같은 글이 다시 와도 id가 달라 시간을 다시 셈
       toast: null,
       showToast: (message) => {

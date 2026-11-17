@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isBlank, isLengthInRange, isNumberInRange, isValidNickname } from './validate'
+import {
+  isBlank,
+  isLengthInRange,
+  isNumberInRange,
+  isSafeReturnPath,
+  isValidBirthDate,
+  isValidNickname,
+} from './validate'
 
 describe('isBlank', () => {
   it('공백만 있는 글자는 빈 값이다', () => {
@@ -130,6 +137,111 @@ describe('isValidNickname', () => {
     const nickname = ' 캐 '
     // When
     const result = isValidNickname(nickname)
+    // Then
+    expect(result).toBe(false)
+  })
+})
+
+describe('isValidBirthDate', () => {
+  const today = new Date(2026, 10, 17)
+
+  it('형식에 맞는 지난 날짜는 통과한다', () => {
+    // Given
+    const text = '1999-03-15'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it('오늘 날짜는 통과한다', () => {
+    // Given
+    const text = '2026-11-17'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it('미래 날짜는 실패한다', () => {
+    // Given
+    const text = '2026-11-18'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('1900년 이전은 실패한다', () => {
+    // Given
+    const text = '1899-12-31'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('없는 날짜(2월 30일)는 실패한다', () => {
+    // Given
+    const text = '2001-02-30'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('형식이 다르면(YYYY.MM.DD) 실패한다', () => {
+    // Given
+    const text = '1999.03.15'
+    // When
+    const result = isValidBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+})
+
+describe('isSafeReturnPath', () => {
+  it("'/'로 시작하는 사이트 안 주소는 통과한다", () => {
+    // Given
+    const path = '/search?purpose=생활비'
+    // When
+    const result = isSafeReturnPath(path)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it("'//'로 시작하는 다른 사이트 주소는 실패한다", () => {
+    // Given
+    const path = '//evil.example.com'
+    // When
+    const result = isSafeReturnPath(path)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('http로 시작하는 바깥 주소는 실패한다', () => {
+    // Given
+    const path = 'https://evil.example.com'
+    // When
+    const result = isSafeReturnPath(path)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it("'/\\'로 시작하는 주소는 실패한다", () => {
+    // Given
+    const path = '/\\evil.example.com'
+    // When
+    const result = isSafeReturnPath(path)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('값이 없으면 실패한다', () => {
+    // Given
+    const path = null
+    // When
+    const result = isSafeReturnPath(path)
     // Then
     expect(result).toBe(false)
   })

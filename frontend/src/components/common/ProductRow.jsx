@@ -2,25 +2,27 @@ import styled from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
 import { Tag } from '../../styles/common'
+import LikeButton from './LikeButton'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
 
 // CM-04 상품 한 줄: 금융사 / 상품명 / 태그 2개 (상품 특징 앞 2개) / 금리 / 한도
 // 줄 아무 곳 클릭, Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
-// TODO(CM-06, CHORONG-43): 찜 버튼 LikeButton 연결 (클릭이 줄까지 안 퍼지게 e.stopPropagation)
+// 찜 버튼 LikeButton (CM-06): 오른쪽 맞춤 칸(auto). 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation
+//   720 이하에서는 3열(1fr 1fr auto)에서 1행 오른쪽
 // TODO(ST-04, CHORONG-47): [+ 비교] 버튼과 useCompareStore 연결 (폭 480 이하에서는 숨김)
 //   두 버튼이 올라오면 오른쪽에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)에서 1행 오른쪽으로 보낸다.
 const Row = styled.article`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px 128px;
+  grid-template-columns: minmax(0, 1fr) 168px 128px auto;
   gap: 20px;
   align-items: center;
   padding: 20px 2px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
   @container plist (max-width: 720px) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 2px 12px;
     align-items: start;
     padding: 18px 0;
@@ -33,7 +35,17 @@ const Info = styled.div`
   gap: 2px;
   min-width: 0;
   @container plist (max-width: 720px) {
-    grid-column: 1 / -1;
+    grid-column: 1 / 3;
+    grid-row: 1;
+  }
+`
+
+// 줄 끝 버튼 칸 (찜). 720 이하에서는 1행 오른쪽
+const RowActions = styled.div`
+  display: flex;
+  align-items: center;
+  @container plist (max-width: 720px) {
+    grid-column: 3;
     grid-row: 1;
   }
 `
@@ -161,6 +173,9 @@ function ProductRow({ product, from = null }) {
           <LimitCell product={product} />
         </MetricValue>
       </Metric>
+      <RowActions>
+        <LikeButton productId={product.productId} />
+      </RowActions>
     </Row>
   )
 }

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
@@ -10,6 +12,7 @@ import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
 import Disclaimer from './Disclaimer'
+import LikeButton from './LikeButton'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
 
@@ -20,9 +23,9 @@ import RateText from './RateText'
 //
 // TODO(CM-08, CHORONG-45): '내 조건 안내' EligibilityNotice (3칸 아래, useRecommendStore의 입력값이 올라온 뒤)
 // TODO(RC-09, CHORONG-45): 추천 이유 ReasonList (sheetFrom이 'recommend'일 때 3칸 아래, productId를 넘겨 표시)
-// TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
+// [찜하기] LikeButton (CM-06)을 버튼 줄 첫 칸에 연결함 (+ 비교가 올라오면 3칸: 찜하기 / + 비교 / 이자 계산)
 // TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
-// TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
+// 회원이면 최근 본 대출 기록 myApi.postRecentView (API-21, 실패는 안내 안 함)
 // TODO(CM-16, CHORONG-52): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // TODO(ST-03, CHORONG-45): [이자 계산] 금액은 useRecommendStore의 lastInput.need와 한도 중 작은 값 (지금은 기본값 1,000만원)
 const DEFAULT_NEED_MAN = 1000
@@ -166,10 +169,10 @@ const ExternalLink = styled.a`
   font-weight: 700;
 `
 
-// 지금은 [이자 계산] 하나라 한 칸. 찜하기, + 비교가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
+// 지금은 [찜하기], [이자 계산] 2칸. + 비교가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
 const Actions = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 `
 
@@ -400,6 +403,7 @@ function ProductDetail({ product, onClose }) {
       ))}
 
       <Actions>
+        <LikeButton productId={product.productId} hasLabel />
         <Button onClick={handleCalc}>
           이자 계산
           <Icon name="arrow" size={13} />
@@ -466,6 +470,7 @@ function ProductDetailSheet() {
   useEffect(() => {
     if (productId === null) return
     productApi.postProductView(productId).catch(() => {})
+    if (useAuthStore.getState().status === 'member') myApi.postRecentView(productId).catch(() => {})
   }, [productId])
 
   // 열려 있는 동안 뒤 화면 스크롤 잠금

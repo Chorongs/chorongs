@@ -1,4 +1,7 @@
 import axios from 'axios'
+import useAuthStore from '../store/useAuthStore'
+import useMyStore from '../store/useMyStore'
+import useUiStore from '../store/useUiStore'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
@@ -15,7 +18,11 @@ api.interceptors.response.use(
       if (url.startsWith('/api/admin/')) {
         // TODO(ST-06, CHORONG-55): 서버 문구 안내 + /admin/login 이동
       } else if (url !== '/api/auth/me') {
-        // TODO(ST-01, CM-17, CHORONG-43): 화면 상태 guest로 + 로그인 안내 창 '로그인이 풀렸어요. 다시 로그인해 주세요' (입력 중인 값은 지우지 않음)
+        // 회원 기능: 화면 상태 guest로, 찜 번호 비움 (회원 관리 기획서 3-5) + 로그인 안내 창 (입력 중인 값은 지우지 않음)
+        // 앱 시작 확인(/api/auth/me)은 안내 안 함
+        useAuthStore.setState({ user: null, status: 'guest' })
+        useMyStore.setState({ likedIds: [] })
+        useUiStore.getState().openLoginDialog('로그인이 풀렸어요. 다시 로그인해 주세요')
       }
     }
     return Promise.reject(error)

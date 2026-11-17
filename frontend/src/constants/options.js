@@ -25,3 +25,9 @@ export const REPAY_METHOD_CODE = {
   원금균등: 'EQUAL_P',
   만기일시: 'BULLET',
 }
+
+// 로그인 방법 코드 → 화면 글 (MemberResponseDTO loginType)
+export const LOGIN_TYPE_LABEL = {
+  KAKAO: '카카오',
+  NAVER: '네이버',
+}
