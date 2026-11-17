@@ -243,6 +243,7 @@ const GuideLink = styled(Link)`
     RC-12 불법 금융 대응 3단계 (SCR-01)
     - 큰 제목 + 한 줄 + 카드 3장 (1 상담 즉시 중단, 2 증거 보관, 3 기관 신고) + '대응 방법 자세히 보기' → /help/illegal
     - 글은 모두 고정 (서버 호출 없음). 카드 한 줄 설명은 가안 기준 (명세서에는 기관 신고의 '금융감독원 1332'만 있음)
+    - TODO(LY-01, CHORONG-63 김채희): /help/illegal 화면은 도움말 이슈가 라우트를 추가해야 생김. 그 전에는 '찾을 수 없음' 화면이 나옴
 */
 function IllegalSteps() {
   return (

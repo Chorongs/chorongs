@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getCalcState } from './recommend'
+import { formatMatchRate, getCalcState, toManWon } from './recommend'
 
 // 테스트용 추천 항목: 한도 1,000만원, 최대 60개월, 예상 금리 2.0~3.0
 const makeItem = (productChanges = {}, itemChanges = {}) => ({
@@ -151,5 +151,54 @@ describe('getCalcState 상환 방식', () => {
     const result = getCalcState(item, null)
     // Then
     expect(result.repayMethod).toBe('EQUAL_PI')
+  })
+})
+
+describe('formatMatchRate', () => {
+  it('소수 일치도를 반올림한 정수로 돌려준다', () => {
+    // Given
+    const matchRate = 96.5
+    // When
+    const result = formatMatchRate(matchRate)
+    // Then
+    expect(result).toBe(97)
+  })
+
+  it('정수 일치도는 그대로 돌려준다', () => {
+    // Given
+    const matchRate = 80
+    // When
+    const result = formatMatchRate(matchRate)
+    // Then
+    expect(result).toBe(80)
+  })
+})
+
+describe('toManWon', () => {
+  it('100만원보다 작으면 소수 첫째 자리까지 만원으로 바꾼다', () => {
+    // Given
+    const won = 289000
+    // When
+    const result = toManWon(won)
+    // Then
+    expect(result).toBe(28.9)
+  })
+
+  it('100만원 이상이면 정수 만원으로 바꾼다', () => {
+    // Given
+    const won = 1234500
+    // When
+    const result = toManWon(won)
+    // Then
+    expect(result).toBe(123)
+  })
+
+  it('딱 떨어지는 금액은 소수점 없이 돌려준다', () => {
+    // Given
+    const won = 300000
+    // When
+    const result = toManWon(won)
+    // Then
+    expect(result).toBe(30)
   })
 })

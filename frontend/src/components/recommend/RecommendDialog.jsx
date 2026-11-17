@@ -30,7 +30,7 @@ const Title = styled.h2`
   margin: 0;
   color: var(--ink);
   font-family: var(--f-ui);
-  font-size: var(--fs-h3);
+  font-size: var(--fs-h4);
   font-weight: 800;
 `
 
@@ -88,7 +88,7 @@ function RecommendDialogBody() {
 
 /*
     RC-14 맞춤 추천 창 (SCR-26)
-    - 어느 화면에서든 뜨는 추천 입력 창. Layout(LY-03)에서 한 번만 그림 (Layout은 조빌립 담당, 연결 TODO)
+    - 어느 화면에서든 뜨는 추천 입력 창. Layout(LY-03)에서 한 번만 그림 (Layout.jsx에 연결했음)
     - 열림은 useUiStore(recommendOpen, closeRecommend). 여는 곳은 openRecommend(skipGate)
     - 제목 '캐링 추천' + 닫기 / '잠깐' 창(RC-13) → 3단계 입력(RC-03)
     - 마지막 단계에서 추천 실행(API-06) → 성공하면 창을 닫고 /recommend로 이동. 실패하면 창을 닫지 않고 3단계 아래에 문구 + [다시 시도] (E3)

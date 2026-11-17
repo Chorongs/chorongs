@@ -278,6 +278,8 @@ const Pill = styled(Link)`
     RC-10 도구 바로가기 (SCR-01)
     - 큰 제목 + 한 줄 + 예시 그림 칸(추천 카드 1장, 고정 글) + 알약 버튼 8개 → 누르면 이동 (서버 호출 없음)
     - 예시 카드와 안내 문구는 가안 기준 (실제 추천 결과 아님)
+    - TODO(LY-01, 각 이슈 담당): 이동 주소 중 /search, /search/simple, /compare, /ranking, /calc, /calc/reverse, /diagnosis/*는 각 이슈
+      (CHORONG-64 조빌립, 47 조빌립, 60 김채희, 49 김진석, 56 김진석, 51 김진석, 59 조빌립)가 라우트를 추가해야 화면이 생김. 그 전에는 '찾을 수 없음' 화면이 나옴 (App.jsx TODO 참고)
 */
 function ToolShortcuts() {
   return (

@@ -231,6 +231,8 @@ const Pill = styled(Link)`
     RC-11 도움말 바로가기 (SCR-01)
     - 큰 제목 + 한 줄 + 예시 그림 칸(용어 카드 1장, 필요 서류 목록 1장, 고정 글) + 알약 버튼 4개 → 누르면 이동
     - 서버 호출 없음. 예시 카드와 안내 문구는 가안 기준
+    - TODO(LY-01, CHORONG-63 김채희): /help/terms, /help/docs, /help/faq, /help/tips 화면은 도움말 이슈가 라우트를 추가해야 생김.
+      그 전에는 '찾을 수 없음' 화면이 나옴 (App.jsx TODO 참고)
 */
 function HelpShortcuts() {
   return (

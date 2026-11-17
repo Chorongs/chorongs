@@ -8,7 +8,15 @@ import {
   QUICK_AMOUNT_OPTIONS,
 } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
-import { InlineError } from '../../styles/common'
+import {
+  ChipGrid,
+  FormField,
+  FormLabel,
+  FormLabelNote,
+  FormStack,
+  InlineError,
+  SegmentedFull,
+} from '../../styles/common'
 import { getMonthsOptions, isValidMonths } from '../../utils/validate'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
@@ -36,77 +44,12 @@ const PURPOSE_TIP = {
 // 기간 선택 글자: 12개월 단위는 'N년 이내', 0은 '모르겠어요' (가안)
 const getMonthsLabel = (months) => (months === MONTHS_UNKNOWN ? '모르겠어요' : `${months / 12}년 이내`)
 
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`
-
-const Field = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
-
-const Label = styled.p`
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
-  font-weight: 700;
-`
-
-// 칸 이름 옆 작은 안내 (예: 필요한 금액 '10만원 ~ 10억원')
-const Small = styled.small`
-  margin-left: 4px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-`
-
-// 용도 칩: 3칸 격자, 칩 글자는 작게
-const ChipGrid = styled.div`
-  & > [role='group'] {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  & button {
-    min-width: 0;
-    padding: 0 6px;
-    overflow: hidden;
-    border-radius: var(--r-sm);
-    font-size: var(--fs-sm);
-    text-overflow: ellipsis;
-  }
-
-  @media (min-width: 900px) {
-    & button {
-      padding: 0 13px;
-    }
-  }
-`
-
-// 갚을 기간: 가로 가득 반반
-const SegFull = styled.div`
-  & > [role='group'] {
-    display: flex;
-    width: 100%;
-  }
-
-  & button {
-    flex: 1;
-    padding: 0 4px;
-    font-size: var(--fs-sm);
-  }
-`
-
 // 맨 아래 팁: 용도에 따라 글이 바뀜 (좁은 화면에서는 숨김. 단 '기타' 안내는 명세서 문구라 계속 보임)
 const Tip = styled.p`
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 0;
+  margin: auto 0 0;
   padding-top: 4px;
   color: var(--cocoa);
   font-size: var(--fs-sm);
@@ -147,9 +90,9 @@ function StepMoney({ error }) {
   }
 
   return (
-    <Wrap>
-      <Field data-field="purpose">
-        <Label>어디에 쓰나요</Label>
+    <FormStack>
+      <FormField data-field="purpose">
+        <FormLabel>어디에 쓰나요</FormLabel>
         <ChipGrid>
           <ChipGroup
             label="자금 용도"
@@ -159,13 +102,13 @@ function StepMoney({ error }) {
           />
         </ChipGrid>
         <InlineError>{errorOf('purpose')}</InlineError>
-      </Field>
+      </FormField>
 
-      <Field data-field="need">
+      <FormField data-field="need">
         <NumberField
           label={
             <>
-              얼마나 필요한가요<Small>10만원 ~ 10억원</Small>
+              얼마나 필요한가요<FormLabelNote>10만원 ~ 10억원</FormLabelNote>
             </>
           }
           unit="만원"
@@ -178,11 +121,11 @@ function StepMoney({ error }) {
           onChange={(need) => setInput({ need: need === '' ? null : need })}
           error={errorOf('need')}
         />
-      </Field>
+      </FormField>
 
-      <Field data-field="months">
-        <Label>언제까지 갚을 계획인가요</Label>
-        <SegFull>
+      <FormField data-field="months">
+        <FormLabel>언제까지 갚을 계획인가요</FormLabel>
+        <SegmentedFull>
           <Segmented
             label="갚을 기간"
             isOnPanel
@@ -190,15 +133,15 @@ function StepMoney({ error }) {
             value={input.months}
             onChange={(months) => setInput({ months })}
           />
-        </SegFull>
+        </SegmentedFull>
         <InlineError>{errorOf('months')}</InlineError>
-      </Field>
+      </FormField>
 
       <Tip $isAlwaysShown={input.purpose === OTHER_PURPOSE}>
         <Icon name="bulb" size={16} />
         {PURPOSE_TIP[input.purpose] ?? DEFAULT_TIP}
       </Tip>
-    </Wrap>
+    </FormStack>
   )
 }
 

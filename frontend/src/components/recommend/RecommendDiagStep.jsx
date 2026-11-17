@@ -74,11 +74,12 @@ const GateButtons = styled.div`
   margin-top: 12px;
 `
 
+// 가안(.rd-gate>p)은 이 안내도 본문과 같은 크기, 같은 색
 const GateNote = styled.p`
   margin: 0;
-  color: var(--cocoa);
+  color: var(--ink-2);
   font-family: var(--f-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-lg);
   line-height: 1.55;
 `
 
@@ -89,7 +90,7 @@ const GateNote = styled.p`
     - 보이는 화면(useState): 잠깐 → 진단 (결과 화면은 CreditCheck 연결 때 추가)
     - [알아요] → onDone() / [몰라요 (셀프 진단하기)] → 진단 / 진단의 [이전] → 연 곳 (잠깐 창에서 열었으면 잠깐, 3단계면 3단계)
     - 닫거나 건너뛰면 3단계에서 직접 고름. 점수, 답은 console 출력 금지, 스토어에는 구간만 (E6)
-    - TODO(CR-02, CR-03, CHORONG-51): 진단 자리에 <CreditCheck submitLabel="결과 확인" onContinue={handleContinue} /> 연결
+    - TODO(CR-02, CR-03, CHORONG-51 김진석): 진단 자리에 <CreditCheck submitLabel="결과 확인" onContinue={handleContinue} /> 연결
       결과 카드(CreditResultCard)는 이 창 안에 표시하고 [이 구간으로 상품 찾기]는 없이 [이어서 추천받기]만 둠
       handleContinue = (creditBand) => {
         setInput({ creditBand }); setDiagBand(creditBand)   // useRecommendStore
@@ -104,7 +105,7 @@ function RecommendDiagStep({ openedFrom, onDone }) {
       <>
         <Title>신용 구간 알아보기</Title>
         <Description>문항에 답하면 신용 구간을 알려 드려요. 점수와 답은 저장하지 않아요.</Description>
-        {/* TODO(CR-02): 셀프 진단 10문항(CreditCheck) 자리 */}
+        {/* TODO(CR-02, CHORONG-51 김진석): 셀프 진단 10문항(CreditCheck) 자리 */}
         <Buttons>
           <Button
             $variant="outline"

@@ -97,13 +97,10 @@ export const QUICK_AMOUNT_OPTIONS = [
 ]
 
 // 신용점수 구간 5개 (NICE 점수 기준, 화면 글 = CREDIT 칩 글자)
-export const CREDIT_BAND_OPTIONS = [
-  { value: 'BAND1', label: '900 초과' },
-  { value: 'BAND2', label: '801~900' },
-  { value: 'BAND3', label: '701~800' },
-  { value: 'BAND4', label: '601~700' },
-  { value: 'BAND5', label: '600 이하' },
-]
+export const CREDIT_BAND_OPTIONS = Object.entries(CREDIT_BAND_LABEL).map(([value, label]) => ({
+  value,
+  label,
+}))
 
 // 최근 1년 연체 (값은 true, false)
 export const OVERDUE_OPTIONS = [

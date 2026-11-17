@@ -47,11 +47,32 @@ const Head = styled.div`
   gap: 12px;
 `
 
+// 가안은 이 제목에 글자 크기 규칙이 없어 브라우저 기본(h3, 부모의 1.17배, 굵게)으로 보임
 const StepTitle = styled.h3`
   margin: 0;
   color: var(--ink);
-  font-size: var(--fs-h4);
-  font-weight: 800;
+  font-size: 1.17em;
+  font-weight: 700;
+`
+
+// 세 단계를 같은 칸에 겹쳐 두고 안 보이는 것은 숨겨서, 단계가 바뀌어도 창 높이가 그대로 (가안 fitStepper). 899px 이하는 보이는 단계 높이만큼
+const Panes = styled.div`
+  display: grid;
+`
+
+const Pane = styled.div`
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  visibility: ${({ $isActive }) => ($isActive ? 'visible' : 'hidden')};
+
+  & > * {
+    flex: 1;
+  }
+
+  @media (max-width: 899px) {
+    display: ${({ $isActive }) => ($isActive ? 'flex' : 'none')};
+  }
 `
 
 const StepCount = styled.span`
@@ -234,9 +255,17 @@ function RecommendStepper({ onRun, isRunning, runError = null }) {
         ))}
       </StepTabs>
 
-      {step === 1 && <StepAboutMe error={error} />}
-      {step === 2 && <StepMoney error={error} />}
-      {step === 3 && <StepCredit error={error} onOpenDiag={() => setDiagFrom(DIAG_FROM_STEP3)} />}
+      <Panes>
+        <Pane $isActive={step === 1} inert={step !== 1}>
+          <StepAboutMe error={step === 1 ? error : null} />
+        </Pane>
+        <Pane $isActive={step === 2} inert={step !== 2}>
+          <StepMoney error={step === 2 ? error : null} />
+        </Pane>
+        <Pane $isActive={step === 3} inert={step !== 3}>
+          <StepCredit error={step === 3 ? error : null} onOpenDiag={() => setDiagFrom(DIAG_FROM_STEP3)} />
+        </Pane>
+      </Panes>
       {step === LAST_STEP && runError && <InlineError>{runError.message}</InlineError>}
 
       <Buttons>

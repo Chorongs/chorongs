@@ -94,6 +94,7 @@ const Message = styled.p`
     - props: productId, productStatus (ProductSummaryDTO의 값)
     - 최근 추천 입력(lastInput)이 있고 게시(ON) 상품일 때만 표시. 판매 종료, 숨김 상품은 API-44를 안 부름
     - 판정, 이유 문장, 예상 금리, 월 상환은 서버가 보낸 값 그대로 표시
+    - 참고(CM-08, 시안과 다름): 가안은 이유 줄 앞에 좋음은 체크, 주의는 느낌표 아이콘을 보여 주는데, 명세서는 '서버 문장 그대로 표시'이고 서버도 중립 문장이 섞인 글자 배열(reasons)이라 구분하지 않고 글자만 표시함 (명세서 변경 요청 A12)
 */
 function EligibilityNotice({ productId, productStatus }) {
   const lastInput = useRecommendStore((state) => state.lastInput)

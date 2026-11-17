@@ -6,37 +6,18 @@ import {
   PRIORITY_OPTIONS,
 } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
-import { InlineError } from '../../styles/common'
+import {
+  ChipGrid,
+  FormField,
+  FormLabel,
+  FormLabelNote,
+  FormStack,
+  InlineError,
+  SegmentedFull,
+} from '../../styles/common'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import Segmented from '../ui/Segmented'
-
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`
-
-const Field = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
-
-const Label = styled.p`
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
-  font-weight: 700;
-`
-
-// 칸 이름 옆 작은 안내 (예: 가장 중요한 건 '최대 3개 · 1/3')
-const Small = styled.small`
-  margin-left: 4px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-`
 
 const LabelRow = styled.div`
   display: flex;
@@ -73,60 +54,12 @@ const Hint = styled.p`
   font-size: var(--fs-sm);
   line-height: 1.55;
 
-  & [data-icon='check'] {
+  & [data-icon] {
     margin-top: 2px;
+  }
+
+  & [data-icon='check'] {
     color: var(--good);
-  }
-`
-
-// 주의 안내 앞 느낌표 아이콘 (원 안에 느낌표, 공통 아이콘에는 없어서 여기에 직접 그림)
-const AlertMark = styled.svg`
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin-top: 2px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-`
-
-// 칩 격자: 구간은 3칸, 중요한 건은 2칸. 칩 글자는 작게
-const ChipGrid = styled.div`
-  & > [role='group'] {
-    display: grid;
-    grid-template-columns: repeat(${({ $columns }) => $columns}, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  & button {
-    min-width: 0;
-    padding: 0 6px;
-    overflow: hidden;
-    border-radius: var(--r-sm);
-    font-size: var(--fs-sm);
-    text-overflow: ellipsis;
-  }
-
-  @media (min-width: 900px) {
-    & button {
-      padding: 0 13px;
-    }
-  }
-`
-
-// 연체 선택: 가로 가득 반반
-const SegFull = styled.div`
-  & > [role='group'] {
-    display: flex;
-    width: 100%;
-  }
-
-  & button {
-    flex: 1;
-    padding: 0 4px;
-    font-size: var(--fs-sm);
   }
 `
 
@@ -154,7 +87,7 @@ const getBandHint = (creditBand, diagBand) => {
     - props: error ({ field, message } 또는 null, 부른 쪽에서 [추천 받기] 검사에 걸린 칸), onOpenDiag ('모르면 셀프 진단' 누름)
     - 신용 구간은 진단(RC-13)에서 왔으면 store에 이미 들어 있어 미리 선택되어 보임
     - 구간 아래 안내는 이 탭의 진단 구간(diagBand)과 비교
-    - TODO(ST-01, CHORONG-43): 진단 구간이 없으면 회원은 저장한 진단 구간(API-25 myApi.getCreditReport, 창 열 때 1번)을 씀.
+    - TODO(ST-01, CHORONG-43 Tong-B): 진단 구간이 없으면 회원은 저장한 진단 구간(API-25 myApi.getCreditReport, 창 열 때 1번)을 씀.
       useAuthStore가 올라오면 회원일 때만 부르기 (비회원이 부르면 401 안내 창이 뜸)
     - 가장 중요한 것은 3개까지 (4번째를 고르면 ChipGroup이 알림), 하나도 안 고르면 실행 안 됨 (검사는 RecommendStepper)
     - 정확한 점수는 받지 않음 (구간만), 입력값 console 출력 금지 (E6)
@@ -168,10 +101,10 @@ function StepCredit({ error, onOpenDiag }) {
   const bandHint = getBandHint(input.creditBand, diagBand)
 
   return (
-    <Wrap>
-      <Field data-field="creditBand">
+    <FormStack>
+      <FormField data-field="creditBand">
         <LabelRow>
-          <Label>신용점수 구간</Label>
+          <FormLabel>신용점수 구간</FormLabel>
           <DiagLink onClick={onOpenDiag}>
             모르면 셀프 진단
             <Icon name="chevron_right" size={16} />
@@ -186,21 +119,16 @@ function StepCredit({ error, onOpenDiag }) {
           />
         </ChipGrid>
         <Hint $isWarn={bandHint.isWarn}>
-          {bandHint.isWarn && (
-            <AlertMark viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7.5v5.5M12 16.5h.01" />
-            </AlertMark>
-          )}
+          {bandHint.isWarn && <Icon name="alert" size={16} />}
           {bandHint.isDiagPicked && <Icon name="check" size={16} />}
           {bandHint.text}
         </Hint>
         <InlineError>{errorOf('creditBand')}</InlineError>
-      </Field>
+      </FormField>
 
-      <Field data-field="overdue">
-        <Label>최근 1년 안에 연체한 적이 있나요</Label>
-        <SegFull>
+      <FormField data-field="overdue">
+        <FormLabel>최근 1년 안에 연체한 적이 있나요</FormLabel>
+        <SegmentedFull>
           <Segmented
             label="최근 1년 연체"
             isOnPanel
@@ -208,17 +136,17 @@ function StepCredit({ error, onOpenDiag }) {
             value={input.overdue}
             onChange={(overdue) => setInput({ overdue })}
           />
-        </SegFull>
+        </SegmentedFull>
         <InlineError>{errorOf('overdue')}</InlineError>
-      </Field>
+      </FormField>
 
-      <Field data-field="priorities">
-        <Label>
+      <FormField data-field="priorities">
+        <FormLabel>
           마지막으로, 가장 중요한 건
-          <Small>
+          <FormLabelNote>
             최대 {PRIORITY_MAX}개 · {input.priorities.length}/{PRIORITY_MAX}
-          </Small>
-        </Label>
+          </FormLabelNote>
+        </FormLabel>
         <ChipGrid $columns={2}>
           <ChipGroup
             label="가장 중요한 것"
@@ -230,8 +158,8 @@ function StepCredit({ error, onOpenDiag }) {
           />
         </ChipGrid>
         <InlineError>{errorOf('priorities')}</InlineError>
-      </Field>
-    </Wrap>
+      </FormField>
+    </FormStack>
   )
 }
 

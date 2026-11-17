@@ -31,3 +31,12 @@ export const getCalcState = (item, lastInput) => {
 
   return state
 }
+
+// 일치도(서버는 소수 2자리, 예: 96.5)를 화면에는 정수로 (가안 '일치도 96%')
+export const formatMatchRate = (matchRate) => Math.round(matchRate)
+
+// 월 상환 값(원)을 만원 단위로: 100만원 이상은 정수, 그보다 작으면 소수 첫째 자리 (가안 28.9만원)
+export const toManWon = (won) => {
+  const man = won / 10000
+  return man >= 100 ? Math.round(man) : Math.round(man * 10) / 10
+}

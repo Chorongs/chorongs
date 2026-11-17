@@ -1,7 +1,15 @@
 import styled from 'styled-components'
 import { AGE_GROUP_OPTIONS, JOB_OPTIONS, REGION_OPTIONS } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
-import { InlineError } from '../../styles/common'
+import {
+  ChipGrid,
+  FormField,
+  FormLabel,
+  FormLabelNote,
+  FormStack,
+  InlineError,
+  SegmentedFull,
+} from '../../styles/common'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
@@ -22,33 +30,6 @@ const DEBT_OPTIONS = [
   { value: DEBT_UNKNOWN, label: '잘 모르겠어요' },
 ]
 
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`
-
-const Field = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`
-
-const Label = styled.p`
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
-  font-weight: 700;
-`
-
-// 칸 이름 옆 작은 안내 (예: 나이 '청년 상품 확인에만 써요')
-const Small = styled.small`
-  margin-left: 4px;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-`
-
 const Hint = styled.p`
   margin: 0;
   color: var(--cocoa);
@@ -56,50 +37,12 @@ const Hint = styled.p`
   line-height: 1.55;
 `
 
-// 직업 칩: 3칸 격자, 칩 글자는 작게
-const ChipGrid = styled.div`
-  & > [role='group'] {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  & button {
-    min-width: 0;
-    padding: 0 6px;
-    overflow: hidden;
-    border-radius: var(--r-sm);
-    font-size: var(--fs-sm);
-    text-overflow: ellipsis;
-  }
-
-  @media (min-width: 900px) {
-    & button {
-      padding: 0 13px;
-    }
-  }
-`
-
-// 나이 선택: 가로 가득 반반
-const SegFull = styled.div`
-  & > [role='group'] {
-    display: flex;
-    width: 100%;
-  }
-
-  & button {
-    flex: 1;
-    padding: 0 4px;
-    font-size: var(--fs-sm);
-  }
-`
-
 // 맨 아래 안내 (좁은 화면에서는 숨김)
 const Note = styled.p`
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 0;
+  margin: auto 0 0;
   padding-top: 4px;
   color: var(--cocoa);
   font-size: var(--fs-sm);
@@ -142,9 +85,9 @@ function StepAboutMe({ error }) {
   }
 
   return (
-    <Wrap>
-      <Field data-field="job">
-        <Label>지금 나는</Label>
+    <FormStack>
+      <FormField data-field="job">
+        <FormLabel>지금 나는</FormLabel>
         <ChipGrid>
           <ChipGroup
             label="직업"
@@ -154,13 +97,13 @@ function StepAboutMe({ error }) {
           />
         </ChipGrid>
         <InlineError>{errorOf('job')}</InlineError>
-      </Field>
+      </FormField>
 
-      <Field data-field="ageGroup">
-        <Label>
-          나이<Small>청년 상품 확인에만 써요</Small>
-        </Label>
-        <SegFull>
+      <FormField data-field="ageGroup">
+        <FormLabel>
+          나이<FormLabelNote>청년 상품 확인에만 써요</FormLabelNote>
+        </FormLabel>
+        <SegmentedFull>
           <Segmented
             label="나이"
             isOnPanel
@@ -168,28 +111,28 @@ function StepAboutMe({ error }) {
             value={input.ageGroup}
             onChange={(ageGroup) => setInput({ ageGroup })}
           />
-        </SegFull>
+        </SegmentedFull>
         <InlineError>{errorOf('ageGroup')}</InlineError>
-      </Field>
+      </FormField>
 
-      <Field data-field="region">
+      <FormField data-field="region">
         <SelectField
           label={
             <>
-              사는 지역<Small>지역 상품 확인에만 써요</Small>
+              사는 지역<FormLabelNote>지역 상품 확인에만 써요</FormLabelNote>
             </>
           }
           options={REGION_SELECT_OPTIONS}
           value={input.region ?? ''}
           onChange={(region) => setInput({ region: region === '' ? null : region })}
         />
-      </Field>
+      </FormField>
 
-      <Field data-field="income">
+      <FormField data-field="income">
         <NumberField
           label={
             <>
-              연소득<Small>세전, 없으면 0</Small>
+              연소득<FormLabelNote>세전, 없으면 0</FormLabelNote>
             </>
           }
           unit="만원"
@@ -201,13 +144,13 @@ function StepAboutMe({ error }) {
           onChange={(income) => setInput({ income: income === '' ? null : income })}
           error={errorOf('income')}
         />
-      </Field>
+      </FormField>
 
-      <Field data-field="debt">
+      <FormField data-field="debt">
         <NumberField
           label={
             <>
-              현재 갚고 있는 대출<Small>매달 내는 금액</Small>
+              현재 갚고 있는 대출<FormLabelNote>매달 내는 금액</FormLabelNote>
             </>
           }
           unit="만원/월"
@@ -227,13 +170,13 @@ function StepAboutMe({ error }) {
           onChange={handleDebtChoice}
         />
         <Hint>여러 개면 합쳐서, 대략적인 금액도 괜찮아요.</Hint>
-      </Field>
+      </FormField>
 
       <Note>
         <Icon name="shield" size={16} />
         입력값은 이 탭에만 잠시 두고 저장하지 않아요. 탭을 닫거나 로그아웃하면 지워져요.
       </Note>
-    </Wrap>
+    </FormStack>
   )
 }
 

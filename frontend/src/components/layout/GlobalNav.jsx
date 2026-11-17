@@ -1,6 +1,6 @@
 import { Link, NavLink, matchPath, useLocation } from 'react-router-dom'
 import styled from 'styled-components'
-import { NAV_MENU } from '../../constants/menu'
+import { NAV_MENU, RESULT_MENU_LABEL } from '../../constants/menu'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 
@@ -12,7 +12,6 @@ import useUiStore from '../../store/useUiStore'
 // 캐링 추천: 추천받기 전이면 추천 창 열기 (주소 그대로), 받은 뒤면 /recommend 이동
 // hasResult: useRecommendStore의 result 유무 (받은 뒤에는 메뉴 이름이 '추천 결과')
 const MEGA_MIN_WIDTH = 1180
-const RESULT_MENU_LABEL = '추천 결과'
 
 const canExpand = () => window.matchMedia(`(min-width: ${MEGA_MIN_WIDTH}px)`).matches
 const Nav = styled.nav`

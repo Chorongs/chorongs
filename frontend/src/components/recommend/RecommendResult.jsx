@@ -2,12 +2,22 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { postSavedRecommend } from '../../api/myApi'
-import { JOB_OPTIONS, MONTHS_UNKNOWN } from '../../constants/options'
+import {
+  CREDIT_BAND_LABEL,
+  HOUSING_PURPOSES,
+  JOB_OPTIONS,
+  MONTHS_DEFAULT,
+  MONTHS_DEFAULT_HOUSING,
+  MONTHS_UNKNOWN,
+  PRIORITY_OPTIONS,
+} from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Panel, Tag } from '../../styles/common'
+import { Button, IconButton, Panel, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
+import { formatMatchRate } from '../../utils/recommend'
 import Disclaimer from '../common/Disclaimer'
+import ProductList from '../common/ProductList'
 import Icon from '../ui/Icon'
 import RecommendCard from './RecommendCard'
 
@@ -15,6 +25,10 @@ const TOP_COUNT = 3 // 1~3위는 위에 따로
 const PAGE_SIZE = 10 // 4위부터 한 쪽에 10개씩
 const MAX_RESULT_COUNT = 30 // 서버가 보내는 최대 개수. 남은 상품이 이보다 많으면 '상위 30개까지' 안내
 
+// 서버가 0건일 때 notes에 넣는 글 (RecommendServiceImpl NOTE_EMPTY). 제목에 같은 글을 쓰므로 안내 줄에서는 뺌
+const EMPTY_NOTE = '조건에 맞는 상품을 찾지 못했어요'
+
+// 고지 글: 명세서 RC-07 '실제 심사가 아닌 참고용, 예상 금리는 공시 범위'
 const DISCLAIMER_TEXT = '실제 심사가 아닌 참고용이에요. 예상 금리는 공시된 금리 범위를 기준으로 해요.'
 
 // 서민금융진흥원 누리집 (0건 안내의 상담 안내에서 새 창으로)
@@ -50,6 +64,11 @@ const HeadMain = styled.div`
   gap: 12px;
 `
 
+// 줄이 바뀌어도 오른쪽 끝에 붙음 (가안 .save-row)
+const SaveButton = styled(Button)`
+  margin-left: auto;
+`
+
 const ResultTitle = styled.h2`
   margin: 0;
   font-size: var(--fs-h2);
@@ -69,13 +88,14 @@ const ConditionTags = styled.div`
 `
 
 // 안내 줄: 앞에 느낌표 아이콘 (가안). 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
+// 안내 줄 사이 간격 20, 카드까지 20 (가안 .excl)
 const Notes = styled.ul`
-  margin: 0;
+  margin: 0 0 8px;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 20px;
 `
 
 const NoteLine = styled.li`
@@ -85,24 +105,18 @@ const NoteLine = styled.li`
   color: var(--cocoa);
   font-size: var(--fs-sm);
   line-height: 1.55;
+
+  & [data-icon] {
+    margin-top: 2px;
+    color: var(--muted);
+  }
 `
 
-const AlertMark = styled.svg`
-  flex: none;
-  width: 17px;
-  height: 17px;
-  margin-top: 2px;
-  fill: none;
-  stroke: var(--muted);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-`
-
-const CardGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+// 1~3위 카드는 한 줄에 하나씩 세로로 (가안)
+const CardList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 `
 
 const Pager = styled.div`
@@ -110,20 +124,26 @@ const Pager = styled.div`
   align-items: center;
   justify-content: center;
   gap: 12px;
+  padding-top: 20px;
+`
+
+// 이전 쪽 버튼: 다음 쪽과 같은 화살표를 반대로 돌림
+const PrevButton = styled(IconButton)`
+  & [data-icon] {
+    transform: rotate(180deg);
+  }
 `
 
 const PageNumber = styled.span`
-  color: var(--ink-2);
-  font-family: var(--f-num);
-  font-size: var(--fs-md);
-  font-weight: 700;
-`
-
-const Notice = styled.p`
-  margin: 0;
   color: var(--cocoa);
   font-size: var(--fs-sm);
-  text-align: center;
+  font-weight: 800;
+`
+
+const Hint = styled.p`
+  margin: -4px 0 0;
+  color: var(--cocoa);
+  font-size: var(--fs-sm);
 `
 
 // 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼 (가안)
@@ -150,12 +170,42 @@ const OrgLink = styled.a`
   text-underline-offset: 3px;
 `
 
-// 입력 조건 태그 (소득, 신용 같은 민감한 값은 보이지 않음)
+const AGE_LABEL = { YOUTH: '청년(만 19~34세)', ADULT: '만 35세 이상' }
+
+// 신용 구간 글에 '점' 붙이기: '701~800' → '701~800점', '900 초과' → '900점 초과'
+const getBandText = (creditBand) => {
+  const label = CREDIT_BAND_LABEL[creditBand]
+  if (!label) return ''
+  return /^\d+ /.test(label) ? label.replace(' ', '점 ') : `${label}점`
+}
+
+// 입력 조건 태그 (가안 순서: 직업, 나이, 지역, 소득, 용도 금액 · 기간, 신용, 기존 대출, 연체, 중요한 것)
 const getConditionLabels = (input) => {
   if (!input) return []
   const job = JOB_OPTIONS.find((option) => option.value === input.job)
-  const months = input.months === MONTHS_UNKNOWN ? '기간 모름' : `${input.months}개월`
-  return [job?.label, input.purpose, formatMoney(input.need), months].filter(Boolean)
+  const defaultMonths = HOUSING_PURPOSES.includes(input.purpose) ? MONTHS_DEFAULT_HOUSING : MONTHS_DEFAULT
+  const period =
+    input.months === MONTHS_UNKNOWN
+      ? `기간 미정(${defaultMonths / 12}년으로 가정)`
+      : `${input.months / 12}년 이내`
+  let debt = '기존 대출 없음'
+  if (input.debtUnknown) debt = '기존 대출 모름'
+  else if (input.debtMonthly > 0) debt = `기존 상환 월 ${formatMoney(input.debtMonthly)}`
+  const priorities = (input.priorities ?? [])
+    .map((value) => PRIORITY_OPTIONS.find((option) => option.value === value)?.label)
+    .filter(Boolean)
+
+  return [
+    job?.label,
+    AGE_LABEL[input.ageGroup],
+    input.region ? `사는 지역 ${input.region}` : '',
+    `연소득 ${formatMoney(input.income ?? 0)}`,
+    `${input.purpose} ${formatMoney(input.need)} · ${period}`,
+    `신용 ${getBandText(input.creditBand)}`,
+    debt,
+    input.overdue ? '최근 연체 있음' : '',
+    `중요: ${priorities.join(' · ')}`,
+  ].filter(Boolean)
 }
 
 /*
@@ -163,9 +213,10 @@ const getConditionLabels = (input) => {
     - useRecommendStore의 result, lastInput을 읽음. 결과가 없으면 아무것도 안 그림 (빈 안내는 RecommendPage가 함)
     - [결과 저장] → API-38 (purpose, need, months, job + 순위대로 productIds), 연타 방지 (E5)
     - 서버가 준 안내 문구(notes, hint)와 제외 요약은 글자로만 출력 (E1)
-    - 4위부터는 10개씩 쪽 넘김 (이미 받은 30개 안에서)
-    - TODO(CM-22, CHORONG-43): [결과 저장]을 requireLogin(저장 함수, '로그인하면 결과를 저장할 수 있어요')로 감싸기 (지금은 비회원이면 서버 401 → 실패 알림)
-    - TODO(ST-04, CHORONG-47): 비교함에 용도 필터가 있으면 겹치는 상품만 보이고 숨긴 개수 안내
+    - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 일치도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
+    - TODO(LY-01, 각 이슈 담당): 0건 바로가기의 /search(CHORONG-64 조빌립), /diagnosis/credit(CHORONG-51 김진석), /ranking(CHORONG-60 김채희) 화면은 각 이슈가 라우트를 추가해야 생김 (그 전에는 '찾을 수 없음' 화면)
+    - TODO(CM-22, CHORONG-43 Tong-B): [결과 저장]을 requireLogin(저장 함수, '로그인하면 결과를 저장할 수 있어요')로 감싸기 (지금은 비회원이면 서버 401 → 실패 알림)
+    - TODO(ST-04, CHORONG-47 조빌립): 비교함에 용도 필터가 있으면 겹치는 상품만 보이고 숨긴 개수 안내
       (상품 용도는 product.tags의 PURPOSE, 비교함 용도는 useCompareStore tray의 purposes)
 */
 function RecommendResult() {
@@ -187,8 +238,9 @@ function RecommendResult() {
   // 서버가 빼고 보낸 칸은 빈 값으로 (화면이 깨지지 않게)
   const { total = 0, hint = null } = result
   const excluded = result.excluded ?? []
-  const notes = result.notes ?? []
   const items = result.items ?? []
+  // 0건일 때 서버가 notes에 넣는 '찾지 못했어요' 글은 제목과 같아서 뺌 (연체, 기간 모름 같은 다른 안내는 0건에서도 보임)
+  const noteLines = (result.notes ?? []).filter((note) => note !== EMPTY_NOTE)
   const topItems = items.filter((item) => item.rankNo <= TOP_COUNT)
   const restItems = items.filter((item) => item.rankNo > TOP_COUNT)
   const restPageCount = Math.ceil(restItems.length / PAGE_SIZE)
@@ -224,6 +276,7 @@ function RecommendResult() {
               ? '조건에 맞는 상품을 찾지 못했어요'
               : `조건에 맞는 대출 ${total}개가 추천 상품이에요`}
           </ResultTitle>
+          {total > MAX_RESULT_COUNT && <Hint>추천 순위 상위 {MAX_RESULT_COUNT}개까지 보여드려요.</Hint>}
           <ConditionTags>
             {getConditionLabels(lastInput).map((label, index) => (
               <Tag key={`${index}-${label}`}>{label}</Tag>
@@ -231,30 +284,24 @@ function RecommendResult() {
           </ConditionTags>
         </HeadMain>
         {canSave && (
-          <Button $variant="outline" $size="sm" disabled={isSaving} onClick={handleSave}>
+          <SaveButton $variant="outline" $size="sm" disabled={isSaving} onClick={handleSave}>
             <Icon name="doc" size={16} />
             결과 저장
-          </Button>
+          </SaveButton>
         )}
       </Head>
 
-      {items.length > 0 && (notes.length > 0 || excluded.length > 0) && (
+      {(noteLines.length > 0 || (items.length > 0 && excluded.length > 0)) && (
         <Notes>
-          {notes.map((note, index) => (
+          {noteLines.map((note, index) => (
             <NoteLine key={`${index}-${note}`}>
-              <AlertMark viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7.5v5.5M12 16.5h.01" />
-              </AlertMark>
+              <Icon name="alert" size={17} />
               <span>{note}</span>
             </NoteLine>
           ))}
-          {excluded.length > 0 && (
+          {items.length > 0 && excluded.length > 0 && (
             <NoteLine>
-              <AlertMark viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 7.5v5.5M12 16.5h.01" />
-              </AlertMark>
+              <Icon name="alert" size={17} />
               <span>
                 제외한 상품 {excludedTotal}개:{' '}
                 {excluded.map((entry) => `${entry.reason} ${entry.count}개`).join(', ')}
@@ -268,8 +315,7 @@ function RecommendResult() {
         <Panel>
           {hint && <EmptyText>{hint}</EmptyText>}
           <EmptyText>
-            {!hint && '용도나 금액을 바꿔 보거나, '}신용점수 기준이 없는 <b>정책·서민금융</b> 상품을{' '}
-            살펴보세요.{' '}
+            신용점수 기준이 없는 <b>정책·서민금융</b> 상품을 살펴보세요.{' '}
             <OrgLink href={KINFA_URL} target="_blank" rel="noopener noreferrer">
               서민금융진흥원(1397)
             </OrgLink>
@@ -286,45 +332,45 @@ function RecommendResult() {
         </Panel>
       ) : (
         <>
-          <CardGrid>
+          <CardList>
             {topItems.map((item) => (
               <RecommendCard key={item.product.productId} item={item} />
             ))}
-          </CardGrid>
+          </CardList>
           {visibleRest.length > 0 && (
             <>
               <RestTitle>다음 순위 {restItems.length}개</RestTitle>
-              <CardGrid>
-                {visibleRest.map((item) => (
-                  <RecommendCard key={item.product.productId} item={item} />
-                ))}
-              </CardGrid>
+              <ProductList
+                items={visibleRest.map((item) => item.product)}
+                from="recommend"
+                getRowProps={(_, index) => ({
+                  rank: visibleRest[index].rankNo,
+                  matchRate: formatMatchRate(visibleRest[index].matchRate),
+                })}
+              />
             </>
           )}
           {restPageCount > 1 && (
             <Pager>
-              <Button
-                $variant="outline"
-                $size="sm"
+              <PrevButton
+                aria-label="다음 순위 이전"
                 disabled={restPage === 0}
                 onClick={() => setRestPage((page) => page - 1)}
               >
-                이전 쪽
-              </Button>
+                <Icon name="chevron_right" />
+              </PrevButton>
               <PageNumber aria-label={`${restPageCount}쪽 중 ${restPage + 1}쪽`}>
                 {restPage + 1} / {restPageCount}
               </PageNumber>
-              <Button
-                $variant="outline"
-                $size="sm"
+              <IconButton
+                aria-label="다음 순위 다음"
                 disabled={restPage === restPageCount - 1}
                 onClick={() => setRestPage((page) => page + 1)}
               >
-                다음 쪽
-              </Button>
+                <Icon name="chevron_right" />
+              </IconButton>
             </Pager>
           )}
-          {total > MAX_RESULT_COUNT && <Notice>상위 {MAX_RESULT_COUNT}개까지 보여 드려요</Notice>}
         </>
       )}
 

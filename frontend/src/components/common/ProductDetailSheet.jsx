@@ -21,10 +21,10 @@ import RateText from './RateText'
 // 열려 있는 동안 뒤 화면 스크롤을 잠근다.
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
-// TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
-// TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
-// TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
-// TODO(CM-16, CHORONG-52): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
+// TODO(CM-06, CHORONG-43 Tong-B): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
+// TODO(ST-04, CHORONG-47 조빌립): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
+// TODO(API-21, CHORONG-43 Tong-B): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
+// TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 const DEFAULT_NEED_MAN = 1000
 const DEFAULT_MONTHS = 36
 const SOURCE_LABEL = { KINFA: '서민금융진흥원', FSS: '금융감독원' }
