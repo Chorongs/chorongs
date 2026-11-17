@@ -11,6 +11,7 @@ import {
   MONTHS_UNKNOWN,
   PRIORITY_OPTIONS,
 } from '../../constants/options'
+import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, IconButton, Panel, Tag } from '../../styles/common'
@@ -18,6 +19,7 @@ import { formatMoney } from '../../utils/format'
 import { formatMatchRate } from '../../utils/recommend'
 import Disclaimer from '../common/Disclaimer'
 import ProductList from '../common/ProductList'
+import PurposeFilterBanner from '../common/PurposeFilterBanner'
 import Icon from '../ui/Icon'
 import RecommendCard from './RecommendCard'
 
@@ -216,14 +218,15 @@ const getConditionLabels = (input) => {
     - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 일치도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
     - TODO(LY-01, 각 이슈 담당): 0건 바로가기의 /search(CHORONG-64 조빌립), /diagnosis/credit(CHORONG-51 김진석), /ranking(CHORONG-60 김채희) 화면은 각 이슈가 라우트를 추가해야 생김 (그 전에는 '찾을 수 없음' 화면)
     - TODO(CM-22, CHORONG-43 Tong-B): [결과 저장]을 requireLogin(저장 함수, '로그인하면 결과를 저장할 수 있어요')로 감싸기 (지금은 비회원이면 서버 401 → 실패 알림)
-    - TODO(ST-04, CHORONG-47 조빌립): 비교함에 용도 필터가 있으면 겹치는 상품만 보이고 숨긴 개수 안내
-      (상품 용도는 product.tags의 PURPOSE, 비교함 용도는 useCompareStore tray의 purposes)
+    - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
+      (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
 function RecommendResult() {
   const result = useRecommendStore((state) => state.result)
   const lastInput = useRecommendStore((state) => state.lastInput)
   const showToast = useUiStore((state) => state.showToast)
 
+  const tray = useCompareStore((state) => state.tray)
   const [restPage, setRestPage] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   // 새 추천 결과가 오면 쪽 넘김을 1쪽으로 되돌림 (이전 결과의 3쪽이 남아 목록이 비는 것 방지)
@@ -241,10 +244,18 @@ function RecommendResult() {
   const items = result.items ?? []
   // 0건일 때 서버가 notes에 넣는 '찾지 못했어요' 글은 제목과 같아서 뺌 (연체, 기간 모름 같은 다른 안내는 0건에서도 보임)
   const noteLines = (result.notes ?? []).filter((note) => note !== EMPTY_NOTE)
-  const topItems = items.filter((item) => item.rankNo <= TOP_COUNT)
-  const restItems = items.filter((item) => item.rankNo > TOP_COUNT)
+  // 비교함 필터: 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품은 숨김 (이미 비교함에 담긴 상품은 보임)
+  const isHiddenByTray = (item) =>
+    tray.length > 0 &&
+    !tray.some((trayItem) => trayItem.productId === item.product.productId) &&
+    getCompareBlock(tray[0], item.product) !== null
+  const shownItems = items.filter((item) => !isHiddenByTray(item))
+  const hiddenCount = items.length - shownItems.length
+  const topItems = shownItems.filter((item) => item.rankNo <= TOP_COUNT)
+  const restItems = shownItems.filter((item) => item.rankNo > TOP_COUNT)
   const restPageCount = Math.ceil(restItems.length / PAGE_SIZE)
-  const visibleRest = restItems.slice(restPage * PAGE_SIZE, (restPage + 1) * PAGE_SIZE)
+  const currentRestPage = Math.min(restPage, Math.max(0, restPageCount - 1))
+  const visibleRest = restItems.slice(currentRestPage * PAGE_SIZE, (currentRestPage + 1) * PAGE_SIZE)
   const canSave = lastInput !== null && items.length > 0
   const excludedTotal = excluded.reduce((sum, entry) => sum + entry.count, 0)
 
@@ -332,6 +343,7 @@ function RecommendResult() {
         </Panel>
       ) : (
         <>
+          <PurposeFilterBanner hiddenCount={hiddenCount} />
           <CardList>
             {topItems.map((item) => (
               <RecommendCard key={item.product.productId} item={item} />
@@ -354,18 +366,18 @@ function RecommendResult() {
             <Pager>
               <PrevButton
                 aria-label="다음 순위 이전"
-                disabled={restPage === 0}
-                onClick={() => setRestPage((page) => page - 1)}
+                disabled={currentRestPage === 0}
+                onClick={() => setRestPage(currentRestPage - 1)}
               >
                 <Icon name="chevron_right" />
               </PrevButton>
-              <PageNumber aria-label={`${restPageCount}쪽 중 ${restPage + 1}쪽`}>
-                {restPage + 1} / {restPageCount}
+              <PageNumber aria-label={`${restPageCount}쪽 중 ${currentRestPage + 1}쪽`}>
+                {currentRestPage + 1} / {restPageCount}
               </PageNumber>
               <IconButton
                 aria-label="다음 순위 다음"
-                disabled={restPage === restPageCount - 1}
-                onClick={() => setRestPage((page) => page + 1)}
+                disabled={currentRestPage === restPageCount - 1}
+                onClick={() => setRestPage(currentRestPage + 1)}
               >
                 <Icon name="chevron_right" />
               </IconButton>

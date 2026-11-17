@@ -15,11 +15,6 @@ export async function getRecentViews() {
   return response.data.data
 }
 
-// API-21 최근 본 대출 기록 (상품 상세 창을 열 때, 실패해도 안내 안 함)
-export async function postRecentView(productId) {
-  await api.post('/api/me/recent-views', { productId })
-}
-
 // API-23 비교 결과 저장 (201). 같은 조합은 409 CONFLICT
 export async function postCompare(productAId, productBId) {
   await api.post('/api/me/compares', { productAId, productBId })
