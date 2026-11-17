@@ -131,16 +131,55 @@ class CreditServiceImplTest {
 
 	@Test
 	void 감점이_작으면_보통() {
-		// Given: 문항 2 = -73 (FastAPI 점수표의 실제 값)
+		// Given: 문항 8 = -67 (FastAPI 점수표의 실제 값)
 		FastApiScoreResponseDTO scores = scoreResponse(750, 0);
-		scores.getItemScores().get(1).setScore(-73);
+		scores.getItemScores().get(7).setScore(-67);
 		when(fastApiClient.scoreCredit(any())).thenReturn(scores);
 
 		// When
 		CreditCheckResponseDTO response = creditService.checkCredit(validRequest());
 
 		// Then
+		assertEquals("보통", response.getItems().get(7).getStatus());
+	}
+
+	@Test
+	void 문항_2_연체_없음은_양호() {
+		// Given: 없음(1), 점수 -73은 무시하고 고른 보기로 판정
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, -73));
+		CreditCheckRequestDTO request = request(1, 1, 1, 2, List.of(1), 2, 2, 1, 1, 4);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
+		assertEquals("양호", response.getItems().get(1).getStatus());
+	}
+
+	@Test
+	void 문항_2_10일_미만_연체는_점수가_같아도_보통() {
+		// Given: 10일 미만(2), FastAPI는 없음이 아닌 보기에 모두 -73
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, -73));
+		CreditCheckRequestDTO request = request(1, 2, 1, 2, List.of(1), 2, 2, 1, 1, 4);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
 		assertEquals("보통", response.getItems().get(1).getStatus());
+	}
+
+	@Test
+	void 문항_2_30일_이상_연체는_점수가_같아도_주의() {
+		// Given: 30일 이상(4), FastAPI는 없음이 아닌 보기에 모두 -73
+		when(fastApiClient.scoreCredit(any())).thenReturn(scoreResponse(850, -73));
+		CreditCheckRequestDTO request = request(1, 4, 1, 2, List.of(1), 2, 2, 1, 1, 4);
+
+		// When
+		CreditCheckResponseDTO response = creditService.checkCredit(request);
+
+		// Then
+		assertEquals("주의", response.getItems().get(1).getStatus());
 	}
 
 	@Test

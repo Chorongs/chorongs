@@ -37,11 +37,12 @@ public class CreditServiceImpl implements CreditService {
 	private static final Set<Integer> UNKNOWN_ALLOWED = Set.of(6, 7, 8, 9, 10);
 	// 점수 0, 상태와 팁에서 참고로만 쓰는 문항 (대출 건수, 금융권, 대출 잔액) -> 상태 앞에 '참고: '
 	private static final Set<Integer> REFERENCE_QUESTIONS = Set.of(4, 5, 6);
-	// 고른 보기로 상태를 정하는 문항: 참고 문항 + 점수 0이 가장 나쁜 보기라 점수로 못 가르는 문항 (카드 사용 비율, 거래 기간)
-	private static final Set<Integer> CHOICE_TIER_QUESTIONS = Set.of(4, 5, 6, 7, 10);
+	// 고른 보기로 상태를 정하는 문항: 참고 문항 + 점수로 못 가르는 문항
+	// (연체 기간: 없음 아닌 보기가 모두 같은 점수, 카드 사용 비율, 거래 기간: 점수 0이 가장 나쁜 보기)
+	private static final Set<Integer> CHOICE_TIER_QUESTIONS = Set.of(2, 4, 5, 6, 7, 10);
 
 	// 문항별 점수는 선형 점수에 더해지는 값이라 0 이하 (0 = 감점 없음, FastAPI 점수표 기준)
-	// 감점 문항(1, 2, 3, 8, 9) 상태: 0 양호, -100 초과 보통, -100 이하 주의
+	// 감점 문항(1, 3, 8, 9) 상태: 0 양호, -100 초과 보통, -100 이하 주의
 	private static final int CAUTION_MAX = -100;
 
 	private static final int TIER_GOOD = 0;
@@ -223,9 +224,13 @@ public class CreditServiceImpl implements CreditService {
 		return TIER_CAUTION;
 	}
 
-	// 문항 4, 5, 6, 7, 10: 고른 보기로 상태를 정함 (보기 순서 = FastAPI credit.py OPTIONS)
+	// 문항 2, 4, 5, 6, 7, 10: 고른 보기로 상태를 정함 (보기 순서 = FastAPI credit.py OPTIONS)
 	private int choiceTier(int questionNo, List<Integer> choices) {
 		switch (questionNo) {
+			case 2:		// 없음, 10일 미만, 10~29일, 30일 이상
+				if (choices.get(0) == 4) return TIER_CAUTION;
+				if (choices.get(0) >= 2) return TIER_NORMAL;
+				return TIER_GOOD;
 			case 4:		// 0건, 1건, 2~3건, 4건 이상
 				return choices.get(0) == 4 ? TIER_CAUTION : TIER_GOOD;
 			case 5:		// 은행, 카드/캐피탈, 저축은행(상호금융 포함), 대부업 (가장 위험한 금융권 기준)
