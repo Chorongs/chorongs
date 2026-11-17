@@ -5,6 +5,7 @@ import useCompareStore, { getComparePage } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import CompareTray from '../common/CompareTray'
 import ProductDetailSheet from '../common/ProductDetailSheet'
+import RecommendDialog from '../recommend/RecommendDialog'
 import Toast from '../ui/Toast'
 import Footer from './Footer'
 import Header from './Header'
@@ -14,10 +15,9 @@ import MobileTabBar from './MobileTabBar'
 // LY-03 공통 틀: 상단바, 본문(Outlet), 푸터, 하단 탭바(모바일) 배치
 // 화면 위에 뜨는 것(전체 메뉴, 알림)은 여기서 한 번만 그린다. (화면마다 따로 만들지 않음)
 // 비교함에 상품이 있으면 담기 시작한 화면(맞춤 추천 또는 상품 찾기) 밖으로 이동하지 못하게 막고 안내 알림을 띄운다. (되돌아가는 방식)
-// TODO(CM-17, CHORONG-43): 로그인 안내 창이 올라오면 여기서 그리고, 열려 있을 때 뒤 화면 스크롤을 잠근다. (상세 창은 ProductDetailSheet, 전체 메뉴는 MobileMenu가 잠금)
-// TODO(RC-14, CHORONG-45): 맞춤 추천 창 RecommendDialog가 올라오면 여기서 그린다. (열림 상태는 useUiStore의 recommendOpen, recommendSkipGate, 열려 있을 때 뒤 화면 스크롤 잠금은 RecommendDialog가 함)
+// TODO(CM-17, CHORONG-43 Tong-B): 로그인 안내 창이 올라오면 여기서 그리고, 열려 있을 때 뒤 화면 스크롤을 잠근다. (상세 창은 ProductDetailSheet, 전체 메뉴는 MobileMenu가 잠금)
 // 본문 오른쪽에는 300px 칸(#page-side)이 있다: 화면(예: 대출 비교의 '비교할 상품 고르기')이 portal로 내용을 끼워 넣고, 칸이 비어 있으면 안 보인다. (1180 미만은 본문 아래)
-// TODO(LY-09, CHORONG-63): 상시 도우미 HelperPanel이 올라오면 #page-side 칸 안, 끼워 넣은 내용 아래에 그린다. (칸은 도우미가 열려 있거나 끼워 넣은 내용이 있을 때 보이게 바꾼다)
+// TODO(LY-09, CHORONG-63 김채희): 상시 도우미 HelperPanel이 올라오면 #page-side 칸 안, 끼워 넣은 내용 아래에 그린다. (칸은 도우미가 열려 있거나 끼워 넣은 내용이 있을 때 보이게 바꾼다)
 const Shell = styled.div`
   display: flex;
   flex-direction: column;
@@ -132,6 +132,7 @@ function Layout() {
       <MobileMenu />
       <ProductDetailSheet />
       <CompareTray />
+      <RecommendDialog />
       <Toast />
     </Shell>
   )

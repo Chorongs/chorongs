@@ -3,21 +3,28 @@ import styled, { css } from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
-import { CompareButton, Tag } from '../../styles/common'
+import { CompareButton, IconButton, Tag } from '../../styles/common'
 import Icon from '../ui/Icon'
-import MoneyText from './MoneyText'
+import LimitText from './LimitText'
 import RateText from './RateText'
 
 // CM-04 상품 한 줄: 금융사 / 상품명 / 태그 2개 (상품 특징 앞 2개) / 금리 / 한도
 // 줄 아무 곳 클릭, Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
-// TODO(CM-06, CHORONG-43): 찜 버튼 LikeButton 연결 (클릭이 줄까지 안 퍼지게 e.stopPropagation)
+// rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '일치도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
+// 태그: (일치도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (시안 prodRow). 명세서는 '상품 특징 앞 2개'만 있어 소분류는 변경 요청 중
+// 오른쪽 끝 하트(찜): 시안 모양과 자리만 있고 동작은 달지 않았음 (연결 때 클릭이 줄까지 안 퍼지게 stopPropagation). 눌러도 반응이 없는 것에 대한 사용자 안내는 CHORONG-43이 시연 전 일괄 처리하기로 함
+//   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
+// TODO(CM-06, CHORONG-43 Tong-B): 하트를 LikeButton(찜 담기, 비회원은 requireLogin)으로 교체
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
-//   오른쪽에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
+//   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
 //   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
+// TODO(CHORONG-64 조빌립, 상품 찾기 간편 검색): 시안은 태그 자리에 'N/M 일치' 글 + 초록 충족 태그(체크 아이콘)를 보여 줌. 이 줄에 hits 같은 props로 추가 (상세 검색은 그대로)
+// TODO(CM-04, CHORONG-68 조빌립): 줄 전체가 role="button"인데 안에 하트, [+ 비교] 버튼이 또 있어 화면 낭독기에서 버튼 안의 버튼으로 읽힘 (카드도 같음). 줄 전체 클릭은 상품명 버튼 하나로 두고 줄 클릭은 마우스용으로만 두는 방식 검토
+// 랭킹(RK-02, CHORONG-60)은 순위 숫자 칸, 1~3위 메달 카드, '최저 금리' 이름표가 달라 이 줄을 쓰지 않고 components/ranking/RankingItem.jsx로 따로 만듦
 const Row = styled.article`
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px 128px${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
+  grid-template-columns: minmax(0, 1fr) 168px 128px auto${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
   gap: 20px;
   align-items: center;
   padding: 20px 2px;
@@ -40,7 +47,7 @@ const Row = styled.article`
       }
     `}
   @container plist (max-width: 720px) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
     gap: 2px 12px;
     align-items: start;
     padding: 18px 0;
@@ -62,7 +69,7 @@ const Info = styled.div`
   gap: 2px;
   min-width: 0;
   @container plist (max-width: 720px) {
-    grid-column: 1 / -1;
+    grid-column: 1 / 3;
     grid-row: 1;
   }
 `
@@ -71,6 +78,13 @@ const Org = styled.span`
   color: var(--cocoa);
   font-size: var(--fs-sm);
   font-weight: 700;
+`
+
+const RankNo = styled.b`
+  margin-right: 8px;
+  color: var(--brand-text);
+  font-family: var(--f-num);
+  font-weight: 900;
 `
 
 // 상품명이 길면 2줄에서 자름. 줄 위에 마우스를 올리면 밑줄
@@ -88,6 +102,16 @@ const Name = styled.span`
     text-decoration: underline;
     text-decoration-thickness: 1.5px;
     text-underline-offset: 4px;
+  }
+`
+
+// 줄 끝 버튼 칸 (찜). 720 이하에서는 1행 오른쪽
+const RowActions = styled.div`
+  display: flex;
+  align-items: center;
+  @container plist (max-width: 720px) {
+    grid-column: 3;
+    grid-row: 1;
   }
 `
 
@@ -165,17 +189,10 @@ function RateCell({ product }) {
   return <RateText min={rateMin} max={rateMax} hasFixedLabel unitTone="soft" />
 }
 
-// 한도가 숫자가 아니면 종류 글 (한도 제한 없음, 심사 후 결정 등), 그것도 없으면 '기관 문의'
-function LimitCell({ product }) {
-  if (typeof product.limitAmount === 'number') return <MoneyText value={product.limitAmount} unitTone="muted" />
-  const amountTag = (product.tags ?? []).find((tag) => tag.tagType === 'AMOUNT')
-  return <Memo>{amountTag?.tagValue ?? '기관 문의'}</Memo>
-}
-
 // 중도상환수수료 없음, 정부/서민 지원은 주황 딱지로 눈에 띄게
 const ACCENT_FEATURES = ['NO_PREPAY_FEE', 'POLICY']
 
-function ProductRow({ product, from = null }) {
+function ProductRow({ product, from = null, rank = null, matchRate = null }) {
   const openProduct = useUiStore((state) => state.openProduct)
   const { pathname } = useLocation()
   // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 자금 용도가 안 겹치면 '비교 불가'
@@ -186,6 +203,7 @@ function ProductRow({ product, from = null }) {
   // 비교 안 하는 화면(랭킹 등)에서는 담긴 표시도 안 함
   const traySlot = hasCompare ? trayLabel : null
   const featureTags = (product.features ?? []).slice(0, 2)
+  const sector = (product.tags ?? []).find((tag) => tag.tagType === 'SECTOR')?.tagValue
 
   const handleOpen = () => openProduct(product.productId, from)
 
@@ -212,12 +230,15 @@ function ProductRow({ product, from = null }) {
     >
       <Info>
         <Org>
+          {rank != null && <RankNo>{rank}위</RankNo>}
           {product.companyName}
           {traySlot && <CompareBadge>비교 {traySlot}에 담음</CompareBadge>}
         </Org>
         <Name>{product.productName}</Name>
-        {featureTags.length > 0 && (
+        {(matchRate != null || sector || featureTags.length > 0) && (
           <Tags>
+            {matchRate != null && <Tag $variant="acc">일치도 {matchRate}%</Tag>}
+            {sector && <Tag>{sector}</Tag>}
             {featureTags.map((code) => (
               <Tag key={code} $variant={ACCENT_FEATURES.includes(code) ? 'acc' : undefined}>
                 {FEATURE_LABEL[code] ?? code}
@@ -235,9 +256,14 @@ function ProductRow({ product, from = null }) {
       <Metric $slot={2}>
         <MetricLabel>최대 한도</MetricLabel>
         <MetricValue>
-          <LimitCell product={product} />
+          <LimitText product={product} />
         </MetricValue>
       </Metric>
+      <RowActions>
+        <IconButton aria-label={`${product.productName} 찜하기`}>
+          <Icon name="heart" />
+        </IconButton>
+      </RowActions>
       {hasCompare && (
         <CompareCell data-compare-cell>
           <CompareButton

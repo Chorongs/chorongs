@@ -193,6 +193,78 @@ export const Tag = styled.span`
   ${({ $variant }) => tagVariant[$variant] || tagVariant.default}
 `
 
+// 입력 단계 화면(맞춤 추천 1~3단계, CHORONG-45)이 같이 쓰는 칸 모양 (명세서 UI 번호는 변경 요청 중)
+// FormStack: 칸들을 세로로 쌓음 / FormField: 칸 하나 (이름 + 입력 + 오류) / FormLabel: 칸 이름
+// FormLabelNote: 칸 이름 옆 작은 안내 (예: '청년 상품 확인에만 써요')
+export const FormStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+`
+
+export const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+export const FormLabel = styled.p`
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-md);
+  font-weight: 700;
+`
+
+export const FormLabelNote = styled.small`
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+`
+
+// ChipGrid: 칩 묶음(ChipGroup)을 격자로 (기본 3칸, $columns로 바꿈), 칩 글자는 작게
+export const ChipGrid = styled.div`
+  & > [role='group'] {
+    display: grid;
+    grid-template-columns: repeat(${({ $columns }) => $columns ?? 3}, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  & button {
+    min-width: 0;
+    padding: 0 6px;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+    font-size: var(--fs-sm);
+    text-overflow: ellipsis;
+  }
+
+  /* 고른 칩도 바탕은 흰색, 주황은 테두리와 글자만 (가안 .st-pane .chip) */
+  & button[aria-pressed='true'] {
+    background: var(--paper);
+  }
+
+  @media (min-width: 900px) {
+    & button {
+      padding: 0 13px;
+    }
+  }
+`
+
+// SegmentedFull: 선택 버튼 묶음(Segmented)을 가로 가득 반반으로
+export const SegmentedFull = styled.div`
+  & > [role='group'] {
+    display: flex;
+    width: 100%;
+  }
+
+  & button {
+    flex: 1;
+    padding: 0 4px;
+    font-size: var(--fs-sm);
+  }
+`
+
 // UI-17 입력 오류 문구: 비어 있으면 자리 차지 안 함
 export const InlineError = styled.p.attrs({ role: 'alert' })`
   margin: 0;
