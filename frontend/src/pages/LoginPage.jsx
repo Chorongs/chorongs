@@ -1,12 +1,17 @@
 import { Navigate, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../api/authApi'
+import kakaoSymbol from '../assets/images/kakao_symbol.svg'
+import naverSymbol from '../assets/images/naver_symbol.png'
 import useAuthStore from '../store/useAuthStore'
 import { Button, Panel } from '../styles/common'
 
 // AU-01 로그인 화면 (/login): 소셜 로그인 시작. 자체 회원가입, 비밀번호 없음
 // 이미 로그인 → /my / 버튼 → API-18 (카카오, 네이버 로그인 화면으로 이동)
 // 주소의 error 값(API-19가 붙임)으로 안내 한 줄을 바꿈. 정해진 값이 아니면 기본 안내
+// 소셜 버튼: 카카오 로그인 디자인 가이드의 문구('카카오 로그인' 또는 '로그인')와 받은 네이버 공식 리소스 문구('네이버 로그인')를 따름
+//   (명세서의 '카카오로 계속하기', '카카오로 로그인' 대신. 2026-11-17 사용자 결정 B, 문서_반영_목록)
+//   심볼은 공식 파일 그대로(모양, 비율, 색 변경 금지), 글자가 있으니 alt=""(꾸밈 그림)
 const ERROR_TEXT = {
   ADMIN_LOGGED_IN: '관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요',
   CANCELLED: '로그인을 취소했어요',
@@ -58,9 +63,13 @@ function LoginPage() {
       <Guide $isError={Boolean(errorText)} role={errorText ? 'alert' : undefined}>
         {errorText ?? '로그인 방법을 선택하세요'}
       </Guide>
-      <Button onClick={() => handleLogin('kakao')}>카카오로 계속하기</Button>
-      <Button $variant="outline" onClick={() => handleLogin('naver')}>
-        네이버로 계속하기
+      <Button $variant="kakao" onClick={() => handleLogin('kakao')}>
+        <img src={kakaoSymbol} alt="" />
+        카카오 로그인
+      </Button>
+      <Button $variant="naver" onClick={() => handleLogin('naver')}>
+        <img src={naverSymbol} alt="" />
+        네이버 로그인
       </Button>
     </Wrap>
   )

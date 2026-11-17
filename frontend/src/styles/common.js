@@ -44,6 +44,37 @@ const buttonVariant = {
       background: var(--mist);
     }
   `,
+  // 소셜 로그인 버튼 (CHORONG-43): 글자 앞에 공식 심볼 <img alt="" />, 글자 --fs-lg (fe_design 카카오/네이버 버튼)
+  // 가이드가 정한 색 밖으로 바꾸지 않게 마우스 올림 색 변화 없음 / 모서리는 기본 --r-sm(12px) = 카카오 가이드 radius 12
+  // 심볼 파일은 둥근 바탕이 버튼과 같은 색이라 바탕은 안 보이고 말풍선, N만 보임
+  // 둥근 바탕의 안 보이는 여백만큼 음수 margin으로 당겨, 보이는 심볼 + 글자 묶음이 버튼 가운데에 오고 심볼과 글자 사이가 8px이 되게 함
+  // 기본 높이(48) 버튼 전용 (심볼 크기를 px로 정함)
+  // 카카오: kakao_symbol.svg 30px → 말풍선 약 14px (공식 medium 버튼과 같은 비율), 양옆 안 보이는 여백 약 8px
+  kakao: css`
+    gap: 0;
+    background: var(--kakao);
+    color: var(--on-kakao);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    & > img {
+      height: 30px;
+      margin-left: -8px;
+    }
+  `,
+  // 네이버 로그인 버튼 사용 가이드: 배경 #03A94D, 로고, 레이블 #FFFFFF / 완성형 N 로고 16px 이상 / 가운데 정렬 때 로고와 레이블 간격 8px
+  //   / 레이블은 로고 높이보다 작게 (글자 16px의 실제 글자 높이는 16px보다 작음)
+  // naver_symbol.png 44px → N 16.5px (아이콘의 37.5%), 양옆 안 보이는 여백 13.75px → 왼쪽 -13.75px, 오른쪽 -5.75px(간격 8px)
+  naver: css`
+    gap: 0;
+    background: var(--naver);
+    color: var(--on-naver);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    & > img {
+      height: 44px;
+      margin: 0 -5.75px 0 -13.75px;
+    }
+  `,
 }
 
 // 글자: 주 버튼 --fs-lg 800 / 나머지 --fs-base 700 (크기와 상관없이)
