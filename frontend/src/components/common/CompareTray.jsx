@@ -30,7 +30,7 @@ const Bar = styled.section`
   align-items: center;
   gap: 12px;
   width: min(640px, calc(100vw - 32px));
-  padding: 10px 10px 10px 18px;
+  padding: 12px 12px 12px 20px;
   border-radius: var(--r-md);
   background: var(--ink);
   box-shadow: var(--shadow-pop);
@@ -85,7 +85,7 @@ const RemoveButton = styled.button.attrs({ type: 'button' })`
   cursor: pointer;
   opacity: 0.7;
   &:hover {
-    background: rgb(255 255 255 / 0.15);
+    background: color-mix(in srgb, currentColor 15%, transparent);
     opacity: 1;
   }
 `
@@ -113,7 +113,7 @@ const ClearButton = styled.button.attrs({ type: 'button' })`
   cursor: pointer;
   opacity: 0.75;
   &:hover {
-    background: rgb(127 127 127 / 0.25);
+    background: color-mix(in srgb, currentColor 25%, transparent);
     opacity: 1;
   }
 `

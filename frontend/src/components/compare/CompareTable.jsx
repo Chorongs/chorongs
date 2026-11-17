@@ -11,8 +11,8 @@ const Legend = styled.div`
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 4px 0 10px;
-  border-bottom: 2px solid var(--ink);
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--line-2);
   font-size: var(--fs-md);
   font-weight: 800;
   & > span {
@@ -33,7 +33,7 @@ const Row = styled.div`
   @media (max-width: 899px) {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px 12px;
-    padding: 14px 0;
+    padding: 12px 0;
   }
   @media (max-width: 420px) {
     gap: 6px 8px;
@@ -49,7 +49,7 @@ const Label = styled.div`
     display: block;
     color: var(--muted);
     font-size: var(--fs-xs);
-    font-weight: 500;
+    font-weight: 400;
   }
   @media (max-width: 899px) {
     display: flex;
@@ -98,8 +98,8 @@ const Value = styled.div`
 const Win = styled.span`
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 7px;
+  gap: 4px;
+  padding: 4px 8px;
   border-radius: var(--r-xs);
   background: var(--good-soft);
   color: var(--good);
