@@ -15,7 +15,7 @@ api.interceptors.response.use(
       if (url.startsWith('/api/admin/')) {
         // TODO(ST-06, CHORONG-55): 서버 문구 안내 + /admin/login 이동
       } else if (url !== '/api/auth/me') {
-        // TODO(ST-01, ST-05): 화면 상태 guest로 + 로그인 안내 창 '로그인이 풀렸어요. 다시 로그인해 주세요' (입력 중인 값은 지우지 않음)
+        // TODO(ST-01, CM-17, CHORONG-43): 화면 상태 guest로 + 로그인 안내 창 '로그인이 풀렸어요. 다시 로그인해 주세요' (입력 중인 값은 지우지 않음)
       }
     }
     return Promise.reject(error)
