@@ -6,6 +6,7 @@ import ProductRow from './ProductRow'
 // items: ProductSummaryDTO 목록 (key는 상품 번호) / from: 상세 창을 어디서 열었는지 ('recommend' 또는 생략)
 // 많으면 page, size로 나눠 받는다 (E7): 받는 일은 부르는 쪽이 하고, 여기서는 [더 보기]만 그린다.
 // hasMore: 더 받을 쪽이 있음 / onMore: [더 보기] 누름 / isMoreLoading: 받는 중이면 버튼 잠금 (E5)
+// getRowProps (선택): (product, index) => ProductRow에 더 넘길 props (맞춤 추천 4위부터의 rank, matchRate, CHORONG-45)
 // 목록 폭이 줄 모양을 정한다: ProductRow가 이 목록(plist)의 폭 720, 480 이하에서 바뀜
 const List = styled.ul`
   display: flex;
@@ -28,15 +29,16 @@ function ProductList({
   hasMore = false,
   onMore,
   isMoreLoading = false,
+  getRowProps = null,
 }) {
   if (items.length === 0) return <EmptyBox>{emptyText}</EmptyBox>
 
   return (
     <>
       <List>
-        {items.map((product) => (
+        {items.map((product, index) => (
           <li key={product.productId}>
-            <ProductRow product={product} from={from} />
+            <ProductRow product={product} from={from} {...(getRowProps?.(product, index) ?? {})} />
           </li>
         ))}
       </List>

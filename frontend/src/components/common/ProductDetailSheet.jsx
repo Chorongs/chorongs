@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
+import ReasonList from '../recommend/ReasonList'
 import { Button, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
 import Disclaimer from './Disclaimer'
+import EligibilityNotice from './EligibilityNotice'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
 
@@ -18,13 +21,10 @@ import RateText from './RateText'
 // 열려 있는 동안 뒤 화면 스크롤을 잠근다.
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
-// TODO(CM-08, CHORONG-45): '내 조건 안내' EligibilityNotice (3칸 아래, useRecommendStore의 입력값이 올라온 뒤)
-// TODO(RC-09, CHORONG-45): 추천 이유 ReasonList (sheetFrom이 'recommend'일 때 3칸 아래, productId를 넘겨 표시)
-// TODO(CM-06, CHORONG-43): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
-// TODO(ST-04, CHORONG-47): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
-// TODO(API-21, CHORONG-43): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
-// TODO(CM-16, CHORONG-52): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
-// TODO(ST-03, CHORONG-45): [이자 계산] 금액은 useRecommendStore의 lastInput.need와 한도 중 작은 값 (지금은 기본값 1,000만원)
+// TODO(CM-06, CHORONG-43 Tong-B): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
+// TODO(ST-04, CHORONG-47 조빌립): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
+// TODO(API-21, CHORONG-43 Tong-B): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
+// TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 const DEFAULT_NEED_MAN = 1000
 const DEFAULT_MONTHS = 36
 const SOURCE_LABEL = { KINFA: '서민금융진흥원', FSS: '금융감독원' }
@@ -275,15 +275,15 @@ function getSiteContent(siteUrl) {
 }
 
 // [이자 계산]으로 계산기(/calc)에 넘기는 값
-// 금액: 1,000만원과 한도 중 작은 값(원) / 기간: 36개월과 최대 기간 중 작은 값 / 금리: 범위 중간값 / 방식: 첫 상환 방식
-function buildCalcState(product) {
-  const limit = product.limitAmount > 0 ? product.limitAmount : DEFAULT_NEED_MAN
+// 금액: 필요 금액(추천받은 적 있으면 lastInput.need, 없으면 1,000만원)과 한도 중 작은 값(원) / 기간: 36개월과 최대 기간 중 작은 값 / 금리: 범위 중간값 / 방식: 첫 상환 방식
+function buildCalcState(product, needMan) {
+  const limit = product.limitAmount > 0 ? product.limitAmount : Infinity
   const rates = [product.rateMin, product.rateMax].filter((rate) => typeof rate === 'number')
   const interestRate = rates.length > 0 ? Number((rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(2)) : null
   const firstRepay = getTagValues(product, 'REPAY')[0]
 
   return {
-    loanAmount: Math.min(DEFAULT_NEED_MAN, limit) * 10000,
+    loanAmount: Math.min(needMan, limit) * 10000,
     loanMonths: Math.min(DEFAULT_MONTHS, product.termMax > 0 ? product.termMax : DEFAULT_MONTHS),
     interestRate,
     repayMethod: REPAY_METHOD_CODE[firstRepay] ?? 'EQUAL_PI',
@@ -300,6 +300,9 @@ function CloseButton({ onClose }) {
 
 function ProductDetail({ product, onClose }) {
   const navigate = useNavigate()
+  const sheetFrom = useUiStore((state) => state.sheetFrom)
+  const lastNeed = useRecommendStore((state) => state.lastInput?.need)
+  const needMan = lastNeed > 0 ? lastNeed : DEFAULT_NEED_MAN
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (
@@ -328,7 +331,7 @@ function ProductDetail({ product, onClose }) {
   const bandRates = product.bandRates ?? []
   const hasRate = product.rateMin != null || product.rateMax != null
 
-  const handleCalc = () => navigate('/calc', { state: buildCalcState(product) })
+  const handleCalc = () => navigate('/calc', { state: buildCalcState(product, needMan) })
 
   return (
     <Body>
@@ -369,6 +372,9 @@ function ProductDetail({ product, onClose }) {
           </TileValue>
         </Tile>
       </Tiles>
+
+      <EligibilityNotice productId={product.productId} productStatus={product.productStatus} />
+      {sheetFrom === 'recommend' && <ReasonList productId={product.productId} />}
 
       {product.grouped && <Hint>조합마다 금리 다름, 가까운 취급기관 문의</Hint>}
 
