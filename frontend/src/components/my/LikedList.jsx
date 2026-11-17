@@ -10,7 +10,8 @@ import MySection from './MySection'
 // MY-04 찜한 대출 (최대 30개): 상품 목록, 쪽 나눔 (E7) / 빈 상태 '맞춤 추천 받기'
 // 찜 취소는 줄의 하트(LikeButton)로 함 (X, 지우기 없음)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
-// TODO(API-20, CHORONG-42 BE): 찜 API는 오늘 서버 범위 밖. 응답 칸 이름 확정 후 맞춤 (지금은 develop 공통 PageInfo { list, total, page, size } 기준)
+// 찜 목록 응답은 공통 PageInfo { list, total, page, size } (2026-11-17 백엔드 담당 결정)
+// TODO(API-20, CHORONG-42 BE): 찜 API는 아직 서버에 없음. 올라오면 응답이 위 모양인지 확인
 // TODO(ST-03, CHORONG-45 김채희): '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음. useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾼다.
 const PAGE_SIZE = 20
 

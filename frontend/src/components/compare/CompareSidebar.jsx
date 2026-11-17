@@ -203,6 +203,8 @@ function useSectionData(load) {
     load()
       .then((data) => {
         if (isCancelled) return
+        // TODO(API-20, CHORONG-47 조빌립): 찜 목록(getLikes)은 쪽 나눔 응답이라 공통 PageInfo { list, total, page, size }의 list로 받기로 정함 (2026-11-17 백엔드 담당 결정, CHORONG-43 전달)
+        //   찜 구역은 data.list, 최근 본(getRecentViews)은 data.items 그대로 읽도록 나눠야 함. 찜 API가 서버에 없는 지금은 items로 읽어도 문제없음
         const items = (data?.items ?? []).map((item) => item.product).filter(isOnProduct)
         setState({ status: 'ok', items })
       })
