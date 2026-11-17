@@ -43,8 +43,9 @@ const Head = styled.div`
 
 const HeadInfo = styled.div`
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   @media (max-width: 899px) {
     flex: 1 1 calc(100% - 48px);
@@ -66,21 +67,20 @@ const Name = styled.h3`
   font-weight: 800;
   line-height: 1.35;
   word-break: keep-all;
+  overflow-wrap: anywhere;
 `
 
-const SwapButton = styled(Button)`
-  flex: none;
-  margin-left: auto;
-`
-
+// X는 이름 길이와 상관없이 카드 오른쪽 위에 고정
 const RemoveIcon = styled(IconButton)`
   flex: none;
+  align-self: flex-start;
+  margin-left: auto;
 `
 
 const Over = styled.p`
   display: flex;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-radius: var(--r-sm);
   background: var(--bad-soft);
   color: var(--ink-2);
@@ -92,7 +92,7 @@ const Over = styled.p`
   svg,
   [data-icon] {
     flex: none;
-    margin-top: 2px;
+    margin-top: 4px;
     color: var(--bad);
   }
 `
@@ -101,7 +101,7 @@ const Numbers = styled.div`
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  padding-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--line);
   small {
     display: block;
@@ -150,8 +150,11 @@ const Hint = styled.p`
   line-height: 1.55;
 `
 
-const CalcButton = styled(Button)`
-  align-self: flex-start;
+// 카드 맨 아래 버튼 줄: [이자 계산] 옆에 [다른 상품으로 비교]
+const Actions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: auto;
 `
 
@@ -256,9 +259,6 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
       <Head>
         <SlotBadge $slot={slot}>{slot}</SlotBadge>
         {info}
-        <SwapButton $size="sm" $variant="outline" onClick={handleSwap}>
-          다른 상품으로 비교
-        </SwapButton>
         <RemoveIcon aria-label={`${product.productName} 비교에서 빼기`} title="비교에서 빼기" onClick={() => clearSlot(slot)}>
           <Icon name="close" />
         </RemoveIcon>
@@ -312,14 +312,18 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
         <dt>특징</dt>
         <dd>{features.length > 0 ? features.join(', ') : '-'}</dd>
       </List>
-      {midRate !== null ? (
-        <CalcButton $size="sm" $variant="outline" onClick={handleCalc}>
-          <Icon name="calc" size={16} />
-          이자 계산
-        </CalcButton>
-      ) : (
-        <Hint>금리는 신청하는 곳에서 안내해요. 이자 계산은 할 수 없어요.</Hint>
-      )}
+      {midRate === null && <Hint>금리는 신청하는 곳에서 안내해요. 이자 계산은 할 수 없어요.</Hint>}
+      <Actions>
+        {midRate !== null && (
+          <Button $size="sm" $variant="outline" onClick={handleCalc}>
+            <Icon name="calc" size={16} />
+            이자 계산
+          </Button>
+        )}
+        <Button $size="sm" $variant="outline" onClick={handleSwap}>
+          다른 상품으로 비교
+        </Button>
+      </Actions>
     </Wrap>
   )
 }
