@@ -58,9 +58,20 @@ function LoginRequiredDialog() {
   // 돌아올 주소 검사(사이트 안 주소만, E12)는 getLoginUrl이 함
   // 누르는 순간 서버(API-17)에 한 번 더 확인: 이미 로그인 중이면 소셜 로그인으로 보내지 않고 창을 닫음
   //   + '이미 로그인되어 있어요' + 로그인 상태를 다시 채움 (다시 로그인, 다른 계정 가입 막음)
+  // 서버 응답이 아예 없으면(서버 꺼짐, 네트워크 오류) 소셜 로그인으로 보내도 오류 화면만 뜨므로 보내지 않고 다시 시도 안내 (E3, 창은 열어 둠)
   const handleLogin = async (provider) => {
     setIsChecking(true)
-    const me = await authApi.getMe().catch(() => null)
+    let me = null
+    try {
+      me = await authApi.getMe()
+    } catch (error) {
+      if (!error.response) {
+        setIsChecking(false)
+        showToast('로그인하지 못했어요. 다시 시도해 주세요')
+        return
+      }
+      // 401 등 서버 응답이 있으면 비회원 → 아래에서 소셜 로그인으로 보냄
+    }
     setIsChecking(false)
     if (me?.memberNickname) {
       handleClose()

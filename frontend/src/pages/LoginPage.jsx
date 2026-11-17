@@ -42,12 +42,6 @@ const Guide = styled.p`
   font-weight: 600;
 `
 
-const Status = styled.p`
-  padding: 36px 0;
-  color: var(--cocoa);
-  text-align: center;
-`
-
 function LoginPage() {
   const status = useAuthStore((state) => state.status)
   const showToast = useUiStore((state) => state.showToast)
@@ -56,15 +50,27 @@ function LoginPage() {
   const [isChecking, setIsChecking] = useState(false)
   const errorText = ERROR_TEXT[searchParams.get('error')]
 
-  if (status === 'checking') return <Status role="status">확인하는 중이에요</Status>
+  // 확인하는 동안(checking)에도 로그인 버튼을 보여 줌 (서버 응답이 늦어도 화면이 멈춰 보이지 않게, 2026-11-17 사용자 결정)
+  // 누르는 순간 아래 handleLogin이 서버에 다시 확인하므로 이미 로그인 중이면 소셜 로그인으로 보내지 않음
   if (status === 'member') return <Navigate to="/my" replace />
 
   // 이 화면에서 시작한 로그인은 돌아올 주소가 없음 → 로그인 뒤 /my
   // 누르는 순간 서버(API-17)에 한 번 더 확인: 이미 로그인 중이면 소셜 로그인으로 보내지 않음
   //   → '이미 로그인되어 있어요' + 로그인 상태를 다시 채움 → 회원이면 위의 Navigate가 /my로 보냄 (다시 로그인, 다른 계정 가입 막음)
+  // 서버 응답이 아예 없으면(서버 꺼짐, 네트워크 오류) 소셜 로그인으로 보내도 오류 화면만 뜨므로 보내지 않고 다시 시도 안내 (E3)
   const handleLogin = async (provider) => {
     setIsChecking(true)
-    const me = await authApi.getMe().catch(() => null)
+    let me = null
+    try {
+      me = await authApi.getMe()
+    } catch (error) {
+      if (!error.response) {
+        setIsChecking(false)
+        showToast('로그인하지 못했어요. 다시 시도해 주세요')
+        return
+      }
+      // 401 등 서버 응답이 있으면 비회원 → 아래에서 소셜 로그인으로 보냄
+    }
     setIsChecking(false)
     if (me?.memberNickname) {
       showToast('이미 로그인되어 있어요')

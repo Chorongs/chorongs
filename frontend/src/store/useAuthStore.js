@@ -10,8 +10,9 @@ const useAuthStore = create((set) => ({
   status: 'checking',
 
   // API-17로 로그인 여부 확인. 401이면 guest, 네트워크 오류(응답 없음)면 guest로 보이되 한 번 더 확인
+  // 다시 확인(isRetry)할 때는 checking으로 바꾸지 않음 (guest로 보인 채로 확인, 버튼이 다시 숨지 않게)
   fetchMe: async (isRetry = false) => {
-    set({ status: 'checking' })
+    if (!isRetry) set({ status: 'checking' })
     try {
       const user = await authApi.getMe()
       // 성공(200)인데 내 정보가 없으면 비회원으로 (API 주소 설정이 없거나 틀려 화면 서버가 HTML을 돌려준 경우 등, 화면이 멈추지 않게)

@@ -82,9 +82,8 @@ function AccountMenu() {
   const [logoutStep, setLogoutStep] = useState(null)
   const [isPending, setIsPending] = useState(false)
 
-  // 확인하는 동안은 아무것도 안 그림 (로그인 버튼이 번쩍 보이지 않게)
-  if (status === 'checking') return null
-
+  // 확인하는 동안(checking)에도 [로그인]을 보여 줌: 서버 응답이 늦거나 없어도 버튼이 사라지지 않게 (2026-11-17 사용자 결정)
+  // 누르면 /login으로 가고, 로그인 화면이 버튼을 누르는 순간 서버에 다시 확인함. 회원이면 응답이 오자마자 닉네임 버튼으로 바뀜
   if (status !== 'member') {
     return (
       <Button $size="sm" $variant="outline" onClick={() => navigate('/login')}>
