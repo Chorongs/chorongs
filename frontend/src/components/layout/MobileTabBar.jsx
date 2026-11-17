@@ -1,6 +1,7 @@
 import { NavLink, matchPath, useLocation } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import { TAB_MENU } from '../../constants/menu'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import Icon from '../ui/Icon'
 
@@ -9,7 +10,7 @@ import Icon from '../ui/Icon'
 // 시안처럼 아이콘 위, 글자 아래. 현재 탭은 진한 글자 + 주황 아이콘
 // 추천 탭은 LY-05 '캐링 추천'과 같음 (추천받기 전이면 추천 창 열기, 받은 뒤면 /recommend 이동)
 // 상품 찾기 탭은 /search/simple로 이동하고 /search에서도 현재 탭으로 표시
-// TODO(ST-03, CHORONG-45): useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾼다.
+// hasResult: useRecommendStore의 result 유무
 const Bar = styled.nav`
   display: none;
   @media (max-width: 899px) {
@@ -72,7 +73,7 @@ function MobileTabBar() {
   const openMenu = useUiStore((state) => state.openMenu)
   const openRecommend = useUiStore((state) => state.openRecommend)
   const { pathname } = useLocation()
-  const hasResult = false
+  const hasResult = useRecommendStore((state) => state.result !== null)
 
   const handleTabClick = (event, item) => {
     if (item.isRecommend && !hasResult) {
