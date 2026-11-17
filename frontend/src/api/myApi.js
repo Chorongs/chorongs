@@ -33,3 +33,9 @@ export const getCreditReport = async () => {
   const response = await api.get('/api/me/reports/credit')
   return response.status === 204 ? null : response.data.data
 }
+
+// API-25 진단 리포트 저장 (PUT): 구간 + 시각만, 점수와 답은 보내지 않음, 회원당 1개 덮어씀
+export async function putCreditReport(creditBand) {
+  const response = await api.put('/api/me/reports/credit', { creditBand })
+  return response.data.data
+}
