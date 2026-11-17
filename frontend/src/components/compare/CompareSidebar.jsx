@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, SlotBadge } from '../../styles/common'
 import { formatRate } from '../../utils/format'
+import { formatMatchRate } from '../../utils/recommend'
 import Icon from '../ui/Icon'
 
 // CP-07 비교할 상품 고르기: 비교 화면에서 바로 상품 채우기 (구역마다 3개씩 쪽 넘김 + 건수). 모양은 시안과 같게 접었다 펴는 구역
 // 카드를 누르면 빈 칸에 먼저, 둘 다 차 있으면 B를 바꿈. 이미 있는 상품 → '이미 A에 있어요' 알림
 // 다른 한 상품과 자금 용도나 상환 방식이 안 겹치는 카드는 흐리게 + '용도가(상환 방식이) 달라 비교 불가', 누르면 안 담고 경고 (E15)
-// 찜, 최근 본은 회원만: 요청이 401이면 그 구역을 숨긴다. 목록을 못 받으면 그 구역만 실패 문구 (E3). 구역이 모두 비면 사이드바째 숨김
+// 추천 상품: useRecommendStore의 result.items를 그대로 보여 줌 (카드에 '일치도 N%' 딱지, 비회원도 가능, 새 API 없음). 추천을 받기 전에는 구역이 안 보임
+// 찜, 최근 본: 회원만 (명세서 CP-07, 비회원이면 구역 안 보임): 요청이 401이면 그 구역을 숨긴다.
+// 목록을 못 받으면 그 구역만 실패 문구 (E3). 구역이 모두 비면 사이드바째 숨김
 // 판매 종료, 숨김 상품은 목록에서 뺀다 (관리자가 상태를 바꾸면 안 나옴, 상태 ON만 보임)
-// TODO(ST-01, CHORONG-43): useAuthStore가 올라오면 status가 'member'일 때만 찜을 요청한다. (지금은 401로 비회원을 알아냄) 비회원이 요청하면 401로 로그인 안내 창이 열리니 그때 회원일 때만 요청하게 바꾼다.
-// TODO(MEM-08, CHORONG-42): 최근 본은 비회원도 보게 하는 규칙(11-17 결정)이라, 서버가 비회원에게도 200을 주면 401로 숨기던 것을 없앤다.
+// TODO(ST-01, CHORONG-43): useAuthStore가 올라오면 status가 'member'일 때만 찜과 최근 본을 요청한다. (지금은 401로 비회원을 알아냄) 비회원이 요청하면 401로 로그인 안내 창이 열리니 그때 회원일 때만 요청하게 바꾼다.
+// TODO(MEM-08, MEM-04, CHORONG-42): 최근 본(/api/me/recent-views)과 찜(/api/me/likes) 서버 API가 아직 develop에 없음 (2026-11-17 기준 42번은 로그인, 가입만 합쳐짐: 최근 본 MEM-08, 찜 MEM-04, 비교 내역 MEM-10 없음). 그래서 회원이어도 이 두 구역은 아직 안 보인다.
 // TODO(ST-02, CHORONG-43): useMyStore의 likedIds가 올라오면 찜이 바뀔 때 찜 구역을 다시 받는다. (지금은 열 때 한 번)
-// TODO(ST-03, CHORONG-45): '추천 상품' 구역 (useRecommendStore의 result.items, 카드에 '일치도 N%' 딱지, 비회원도 가능, 새 API 없음)을 찜 구역 위에 넣는다. (일치도 딱지 모양은 test-compare 브랜치의 CompareSidebar에 만들어 둠)
 const PAGE_SIZE = 3
 
 const Wrap = styled.aside`
@@ -191,10 +194,24 @@ const Flip = styled.span`
 `
 
 // 판매 종료(CLOSED), 숨김(HIDDEN) 상품은 비교할 수 없으니 빼고 게시(ON) 상품만 둔다.
+// 추천 상품 카드의 일치도 딱지
+const Match = styled.span`
+  padding: 4px 8px;
+  border-radius: var(--r-pill);
+  background: var(--brand-soft);
+  color: var(--brand-text);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+`
+
 const isOnProduct = (product) => Boolean(product) && product.productStatus === 'ON'
 
+// 구역마다 응답에서 목록을 꺼내는 칸이 다름: 찜(API-20)은 쪽 나눔 응답이라 list, 최근 본(API-21)은 items (43번과 정함)
+const getLikeItems = (data) => data?.list ?? []
+const getRecentItems = (data) => data?.items ?? []
+
 // 구역 하나의 목록 받기: { status: loading / ok / error / guest (401), items: 상품 요약 목록 }
-function useSectionData(load) {
+function useSectionData(load, pickItems) {
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState({ status: 'loading', items: [] })
 
@@ -203,7 +220,7 @@ function useSectionData(load) {
     load()
       .then((data) => {
         if (isCancelled) return
-        const items = (data?.items ?? []).map((item) => item.product).filter(isOnProduct)
+        const items = pickItems(data).map((item) => item.product).filter(isOnProduct)
         setState({ status: 'ok', items })
       })
       .catch((error) => {
@@ -213,7 +230,7 @@ function useSectionData(load) {
     return () => {
       isCancelled = true
     }
-  }, [load, attempt])
+  }, [load, pickItems, attempt])
 
   const retry = () => {
     setState({ status: 'loading', items: [] })
@@ -284,6 +301,7 @@ function SectionBox({ title, state, onRetry, pair, otherProduct, onPick }) {
                     <Name>{product.productName}</Name>
                     <Meta>
                       <Rate>{getRateText(product)}</Rate>
+                      {product.matchRate != null && <Match>일치도 {product.matchRate}%</Match>}
                     </Meta>
                     {slot && (
                       <On>
@@ -330,10 +348,18 @@ function CompareSidebar({ slotProducts, onPicked }) {
   const putPair = useCompareStore((state) => state.putPair)
   const canCompare = useCompareStore((state) => state.canCompare)
   const showToast = useUiStore((state) => state.showToast)
-  const [likes, retryLikes] = useSectionData(myApi.getLikes)
-  const [recents, retryRecents] = useSectionData(myApi.getRecentViews)
+  const [likes, retryLikes] = useSectionData(myApi.getLikes, getLikeItems)
+  const [recents, retryRecents] = useSectionData(myApi.getRecentViews, getRecentItems)
+  const recommendItems = useRecommendStore((state) => state.result?.items)
+  // 추천 결과를 구역 모양으로 (게시 상품만, 일치도는 카드 딱지로)
+  const recommends = useMemo(() => {
+    const items = (recommendItems ?? [])
+      .map((item) => ({ ...item.product, matchRate: formatMatchRate(item.matchRate) }))
+      .filter((product) => product.productId != null && isOnProduct(product))
+    return { status: 'ok', items }
+  }, [recommendItems])
 
-  if (!isShown(likes) && !isShown(recents)) return null
+  if (!isShown(recommends) && !isShown(likes) && !isShown(recents)) return null
 
   // 새 상품이 들어갈 칸: 빈 칸 먼저, 둘 다 차 있으면 B / 그때 남는 다른 한 상품
   const targetSlot = pair[0] === null ? 'A' : 'B'
@@ -360,6 +386,16 @@ function CompareSidebar({ slotProducts, onPicked }) {
     <Wrap aria-label="비교할 상품 고르기">
       <Title>비교할 상품 고르기</Title>
       <Hint>누르면 빈 칸에 먼저 넣고, 둘 다 차 있으면 B를 바꿔요.</Hint>
+      {isShown(recommends) && (
+        <SectionBox
+          title="추천 상품"
+          state={recommends}
+          onRetry={() => {}}
+          pair={pair}
+          otherProduct={otherProduct}
+          onPick={handlePick}
+        />
+      )}
       {isShown(likes) && (
         <SectionBox
           title="찜한 대출"
