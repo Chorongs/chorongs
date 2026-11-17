@@ -3,8 +3,8 @@ import api from './axiosInstance'
 // 찜, 최근 본, 최근 검색, 비교 내역, 계산 기록, 진단 리포트, 추천 결과, 회원 정보, MY 요약 (API-20~25, 28, 38, 51)
 // 본문 { success, data }의 data만 꺼내 돌려준다. 204는 본문이 없어 돌려주는 값이 없다.
 
-// API-20 찜 목록 (쪽 나눔: page는 1부터)
-export async function getLikes({ page = 1, size = 20 } = {}) {
+// API-20 찜 목록 (쪽 나눔: page는 1부터, 기본 30개 = 찜 최대 개수라 인자 없이 부르면 한 번에 다 받음)
+export async function getLikes({ page = 1, size = 30 } = {}) {
   const response = await api.get('/api/me/likes', { params: { page, size } })
   return response.data.data
 }
@@ -67,9 +67,9 @@ export async function getCompares() {
   return response.data.data
 }
 
-// API-23 비교 저장: { productAId, productBId } (같은 조합 409)
-export async function postCompare(body) {
-  await api.post('/api/me/compares', body)
+// API-23 비교 저장 (201). 같은 조합은 409 CONFLICT (비교 화면 CHORONG-47이 씀)
+export async function postCompare(productAId, productBId) {
+  await api.post('/api/me/compares', { productAId, productBId })
 }
 
 // API-23 비교 내역 1건 삭제

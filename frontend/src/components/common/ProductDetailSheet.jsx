@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
+import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import ReasonList from '../recommend/ReasonList'
-import { Button, EmptyBox, IconButton, Tag } from '../../styles/common'
+import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
@@ -24,10 +25,11 @@ import RateText from './RateText'
 // 열려 있는 동안 뒤 화면 스크롤을 잠근다.
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
-// [찜하기] LikeButton (CM-06)을 버튼 줄 첫 칸에 연결함 (+ 비교가 올라오면 3칸: 찜하기 / + 비교 / 이자 계산)
-// TODO(ST-04, CHORONG-47 조빌립): [+ 비교] 버튼 연결. addTray가 true면 창 닫기, false면 그대로. sheetFrom이 'ranking'이면 [+ 비교] 숨김 (랭킹에서는 비교 안 함)
+// [찜하기] LikeButton (CM-06)을 버튼 줄 첫 칸에 연결함 (버튼 줄: 찜하기 / + 비교 / 이자 계산)
+// [+ 비교]: 비교함에 담기 (addTray가 true면 창 닫기, false면 그대로). 맞춤 추천, 상품 찾기 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
 // 회원이면 최근 본 대출 기록 myApi.postRecentView (API-21, 실패는 안내 안 함)
 // TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
+// 내 조건 안내 EligibilityNotice (CM-08), 추천 이유 ReasonList (RC-09), [이자 계산] 금액(추천 입력 lastInput.need와 한도 중 작은 값)은 CHORONG-45에서 연결됨
 const DEFAULT_NEED_MAN = 1000
 const DEFAULT_MONTHS = 36
 const SOURCE_LABEL = { KINFA: '서민금융진흥원', FSS: '금융감독원' }
@@ -169,10 +171,10 @@ const ExternalLink = styled.a`
   font-weight: 700;
 `
 
-// 지금은 [찜하기], [이자 계산] 2칸. + 비교가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
+// 버튼 줄 칸 수: [+ 비교]가 있으면 3칸(찜하기 / + 비교 / 이자 계산), 없으면 2칸(찜하기 / 이자 계산)
 const Actions = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(${({ $count }) => $count}, minmax(0, 1fr));
   gap: 8px;
 `
 
@@ -303,7 +305,13 @@ function CloseButton({ onClose }) {
 
 function ProductDetail({ product, onClose }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const sheetFrom = useUiStore((state) => state.sheetFrom)
+  const addTray = useCompareStore((state) => state.addTray)
+  // 비교함에서 A, B 어느 칸인지 / 비교함 첫 상품과 용도가 안 겹치면 '비교 불가' (상품 한 줄과 같은 표시)
+  const traySlot = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
+  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
+  const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking' && product.productStatus === 'ON'
   const lastNeed = useRecommendStore((state) => state.lastInput?.need)
   const needMan = lastNeed > 0 ? lastNeed : DEFAULT_NEED_MAN
   const sector = getTagValues(product, 'SECTOR')[0]
@@ -335,6 +343,10 @@ function ProductDetail({ product, onClose }) {
   const hasRate = product.rateMin != null || product.rateMax != null
 
   const handleCalc = () => navigate('/calc', { state: buildCalcState(product, needMan) })
+
+  const handleCompare = () => {
+    if (addTray(product)) onClose()
+  }
 
   return (
     <Body>
@@ -408,8 +420,19 @@ function ProductDetail({ product, onClose }) {
         </SectionBox>
       ))}
 
-      <Actions>
+      <Actions $count={hasCompare ? 3 : 2}>
         <LikeButton productId={product.productId} hasLabel />
+        {hasCompare && (
+          <CompareButton
+            $variant="outline"
+            $state={traySlot ? 'in' : isNo ? 'no' : undefined}
+            aria-pressed={Boolean(traySlot)}
+            onClick={handleCompare}
+          >
+            {traySlot && <Icon name="check" size={15} />}
+            {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+          </CompareButton>
+        )}
         <Button onClick={handleCalc}>
           이자 계산
           <Icon name="arrow" size={13} />

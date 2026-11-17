@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import useCompareStore, { getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, Tag } from '../../styles/common'
+import { Button, Card, CompareButton, Tag } from '../../styles/common'
 import { formatMatchRate, getCalcState, toManWon } from '../../utils/recommend'
 import LikeButton from '../common/LikeButton'
 import LimitText from '../common/LimitText'
@@ -187,7 +188,7 @@ const Note = styled.p`
     - TODO(LY-01, CHORONG-49 김진석): /calc 계산기 화면은 계산기 이슈가 라우트를 추가해야 생김. 그 전에는 [이자 계산]이 '찾을 수 없음' 화면으로 감 (넘기는 값은 utils/recommend.js getCalcState)
     - 판단 태그는 서버가 보낸 글 그대로, 순서도 그대로 (서버가 주의 먼저 정렬). 서버 글은 글자로만 출력 (E1)
     - 하트: LikeButton (CM-06. 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 LikeButton이 stopPropagation, CHORONG-43에서 연결)
-    - TODO(ST-04, CHORONG-47 조빌립): [+ 비교] 버튼은 가안 모양과 자리만 있고 동작은 달지 않았음. useCompareStore.addTray(product)를 부르고 담긴 상품은 '담김' 모양으로 (클릭이 카드까지 안 퍼지게 stopPropagation). 사용자 안내는 43이 시연 전 일괄 처리하기로 함
+    - [+ 비교] (ST-04, CHORONG-47): 누르면 상세 창이 아니라 바로 비교함에 담음 (useCompareStore.addTray, 클릭이 카드까지 안 퍼지게 stopPropagation). 담긴 상품은 'A 담음', 비교함 첫 상품과 용도나 상환 방식이 안 맞으면 '비교 불가'. 안 맞는 상품은 눌러도 안 담기고 알림 (addTray)
     - 모양은 가안(cashlink_21.html .rec.rc): 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 2:1:1
     - 금리가 없으면 [이자 계산] 숨김, 월 상환이 없으면 '계산 불가', 만기일시만 있는 상품은 '월 이자' (서버 월 상환이 매달 이자만이므로)
     - 판단 태그: 서버가 글자 배열(List<String>)로 줌 (RecommendItemDTO 확인함). WARN_TAGS에 있는 글은 주의(노랑), 나머지는 좋은 점(초록)으로 색만 나눔
@@ -198,6 +199,15 @@ function RecommendCard({ item }) {
   const navigate = useNavigate()
   const openProduct = useUiStore((state) => state.openProduct)
   const lastInput = useRecommendStore((state) => state.lastInput)
+  const addTray = useCompareStore((state) => state.addTray)
+  // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 용도나 상환 방식이 안 겹치면 '비교 불가'
+  const traySlot = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
+  const isNo = useCompareStore(
+    (state) =>
+      state.tray.length > 0 &&
+      !state.tray.some((trayItem) => trayItem.productId === product.productId) &&
+      getCompareBlock(state.tray[0], product) !== null,
+  )
 
   const isTop = rankNo <= TOP_RANK
   const hasRate = estRateMin != null || estRateMax != null
@@ -219,6 +229,12 @@ function RecommendCard({ item }) {
   const handleCalc = (event) => {
     event.stopPropagation()
     navigate(CALC_PATH, { state: calcState })
+  }
+
+  // 이미 담긴 상품이면 빼기. 안 맞는 상품이면 addTray가 이유를 알림. 상세 창은 열지 않음
+  const handleCompare = (event) => {
+    event.stopPropagation()
+    addTray(product)
   }
 
   return (
@@ -296,9 +312,17 @@ function RecommendCard({ item }) {
             이자 계산
           </Button>
         )}
-        <Button $variant="outline" $size="sm">
-          + 비교
-        </Button>
+        <CompareButton
+          $variant="outline"
+          $size="sm"
+          $state={traySlot ? 'in' : isNo ? 'no' : undefined}
+          aria-pressed={Boolean(traySlot)}
+          onClick={handleCompare}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          {traySlot && <Icon name="check" size={15} />}
+          {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+        </CompareButton>
       </Actions>
 
       {calcNote && <Note>{calcNote}</Note>}

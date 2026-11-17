@@ -30,6 +30,18 @@ export const LOGIN_TYPE_LABEL = {
   NAVER: '네이버',
 }
 
+// 상환 기간 선택지 (개월): 전월세, 주택 구입은 60/120/180, 그 밖 용도는 12/36/60
+export const LONG_TERM_PURPOSES = ['전월세', '주택 구입']
+export const SHORT_TERM_MONTHS = [12, 36, 60]
+export const LONG_TERM_MONTHS = [60, 120, 180]
+
+// 용도 목록(두 상품이 겹치는 용도)이 전부 장기 용도일 때만 장기 선택지
+export function getTermOptions(purposes) {
+  const list = purposes ?? []
+  const isLong = list.length > 0 && list.every((purpose) => LONG_TERM_PURPOSES.includes(purpose))
+  return isLong ? LONG_TERM_MONTHS : SHORT_TERM_MONTHS
+}
+
 // 추천 입력 선택지 (RC-03~06)
 // 고정 선택지 모음 (코드 값은 서버 API-06 보내는 값과 같게)
 // 칩 글자를 그대로 쓰는 값(지역, 용도)은 한글 문자열 배열, 코드 값이 있는 것은 { value, label }
