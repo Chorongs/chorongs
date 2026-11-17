@@ -23,7 +23,17 @@ import Modal from '../ui/Modal'
 //   - 서버 400 → 서버 문구를 맨 아래에 표시
 const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
 const NICKNAME_ERROR = '닉네임은 2~12자로 입력해 주세요'
-const WIPED_RECORDS = ['찜', '최근 본 대출', '최근 검색', '비교 내역', '계산 기록', '진단 리포트', '추천 결과']
+// 탈퇴 때 지워지는 것 (명세서 MY-11 기록 7종 + 회원 관리 기획서 3-9의 닉네임, 생년월일, 소셜 연결 정보)
+const WIPED_RECORDS = [
+  '찜',
+  '최근 본 대출',
+  '최근 검색',
+  '비교 내역',
+  '저장한 추천 결과',
+  '진단 리포트',
+  '계산 기록',
+  '닉네임, 생년월일, 소셜 연결 정보',
+]
 
 const Head = styled.h2`
   margin-bottom: 20px;
@@ -258,13 +268,14 @@ function MemberInfo() {
       <Modal isOpen={withdrawStep === 'confirm'} onClose={() => setWithdrawStep(null)} label="회원 탈퇴" width={460}>
         <DialogTitle>회원 탈퇴</DialogTitle>
         <DialogBody>
-          <p>탈퇴하면 아래 기록이 모두 지워지고 되돌릴 수 없어요.</p>
+          <p>탈퇴하면 아래 정보가 모두 지워지고 되돌릴 수 없어요.</p>
           <ul>
             {WIPED_RECORDS.map((record) => (
               <li key={record}>{record}</li>
             ))}
           </ul>
           <p>신고 기록은 익명으로 남고, 같은 상품은 다시 신고할 수 없어요.</p>
+          <p>상품 조회 집계는 누구인지 알 수 없는 통계로만 남아요.</p>
           <p>소셜 계정 설정에서 연결을 끊을 수 있어요.</p>
           <Checkbox checked={isChecked} onChange={setIsChecked} label="위 내용을 확인했어요" />
           <InlineError>{withdrawError}</InlineError>
