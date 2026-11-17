@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
-import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
+import { CREDIT_BAND_LABEL, FEATURE_LABEL, MONTHS_DEFAULT, REPAY_METHOD_CODE } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
@@ -11,6 +11,7 @@ import useUiStore from '../../store/useUiStore'
 import ReasonList from '../recommend/ReasonList'
 import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
+import { FALLBACK_AMOUNT_MAN } from '../../utils/loanMath'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
@@ -30,8 +31,6 @@ import RateText from './RateText'
 // 회원이면 최근 본 대출 기록 myApi.postRecentView (API-21, 실패는 안내 안 함)
 // TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // 내 조건 안내 EligibilityNotice (CM-08), 추천 이유 ReasonList (RC-09), [이자 계산] 금액(추천 입력 lastInput.need와 한도 중 작은 값)은 CHORONG-45에서 연결됨
-const DEFAULT_NEED_MAN = 1000
-const DEFAULT_MONTHS = 36
 const SOURCE_LABEL = { KINFA: '서민금융진흥원', FSS: '금융감독원' }
 
 const Body = styled.div`
@@ -289,7 +288,7 @@ function buildCalcState(product, needMan) {
 
   return {
     loanAmount: Math.min(needMan, limit) * 10000,
-    loanMonths: Math.min(DEFAULT_MONTHS, product.termMax > 0 ? product.termMax : DEFAULT_MONTHS),
+    loanMonths: Math.min(MONTHS_DEFAULT, product.termMax > 0 ? product.termMax : MONTHS_DEFAULT),
     interestRate,
     repayMethod: REPAY_METHOD_CODE[firstRepay] ?? 'EQUAL_PI',
   }
@@ -313,7 +312,7 @@ function ProductDetail({ product, onClose }) {
   const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
   const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking' && product.productStatus === 'ON'
   const lastNeed = useRecommendStore((state) => state.lastInput?.need)
-  const needMan = lastNeed > 0 ? lastNeed : DEFAULT_NEED_MAN
+  const needMan = lastNeed > 0 ? lastNeed : FALLBACK_AMOUNT_MAN
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (

@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import useCompareStore, { getPurposes } from '../../store/useCompareStore'
 import { Button, EmptyBox, IconButton, SlotBadge, Tag } from '../../styles/common'
-import { formatMoney, formatPrepayFee, formatRange, formatRate } from '../../utils/format'
+import { formatMoney, formatPrepayFee, formatRange, formatRateRange, formatTagValues } from '../../utils/format'
 import { getMidRate, getRepayCode, getSupportedMethods } from '../../utils/loanMath'
 import MoneyText from '../common/MoneyText'
 import RateText from '../common/RateText'
@@ -158,10 +158,6 @@ const Actions = styled.div`
   margin-top: auto;
 `
 
-function getTagText(product, tagType) {
-  const values = (product.tags ?? []).filter((tag) => tag.tagType === tagType).map((tag) => tag.tagValue)
-  return values.length > 0 ? values.join(', ') : '정보 없음'
-}
 
 function getLimitCell(product) {
   if (typeof product.limitAmount === 'number') return <MoneyText value={product.limitAmount} weight={800} />
@@ -169,21 +165,13 @@ function getLimitCell(product) {
   return <Memo>{amountTag?.tagValue ?? '기관 문의'}</Memo>
 }
 
-// 금리 범위 글: '4.00 ~ 8.00%', 같으면 '4.00%', 없으면 '금리는 기관 문의'
-function getRateText(product) {
-  const { rateMin, rateMax } = product
-  if (rateMin == null && rateMax == null) return '금리는 기관 문의'
-  const low = formatRate(rateMin ?? rateMax)
-  const high = formatRate(rateMax ?? rateMin)
-  return low === high ? `${low}%` : `${low} ~ ${high}%`
-}
 
 function CompareCard({ slot, product, amountMan, months, method, isSummary = false }) {
   const navigate = useNavigate()
   const clearSlot = useCompareStore((state) => state.clearSlot)
   const startSwap = useCompareStore((state) => state.startSwap)
   const otherSlot = slot === 'A' ? 'B' : 'A'
-  const sector = getTagText(product, 'SECTOR')
+  const sector = formatTagValues(product, 'SECTOR')
 
   const info = (
     <HeadInfo>
@@ -224,7 +212,7 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
           </Button>
         </Head>
         <Hint>
-          자금 용도 {getPurposes(product).join('·') || '정보 없음'} · 금리 {getRateText(product)}
+          자금 용도 {getPurposes(product).join('·') || '정보 없음'} · 금리 {formatRateRange(product.rateMin, product.rateMax)}
         </Hint>
       </Wrap>
     )
@@ -294,11 +282,11 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
       </Numbers>
       <List>
         <dt>상환 방식</dt>
-        <dd>{getTagText(product, 'REPAY')}</dd>
+        <dd>{formatTagValues(product, 'REPAY')}</dd>
         <dt>중도상환수수료</dt>
         <dd>{formatPrepayFee(product.prepayFeeMax)}</dd>
         <dt>신청 대상</dt>
-        <dd>{getTagText(product, 'TARGET')}</dd>
+        <dd>{formatTagValues(product, 'TARGET')}</dd>
         {hasAge && (
           <>
             <dt>나이 조건</dt>
@@ -306,7 +294,7 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
           </>
         )}
         <dt>자금 용도</dt>
-        <dd>{getTagText(product, 'PURPOSE')}</dd>
+        <dd>{formatTagValues(product, 'PURPOSE')}</dd>
         <dt>신용점수 기준</dt>
         <dd>{formatRange(product.creditMin, product.creditMax, '', '점')}</dd>
         <dt>특징</dt>

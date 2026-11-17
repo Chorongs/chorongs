@@ -12,13 +12,14 @@ import CompareVerdict from '../components/compare/CompareVerdict'
 import Disclaimer from '../components/common/Disclaimer'
 import PageHeader from '../components/common/PageHeader'
 import Icon from '../components/ui/Icon'
-import { getTermOptions } from '../constants/options'
+import { getTermOptions, MONTHS_DEFAULT } from '../constants/options'
 import useCompareStore, { getPurposes, hasSamePurpose } from '../store/useCompareStore'
 import useUiStore from '../store/useUiStore'
 import { Button, EmptyBox } from '../styles/common'
 import { isNumberInRange } from '../utils/validate'
 import {
   adjustCompareInput,
+  FALLBACK_AMOUNT_MAN,
   getCompareDefaults,
   getCompareWinners,
   getLoanResult,
@@ -37,8 +38,6 @@ import requireLogin from '../utils/requireLogin'
 // TODO(ST-03, CHORONG-45): 처음 넣는 금액, 기간은 맞춤 추천에서 입력한 값(useRecommendStore의 lastInput need, months)을 getCompareDefaults의 마지막 값으로 넘긴다. (지금은 없음으로 넘겨 두 상품의 최대 한도, 최대 기간으로 시작)
 // 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
 // 상품을 받기 전에 잠깐 보이는 값만 아래 기본값
-const DEFAULT_AMOUNT_MAN = 1000
-const DEFAULT_MONTHS = 36
 const MAX_AMOUNT_MAN = 100000
 
 // 처음 넣은 금액, 기간의 근거 글 (사용자가 값을 바꾸면 사라짐)
@@ -188,8 +187,8 @@ function ComparePage() {
   const showToast = useUiStore((state) => state.showToast)
   const [idA, idB] = pair
 
-  const [amount, setAmount] = useState(DEFAULT_AMOUNT_MAN)
-  const [months, setMonths] = useState(DEFAULT_MONTHS)
+  const [amount, setAmount] = useState(FALLBACK_AMOUNT_MAN)
+  const [months, setMonths] = useState(MONTHS_DEFAULT)
   const [basis, setBasis] = useState(null)
   const [method, setMethod] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -316,7 +315,7 @@ function ComparePage() {
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
       if (status === 409) showToast('이미 저장한 조합이에요')
-      else showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
+      else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }

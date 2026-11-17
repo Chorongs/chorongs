@@ -42,6 +42,9 @@ export const isValidBirthDate = (text, today = new Date()) => {
   return isRealDate && year >= 1900 && date <= todayStart
 }
 
+// 생년월일 오류 문구 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 기획서 문구 6-2)
+export const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+
 // 로그인 뒤 돌아갈 주소: '/'로 시작하는 사이트 안 주소만 (E12). '//다른사이트', '/\다른사이트'는 외부로 나가므로 막음
 export const isSafeReturnPath = (path) =>
   typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\')

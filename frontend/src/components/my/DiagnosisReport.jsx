@@ -14,6 +14,8 @@ import Modal from '../ui/Modal'
 // [이 구간으로 추천받기]는 CR-03과 같음: 추천 입력의 신용 구간을 이 구간으로 채움 →
 //   추천받기 전이면 추천 창을 '잠깐' 창 없이 1단계부터 열고 '{구간} 구간을 3단계에 골라 뒀어요' 알림 (나머지 입력은 이용자가 채움)
 //   / 받은 뒤면 그 구간으로 다시 추천 실행 → /recommend + '{구간} 구간으로 추천했어요' 알림. 실행 중 버튼 잠금 (E5), 실패하면 알림 (E3)
+// TODO(MY-09, CR-03, CHORONG-43 Tong B, CHORONG-51 김진석): 진단 결과 카드(CreditResultCard.jsx)에 같은 동작이 따로 있음.
+//   나중에 공통 함수로 묶는다 (명세서 '폴더 구조'에 둘 파일을 먼저 추가한 뒤, 두 화면이 그 함수를 부르게)
 const Head = styled.h2`
   margin-bottom: 20px;
   font-size: var(--fs-h4);

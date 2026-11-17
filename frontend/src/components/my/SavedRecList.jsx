@@ -10,7 +10,8 @@ import MySection from './MySection'
 // '결과 다시 보기' → 그때 상품을 최신 정보로 펼쳐 보임 (서버가 지금 상품 정보를 줌, API-38 GET)
 // 삭제 → 줄 X 그 저장 1건, 지우기 전체 (API-38 DELETE) / 알림은 MySection (MY-03)
 // 판매 끝난 상품 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' / 예상 금리, 월 상환 같은 개인 수치는 다시 안 보여줌
-const Card = styled.div`
+// 저장 1건 줄 (공통 Card(UI-04)와 다른 모양: 아래 구분선)
+const SaveRow = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -92,7 +93,7 @@ function SavedRecList() {
     const isOpen = openId === save.saveId
     const products = [...(save.products ?? [])].sort((a, b) => a.rankNo - b.rankNo)
     return (
-      <Card>
+      <SaveRow>
         <Top>
           <div>
             <Label>{save.conditionLabel}</Label>
@@ -117,7 +118,7 @@ function SavedRecList() {
             ))}
           </Products>
         )}
-      </Card>
+      </SaveRow>
     )
   }
 

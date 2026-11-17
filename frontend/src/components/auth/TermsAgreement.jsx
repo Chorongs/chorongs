@@ -4,7 +4,8 @@ import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError, Panel } from '../../styles/common'
-import { isValidBirthDate } from '../../utils/validate'
+import { getTodayText } from '../../utils/format'
+import { BIRTH_ERROR, isValidBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
 import Checkbox from '../ui/Checkbox'
 
@@ -19,7 +20,7 @@ import Checkbox from '../ui/Checkbox'
 //     / 덜 입력, 범위 밖, [시작하기]를 눌렀는데 비어 있음, 서버 400 INVALID_INPUT '입력한 생년월일을 확인해주세요'(6-2)
 //     / 정상 '생년월일 입력 완료'(6-3)
 //   - 덜 입력한 날짜는 브라우저가 값을 빈 글자로 넘기므로 validity.badInput으로 따로 구분
-const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+//   - 오류 문구 BIRTH_ERROR, 오늘 날짜 getTodayText는 MY 회원 정보와 같이 씀 (utils/validate.js, utils/format.js)
 
 const Wrap = styled(Panel)`
   display: flex;
@@ -97,14 +98,6 @@ const Actions = styled.div`
   grid-template-columns: 1fr 2fr;
   gap: 8px;
 `
-
-// 오늘 날짜 'YYYY-MM-DD' (달력에서 미래 날짜를 못 고르게)
-function getTodayText() {
-  const today = new Date()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${today.getFullYear()}-${month}-${day}`
-}
 
 function TermsAgreement({ needBirth, onDone }) {
   const navigate = useNavigate()

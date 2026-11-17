@@ -6,7 +6,7 @@ import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
 import useMyStore from '../../store/useMyStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, SlotBadge } from '../../styles/common'
-import { formatRate } from '../../utils/format'
+import { formatRateRange } from '../../utils/format'
 import Icon from '../ui/Icon'
 
 // CP-07 비교할 상품 고르기: 비교 화면에서 바로 상품 채우기 (구역마다 3개씩 쪽 넘김 + 건수). 모양은 시안과 같게 접었다 펴는 구역
@@ -98,7 +98,7 @@ const List = styled.ul`
   }
 `
 
-const Card = styled.button.attrs({ type: 'button' })`
+const PickCard = styled.button.attrs({ type: 'button' })`
   position: relative;
   display: flex;
   flex-direction: column;
@@ -236,13 +236,6 @@ function isShown(state) {
   return state.status === 'loading' || state.status === 'error' || (state.status === 'ok' && state.items.length > 0)
 }
 
-function getRateText(product) {
-  const { rateMin, rateMax } = product
-  if (rateMin == null && rateMax == null) return '금리는 기관 문의'
-  const low = formatRate(rateMin ?? rateMax)
-  const high = formatRate(rateMax ?? rateMin)
-  return low === high ? `${low}%` : `${low} ~ ${high}%`
-}
 
 function SectionBox({ title, state, onRetry, pair, otherProduct, onPick }) {
   const [page, setPage] = useState(0)
@@ -288,11 +281,11 @@ function SectionBox({ title, state, onRetry, pair, otherProduct, onPick }) {
               const isNo = block !== null
               return (
                 <li key={product.productId}>
-                  <Card $slot={slot} $isNo={isNo} aria-pressed={Boolean(slot)} onClick={() => onPick(product)}>
+                  <PickCard $slot={slot} $isNo={isNo} aria-pressed={Boolean(slot)} onClick={() => onPick(product)}>
                     <Org $isOn={Boolean(slot)}>{product.companyName}</Org>
                     <Name>{product.productName}</Name>
                     <Meta>
-                      <Rate>{getRateText(product)}</Rate>
+                      <Rate>{formatRateRange(product.rateMin, product.rateMax)}</Rate>
                     </Meta>
                     {slot && (
                       <On>
@@ -303,7 +296,7 @@ function SectionBox({ title, state, onRetry, pair, otherProduct, onPick }) {
                       </On>
                     )}
                     {isNo && <No>{block === 'method' ? '상환 방식이 달라 비교 불가' : '용도가 달라 비교 불가'}</No>}
-                  </Card>
+                  </PickCard>
                 </li>
               )
             })}

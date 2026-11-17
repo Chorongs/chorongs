@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatMoney, formatNumber, formatPrepayFee, formatRange, formatRate } from './format'
+import {
+  formatDate,
+  formatMoney,
+  formatNumber,
+  formatPrepayFee,
+  formatRange,
+  formatRate,
+  formatRateRange,
+  formatTagValues,
+  getTodayText,
+} from './format'
 
 describe('formatNumber', () => {
   it('천 단위 쉼표를 붙인다', () => {
@@ -191,5 +201,66 @@ describe('formatRange', () => {
     const result = formatRange(min, null)
     // Then
     expect(result).toBe('정보 없음')
+  })
+})
+
+describe('formatRateRange', () => {
+  it('최소, 최대 금리가 다르면 범위로 보인다', () => {
+    // Given
+    const rateMin = 3.5
+    const rateMax = 5.2
+    // When
+    const result = formatRateRange(rateMin, rateMax)
+    // Then
+    expect(result).toBe(`${formatRate(3.5)} ~ ${formatRate(5.2)}%`)
+  })
+
+  it('한쪽만 있으면 그 값 하나만 보인다', () => {
+    // Given
+    const rateMin = 4
+    // When
+    const result = formatRateRange(rateMin, null)
+    // Then
+    expect(result).toBe(`${formatRate(4)}%`)
+  })
+
+  it('둘 다 없으면 기관 문의로 보인다', () => {
+    // Given
+    const rateMin = null
+    // When
+    const result = formatRateRange(rateMin, null)
+    // Then
+    expect(result).toBe('금리는 기관 문의')
+  })
+})
+
+describe('formatTagValues', () => {
+  it('같은 종류 태그 값을 쉼표로 잇는다', () => {
+    // Given
+    const product = { tags: [{ tagType: 'REPAY', tagValue: '원리금균등' }, { tagType: 'TARGET', tagValue: '청년' }, { tagType: 'REPAY', tagValue: '만기일시' }] }
+    // When
+    const result = formatTagValues(product, 'REPAY')
+    // Then
+    expect(result).toBe('원리금균등, 만기일시')
+  })
+
+  it('그 종류 태그가 없으면 정보 없음이다', () => {
+    // Given
+    const product = { tags: [] }
+    // When
+    const result = formatTagValues(product, 'REPAY')
+    // Then
+    expect(result).toBe('정보 없음')
+  })
+})
+
+describe('getTodayText', () => {
+  it('한 자리 달, 날짜는 0을 붙여 YYYY-MM-DD로 만든다', () => {
+    // Given
+    const today = new Date(2026, 0, 5)
+    // When
+    const result = getTodayText(today)
+    // Then
+    expect(result).toBe('2026-01-05')
   })
 })

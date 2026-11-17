@@ -6,6 +6,7 @@ import { formatMoney } from '../../utils/format'
 // weight: 숫자 굵기 (기본 800, 요약 숫자는 900)
 // unitSize: 단위 크기 'sm'(기본, 13px) / 'base'(15px) / 'xs'(12px)
 // unitTone: 단위 색 'inherit'(기본, 숫자와 같은 색) / 'muted'(설명 글자색) / 'soft'(숫자색을 옅게)
+// TODO(CM-12, CHORONG-68 조빌립): RateText.jsx에 똑같은 UNIT_SIZE, UNIT_WEIGHT가 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
 const UNIT_SIZE = { xs: 'var(--fs-xs)', sm: 'var(--fs-sm)', base: 'var(--fs-base)' }
 const UNIT_WEIGHT = { xs: 800, sm: 700, base: 800 }
 

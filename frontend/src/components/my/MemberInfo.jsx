@@ -7,7 +7,8 @@ import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError } from '../../styles/common'
-import { isValidBirthDate, isValidNickname } from '../../utils/validate'
+import { getTodayText } from '../../utils/format'
+import { BIRTH_ERROR, isValidBirthDate, isValidNickname } from '../../utils/validate'
 import Checkbox from '../ui/Checkbox'
 import Modal from '../ui/Modal'
 
@@ -23,7 +24,7 @@ import Modal from '../ui/Modal'
 //   - 오류는 칸 바로 아래에 입력하는 동안 바로 보이고, 오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림
 //   - [저장]은 하나: 원래 값과 비교해 바뀐 칸만 보냄 (아무것도 안 바뀌면 보내지 않고 '바뀐 내용이 없어요')
 //   - 서버 400 → 서버 문구를 맨 아래에 표시
-const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+//   - 오류 문구 BIRTH_ERROR, 오늘 날짜 getTodayText는 가입 단계와 같이 씀 (utils/validate.js, utils/format.js)
 const NICKNAME_ERROR = '닉네임은 2~12자로 입력해 주세요'
 // 탈퇴 때 지워지는 것 (명세서 MY-11 기록 7종 + 회원 관리 기획서 3-9의 닉네임, 생년월일, 소셜 연결 정보)
 const WIPED_RECORDS = [
@@ -128,14 +129,6 @@ const DialogText = styled.p`
   font-size: var(--fs-lg);
   font-weight: 700;
 `
-
-// 오늘 날짜 'YYYY-MM-DD' (달력에서 미래 날짜를 못 고르게, 가입 단계 TermsAgreement와 같음)
-function getTodayText() {
-  const today = new Date()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${today.getFullYear()}-${month}-${day}`
-}
 
 // MemberResponseDTO의 birthYear('YYYY'), birthDay('MM-DD') → 달력 값 'YYYY-MM-DD' (없으면 빈 칸)
 function toBirthText(user) {

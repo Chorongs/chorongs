@@ -264,7 +264,7 @@ function RecommendResult() {
     } catch (error) {
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 실패 알림을 겹쳐 띄우지 않음 (E4)
       if (error.response?.status === 401) return
-      showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
+      showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
