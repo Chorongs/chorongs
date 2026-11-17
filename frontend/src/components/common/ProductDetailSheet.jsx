@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
@@ -24,7 +25,9 @@ import RateText from './RateText'
 //
 // TODO(CM-06, CHORONG-43 Tong-B): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
 // [+ 비교]: 비교함에 담기 (addTray가 true면 창 닫기, false면 그대로). 맞춤 추천, 상품 찾기 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
-// TODO(API-21, CHORONG-43 Tong-B): 회원이면 최근 본 대출 기록 myApi.postRecentView (useAuthStore가 올라온 뒤)
+// 최근 본 대출 기록 myApi.postRecentView (API-21)는 로그인 여부와 상관없이 보낸다. (비회원도 보게 하는 규칙, 11-17 결정)
+//   비회원은 서버 세션에 기록하는 변경(MEM-08, CHORONG-42)이 서버에 들어가기 전에는 401이라 기록되지 않고, 실패는 화면에 안 보인다.
+// TODO(CM-17, CHORONG-43): 43번이 합쳐져 401에 로그인 안내 창이 뜨게 되면, 비회원의 최근 본 기록(POST /api/me/recent-views)은 그 창을 열지 않게 예외로 둔다.
 // TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // 내 조건 안내 EligibilityNotice (CM-08), 추천 이유 ReasonList (RC-09), [이자 계산] 금액(추천 입력 lastInput.need와 한도 중 작은 값)은 CHORONG-45에서 연결됨
 const DEFAULT_NEED_MAN = 1000
@@ -491,10 +494,11 @@ function ProductDetailSheet() {
     }
   }, [productId, attempt])
 
-  // 조회 기록은 열릴 때 한 번 (다시 시도에는 다시 보내지 않음). 실패해도 화면에 안 보임
+  // 조회 기록(API-05)과 최근 본 기록(API-21)은 열릴 때 한 번 (다시 시도에는 다시 보내지 않음). 실패해도 화면에 안 보임
   useEffect(() => {
     if (productId === null) return
     productApi.postProductView(productId).catch(() => {})
+    myApi.postRecentView(productId).catch(() => {})
   }, [productId])
 
   // 열려 있는 동안 뒤 화면 스크롤 잠금
