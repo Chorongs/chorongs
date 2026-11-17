@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { putCreditReport } from '../../api/myApi'
 import { CREDIT_BAND_LABEL, CREDIT_QUESTIONS } from '../../constants/options'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, Tag } from '../../styles/common'
 import requireLogin from '../../utils/requireLogin'
@@ -15,6 +16,7 @@ import Accordion from '../ui/Accordion'
 // onRetry: [다시 진단하기] / onContinue(creditBand): 있으면 추천 창 안 결과 카드 (RC-13)
 // 점수, 답은 저장하지 않는다. 저장은 구간 + 시각만 (API-25)
 const REFERENCE_PREFIX = '참고: '
+const RECOMMEND_PATH = '/recommend'
 
 // 서버 상태 글 → 딱지 색, 막대 길이(%) / 그 밖의 글(확인 필요)은 회색, 막대 없음
 const STATUS_STYLE = {
@@ -108,7 +110,12 @@ function getQuestionLabel(questionNo) {
 function CreditResultCard({ result, onRetry, onContinue }) {
   const navigate = useNavigate()
   const showToast = useUiStore((state) => state.showToast)
+  const openRecommend = useUiStore((state) => state.openRecommend)
+  const setInput = useRecommendStore((state) => state.setInput)
+  const run = useRecommendStore((state) => state.run)
+  const hasRecommendResult = useRecommendStore((state) => state.result !== null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isRecommending, setIsRecommending] = useState(false)
   const { score, creditBand, items = [], lowAccuracy } = result
 
   // 이렇게 해보세요: 주의 항목 팁 먼저, 그다음 보통 항목 팁
@@ -122,6 +129,28 @@ function CreditResultCard({ result, onRetry, onContinue }) {
   const handleSearch = () => {
     const bandText = encodeURIComponent(CREDIT_BAND_LABEL[creditBand])
     navigate(`/search?credit=${bandText},${encodeURIComponent('신용 무관')}`)
+  }
+
+  // [이 구간으로 추천받기]: 추천 입력의 신용 구간을 이 구간으로 채움 (구간만 담음, E6)
+  // 추천받기 전: 추천 창을 '잠깐' 창 없이 1단계부터 열기 / 받은 뒤: 그 구간으로 다시 추천 실행 (E5 실행 중 버튼 잠금)
+  const handleRecommend = async () => {
+    const bandLabel = CREDIT_BAND_LABEL[creditBand]
+    setInput({ creditBand })
+    if (!hasRecommendResult) {
+      openRecommend(true)
+      showToast(`${bandLabel} 구간을 3단계에 골라 뒀어요`)
+      return
+    }
+    setIsRecommending(true)
+    try {
+      await run()
+      navigate(RECOMMEND_PATH)
+      showToast(`${bandLabel} 구간으로 추천했어요`)
+    } catch {
+      showToast('추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요')
+    } finally {
+      setIsRecommending(false)
+    }
   }
 
   // [결과 저장]: 구간만 보냄, 진단 시각은 서버가 정함 (E5 저장 중 버튼 잠금)
@@ -185,10 +214,9 @@ function CreditResultCard({ result, onRetry, onContinue }) {
             <Button onClick={() => onContinue(creditBand)}>이어서 추천받기</Button>
           ) : (
             <>
-              {/* TODO(ST-03, CHORONG-45): useRecommendStore가 올라오면 연결한다.
-                  추천받기 전: setInput({ creditBand }) → openRecommend(true) → '{구간} 구간을 3단계에 골라 뒀어요' 알림
-                  추천받은 뒤: setInput({ creditBand }) → run() → /recommend 이동 → '{구간} 구간으로 추천했어요' 알림 */}
-              <Button disabled>이 구간으로 추천받기</Button>
+              <Button onClick={handleRecommend} disabled={isRecommending}>
+                이 구간으로 추천받기
+              </Button>
               <Button $variant="outline" onClick={handleSearch}>
                 이 구간으로 상품 찾기
               </Button>

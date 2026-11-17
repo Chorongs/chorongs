@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { postCreditCheck } from '../../api/diagnosisApi'
 import { CREDIT_QUESTIONS } from '../../constants/options'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError } from '../../styles/common'
 import Disclaimer from '../common/Disclaimer'
@@ -117,6 +118,7 @@ function getErrorText(error) {
 
 function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
   const showToast = useUiStore((state) => state.showToast)
+  const setDiagBand = useRecommendStore((state) => state.setDiagBand)
   const [initialAnswers] = useState(loadAnswers)
   const [answers, setAnswers] = useState(initialAnswers)
   const [result, setResult] = useState(null)
@@ -138,7 +140,9 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     let isStale = false
     postCreditCheck(toRequestAnswers(initialAnswers))
       .then((data) => {
-        if (!isStale) setResult(data)
+        if (isStale) return
+        setResult(data)
+        setDiagBand(data.creditBand)
       })
       .catch((error) => {
         if (!isStale) setErrorText(getErrorText(error))
@@ -149,14 +153,16 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     return () => {
       isStale = true
     }
-  }, [initialAnswers])
+  }, [initialAnswers, setDiagBand])
 
-  // TODO(ST-03, CHORONG-45): 결과가 나오면 useRecommendStore.setDiagBand(creditBand)를 부른다. (추천 3단계 비교용, 구간만)
+  // 결과가 나오면 진단 구간을 스토어에 담음 (추천 3단계 비교용, 구간만)
   const requestCheck = async () => {
     setIsLoading(true)
     setErrorText('')
     try {
-      setResult(await postCreditCheck(toRequestAnswers(answers)))
+      const data = await postCreditCheck(toRequestAnswers(answers))
+      setResult(data)
+      setDiagBand(data.creditBand)
     } catch (error) {
       setErrorText(getErrorText(error))
     } finally {
