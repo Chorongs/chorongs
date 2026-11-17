@@ -14,6 +14,7 @@ import PageHeader from '../components/common/PageHeader'
 import Icon from '../components/ui/Icon'
 import { getTermOptions, MONTHS_DEFAULT } from '../constants/options'
 import useCompareStore, { getPurposes, hasSamePurpose } from '../store/useCompareStore'
+import { useRecommendStore } from '../store/useRecommendStore'
 import useUiStore from '../store/useUiStore'
 import { Button, EmptyBox } from '../styles/common'
 import { isNumberInRange } from '../utils/validate'
@@ -35,7 +36,6 @@ import requireLogin from '../utils/requireLogin'
 // A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌
 // 금액, 기간이 비면 오류 문구 + 결과(카드, 판정, 비교표) 숨김
 // [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '비교 결과 저장은 회원 전용이에요.' (CM-17, CM-22, CHORONG-43에서 연결)
-// TODO(ST-03, CHORONG-45): 처음 넣는 금액, 기간은 맞춤 추천에서 입력한 값(useRecommendStore의 lastInput need, months)을 getCompareDefaults의 마지막 값으로 넘긴다. (지금은 없음으로 넘겨 두 상품의 최대 한도, 최대 기간으로 시작)
 // 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
 // 상품을 받기 전에 잠깐 보이는 값만 아래 기본값
 const MAX_AMOUNT_MAN = 100000
@@ -187,6 +187,7 @@ function ComparePage() {
   const showToast = useUiStore((state) => state.showToast)
   const [idA, idB] = pair
 
+  const lastInput = useRecommendStore((state) => state.lastInput)
   const [amount, setAmount] = useState(FALLBACK_AMOUNT_MAN)
   const [months, setMonths] = useState(MONTHS_DEFAULT)
   const [basis, setBasis] = useState(null)
@@ -200,11 +201,13 @@ function ComparePage() {
   const sideEl = useSyncExternalStore(subscribeNothing, getSideEl, () => null)
   const isWide = useSyncExternalStore(subscribeWide, getIsWide, () => true)
   const inputRef = useRef({ amount, months })
+  const recommendRef = useRef(null)
   const hasStartedRef = useRef(false)
 
-  // 응답 안에서 가장 최근 입력값을 읽기 위한 복사 (조정 때 알림을 띄울지 판단)
+  // 응답 안에서 가장 최근 입력값을 읽기 위한 복사 (조정 때 알림을 띄울지 판단, 처음 값은 맞춤 추천에서 입력한 필요 금액, 기간)
   useEffect(() => {
     inputRef.current = { amount, months }
+    recommendRef.current = lastInput ? { need: lastInput.need, months: lastInput.months } : null
   })
 
   // 사용자가 직접 바꾸면 처음 값은 끝 (이후 상품을 바꿔도 사용자 값은 한도, 기간에 맞게만 조정)
@@ -242,7 +245,7 @@ function ComparePage() {
         // 처음 두 상품이 들어왔을 때: 맞춤 추천 입력값 → 없으면 최대 한도, 최대 기간으로 시작 (알림 없이 근거 글만)
         if (!hasStartedRef.current) {
           hasStartedRef.current = true
-          const start = getCompareDefaults(productA, productB, options, null)
+          const start = getCompareDefaults(productA, productB, options, recommendRef.current)
           setAmount(start.amount)
           setMonths(start.months)
           setBasis({ amount: start.amountSource, months: start.monthsSource })
