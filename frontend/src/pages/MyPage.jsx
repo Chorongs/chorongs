@@ -99,7 +99,8 @@ function MyPage() {
         <Title>MY</Title>
         <EmptyBox>
           로그인하면 찜과 기록을 MY에서 볼 수 있어요
-          <Button $size="sm" onClick={() => navigate('/login')}>
+          {/* 로그인 뒤 보던 /my 주소로 돌아오게 지금 주소를 로그인 화면에 넘김 (기획서 3-7, 7-1 9번) */}
+          <Button $size="sm" onClick={() => navigate('/login', { state: { returnPath: section ? `/my/${section}` : '/my' } })}>
             로그인
           </Button>
         </EmptyBox>

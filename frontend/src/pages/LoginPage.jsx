@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../api/authApi'
 import kakaoSymbol from '../assets/images/kakao_symbol.svg'
@@ -46,6 +46,8 @@ function LoginPage() {
   const status = useAuthStore((state) => state.status)
   const showToast = useUiStore((state) => state.showToast)
   const [searchParams] = useSearchParams()
+  // MY에서 [로그인]으로 왔으면 보던 /my 주소 (기획서 3-7, 7-1 9번). 없으면 null → 로그인 뒤 /my
+  const returnPath = useLocation().state?.returnPath ?? null
   // 로그인 여부를 다시 확인하는 동안 버튼 잠금 (E5)
   const [isChecking, setIsChecking] = useState(false)
   const errorText = ERROR_TEXT[searchParams.get('error')]
@@ -54,7 +56,7 @@ function LoginPage() {
   // 누르는 순간 아래 handleLogin이 서버에 다시 확인하므로 이미 로그인 중이면 소셜 로그인으로 보내지 않음
   if (status === 'member') return <Navigate to="/my" replace />
 
-  // 이 화면에서 시작한 로그인은 돌아올 주소가 없음 → 로그인 뒤 /my
+  // 돌아올 주소: MY에서 넘겨받은 주소(사이트 안 주소만, getLoginUrl이 검사 E12), 없으면 로그인 뒤 /my
   // 누르는 순간 서버(API-17)에 한 번 더 확인: 이미 로그인 중이면 소셜 로그인으로 보내지 않음
   //   → '이미 로그인되어 있어요' + 로그인 상태를 다시 채움 → 회원이면 위의 Navigate가 /my로 보냄 (다시 로그인, 다른 계정 가입 막음)
   // 서버 응답이 아예 없으면(서버 꺼짐, 네트워크 오류) 소셜 로그인으로 보내도 오류 화면만 뜨므로 보내지 않고 다시 시도 안내 (E3)
@@ -77,7 +79,7 @@ function LoginPage() {
       useAuthStore.getState().fetchMe()
       return
     }
-    authApi.getLoginUrl(provider)
+    authApi.getLoginUrl(provider, returnPath)
   }
 
   return (
