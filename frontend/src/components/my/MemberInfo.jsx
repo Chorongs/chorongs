@@ -14,7 +14,15 @@ import Modal from '../ui/Modal'
 // 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 후 [탈퇴하기] → sessionStorage 비움
 //   → 안내 창 → 닫으면 새로고침하며 메인(/)으로 (로그아웃과 같은 방식, 2026-11-17 사용자 결정) / 누르는 중 잠금 (E5)
 // TODO(API-28, CHORONG-42 BE): 회원 정보 수정, 탈퇴 API는 오늘 서버 범위 밖이라 지금은 실패 문구가 뜸
+// 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
+//   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
+//   - 생년월일: 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate). 달력도 1900-01-01부터 오늘까지만
+//   - 원래 생년월일이 있던 회원이 칸을 비우거나 덜 입력하면 오류 (덜 입력은 validity.badInput으로 구분, 브라우저가 빈 글자로 넘김)
+//   - 오류는 칸 바로 아래에 입력하는 동안 바로 보이고, 오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림
+//   - [저장]은 하나: 원래 값과 비교해 바뀐 칸만 보냄 (아무것도 안 바뀌면 보내지 않고 '바뀐 내용이 없어요')
+//   - 서버 400 → 서버 문구를 맨 아래에 표시
 const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+const NICKNAME_ERROR = '닉네임은 2~12자로 입력해 주세요'
 const WIPED_RECORDS = ['찜', '최근 본 대출', '최근 검색', '비교 내역', '계산 기록', '진단 리포트', '추천 결과']
 
 const Head = styled.h2`
@@ -104,6 +112,14 @@ const DialogText = styled.p`
   font-weight: 700;
 `
 
+// 오늘 날짜 'YYYY-MM-DD' (달력에서 미래 날짜를 못 고르게, 가입 단계 TermsAgreement와 같음)
+function getTodayText() {
+  const today = new Date()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${today.getFullYear()}-${month}-${day}`
+}
+
 // MemberResponseDTO의 birthYear('YYYY'), birthDay('MM-DD') → 달력 값 'YYYY-MM-DD' (없으면 빈 칸)
 function toBirthText(user) {
   return user.birthYear && user.birthDay ? `${user.birthYear}-${user.birthDay}` : ''
@@ -114,22 +130,35 @@ function MemberInfo() {
   const showToast = useUiStore((state) => state.showToast)
   const [nickname, setNickname] = useState(user.memberNickname)
   const [birth, setBirth] = useState(toBirthText(user))
+  // 서버가 거절한 문구 (칸 검사 오류는 아래에서 바로 계산)
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  // 달력 칸을 덜 입력했는지 (validity.badInput)
+  const [isBirthBadInput, setIsBirthBadInput] = useState(false)
   // 탈퇴 창 단계: null 닫힘 / 'confirm' 확인 / 'done' 끝남 안내
   const [withdrawStep, setWithdrawStep] = useState(null)
   const [isChecked, setIsChecked] = useState(false)
   const [withdrawError, setWithdrawError] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
+  // 칸마다 지금 오류 (입력하는 동안 바로 보임)
+  const hadBirth = toBirthText(user) !== ''
+  const nicknameError = isValidNickname(nickname) ? '' : NICKNAME_ERROR
+  const isBirthWrong = isBirthBadInput || (birth === '' ? hadBirth : !isValidBirthDate(birth))
+  const birthError = isBirthWrong ? BIRTH_ERROR : ''
+
+  // 달력 값이 바뀌거나 칸을 떠날 때 덜 입력했는지 다시 봄
+  const handleBirthInput = (event) => {
+    setBirth(event.target.value)
+    setIsBirthBadInput(event.target.validity.badInput)
+  }
+
   const handleSave = async () => {
     const trimmed = nickname.trim()
-    if (!isValidNickname(trimmed)) {
-      setError('닉네임은 2~12자로 입력해 주세요')
-      return
-    }
-    if (birth !== '' && !isValidBirthDate(birth)) {
-      setError(BIRTH_ERROR)
+    // 오류가 남아 있으면 보내지 않고 다시 확인하라고 알림 (오류 문구는 칸 아래에 이미 보임)
+    if (nicknameError || birthError) {
+      setError('')
+      showToast('입력한 내용을 다시 확인해 주세요')
       return
     }
     const body = {}
@@ -188,7 +217,13 @@ function MemberInfo() {
         <Form>
           <Field>
             닉네임
-            <input value={nickname} maxLength={20} onChange={(event) => setNickname(event.target.value)} />
+            <input
+              value={nickname}
+              maxLength={20}
+              aria-invalid={nicknameError !== ''}
+              onChange={(event) => setNickname(event.target.value)}
+            />
+            <InlineError>{nicknameError}</InlineError>
           </Field>
           <ReadOnly>
             로그인 방법
@@ -196,7 +231,16 @@ function MemberInfo() {
           </ReadOnly>
           <Field>
             생년월일
-            <input type="date" value={birth} min="1900-01-01" onChange={(event) => setBirth(event.target.value)} />
+            <input
+              type="date"
+              value={birth}
+              min="1900-01-01"
+              max={getTodayText()}
+              aria-invalid={birthError !== ''}
+              onChange={handleBirthInput}
+              onBlur={handleBirthInput}
+            />
+            <InlineError>{birthError}</InlineError>
             <Hint>상품의 나이 조건 확인에만 써요</Hint>
           </Field>
           <InlineError>{error}</InlineError>

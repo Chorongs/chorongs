@@ -12,6 +12,13 @@ import Checkbox from '../ui/Checkbox'
 // needBirth: true면 생년월일 입력칸 (카카오는 항상, 네이버는 비어 왔을 때만) / false면 생년월일은 안 보냄 (API-50)
 // [시작하기] → API-50 → onDone(회원 정보) / [취소] → /login (서버 요청 없음, 가입 대기는 10분 뒤 사라짐)
 // 누르는 중 잠금 (E5) / 생년월일 형식, 미래 날짜, 1900년 이전은 보내기 전에 검사 (E2)
+// 검사 규칙 (회원 관리 기획서 4-2, 4-7, 5-1):
+//   - 필수 약관 2개(이용약관, 개인정보 수집/이용)를 모두 체크해야 함 → 아니면 맨 아래 '필수 약관에 동의해 주세요.' (문구 1)
+//   - 생년월일(needBirth일 때만, 필수): 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate)
+//   - 생년월일 안내는 칸 바로 아래에 입력하는 동안 바로 바뀜: 비어 있음 '생년월일을 입력해 주세요'(6-1)
+//     / 덜 입력, 범위 밖, [시작하기]를 눌렀는데 비어 있음, 서버 400 INVALID_INPUT '입력한 생년월일을 확인해주세요'(6-2)
+//     / 정상 '생년월일 입력 완료'(6-3)
+//   - 덜 입력한 날짜는 브라우저가 값을 빈 글자로 넘기므로 validity.badInput으로 따로 구분
 const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
 
 const Wrap = styled(Panel)`
@@ -71,8 +78,11 @@ const BirthField = styled.label`
   }
 `
 
+// $tone: info 안내 / bad 오류 / good 입력 완료
+const HINT_COLOR = { info: 'var(--cocoa)', bad: 'var(--bad)', good: 'var(--good)' }
+
 const BirthHint = styled.span`
-  color: ${({ $isDone }) => ($isDone ? 'var(--good)' : 'var(--cocoa)')};
+  color: ${({ $tone }) => HINT_COLOR[$tone]};
   font-size: var(--fs-sm);
   font-weight: 600;
 `
@@ -100,9 +110,25 @@ function TermsAgreement({ needBirth, onDone }) {
   const [termsKind, setTermsKind] = useState(null)
   const [error, setError] = useState('')
   const [isPending, setIsPending] = useState(false)
+  // 덜 입력한 날짜인지 (validity.badInput) / [시작하기]를 눌러 봤는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
+  const [isBirthBadInput, setIsBirthBadInput] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isServerBirthError, setIsServerBirthError] = useState(false)
 
   const isAllAgreed = agreeService && agreePrivacy
-  const isBirthDone = isValidBirthDate(birth)
+  const isBirthDone = isValidBirthDate(birth) && !isBirthBadInput && !isServerBirthError
+  // 칸 아래 안내: 정상 → 6-3 / 덜 입력, 형식·범위 오류, 눌렀는데 비어 있음, 서버 거절 → 6-2 / 그 밖(아직 안 씀) → 6-1
+  const isBirthError = !isBirthDone && (isBirthBadInput || birth !== '' || isSubmitted || isServerBirthError)
+  let birthHint = { tone: 'info', text: '생년월일을 입력해 주세요' }
+  if (isBirthDone) birthHint = { tone: 'good', text: '생년월일 입력 완료' }
+  else if (isBirthError) birthHint = { tone: 'bad', text: BIRTH_ERROR }
+
+  // 달력 값이 바뀌거나 칸을 떠날 때 덜 입력했는지 다시 봄
+  const handleBirthInput = (event) => {
+    setBirth(event.target.value)
+    setIsBirthBadInput(event.target.validity.badInput)
+    setIsServerBirthError(false)
+  }
 
   const handleAll = (checked) => {
     setAgreeService(checked)
@@ -110,12 +136,15 @@ function TermsAgreement({ needBirth, onDone }) {
   }
 
   const handleSubmit = async () => {
+    setIsSubmitted(true)
+    // 필수 약관 2개 모두 체크 (문구 1)
     if (!isAllAgreed) {
       setError('필수 약관에 동의해 주세요.')
       return
     }
+    // 생년월일이 정상이 아니면 보내지 않음 (오류 문구는 칸 아래에 이미 보임, 6-2)
     if (needBirth && !isBirthDone) {
-      setError(BIRTH_ERROR)
+      setError('')
       return
     }
     setError('')
@@ -135,8 +164,10 @@ function TermsAgreement({ needBirth, onDone }) {
         navigate('/login', { replace: true })
         return
       }
-      if (code === 'INVALID_INPUT') setError(BIRTH_ERROR)
-      else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요. 관리자에서 로그아웃한 뒤 로그인해 주세요')
+      if (code === 'INVALID_INPUT') {
+        setError('')
+        setIsServerBirthError(true)
+      } else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요. 관리자에서 로그아웃한 뒤 로그인해 주세요')
       else setError('가입하지 못했어요. 다시 시도해 주세요')
       setIsPending(false)
     }
@@ -170,9 +201,13 @@ function TermsAgreement({ needBirth, onDone }) {
             value={birth}
             min="1900-01-01"
             max={getTodayText()}
-            onChange={(event) => setBirth(event.target.value)}
+            aria-invalid={birthHint.tone === 'bad'}
+            onChange={handleBirthInput}
+            onBlur={handleBirthInput}
           />
-          <BirthHint $isDone={isBirthDone}>{isBirthDone ? '생년월일 입력 완료' : '생년월일을 입력해 주세요'}</BirthHint>
+          <BirthHint $tone={birthHint.tone} role={birthHint.tone === 'bad' ? 'alert' : undefined}>
+            {birthHint.text}
+          </BirthHint>
         </BirthField>
       )}
 
