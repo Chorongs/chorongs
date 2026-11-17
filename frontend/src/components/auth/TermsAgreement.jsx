@@ -87,6 +87,11 @@ const BirthHint = styled.span`
   font-weight: 600;
 `
 
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
+const ErrorText = styled(InlineError)`
+  white-space: pre-line;
+`
+
 const Actions = styled.div`
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -167,8 +172,8 @@ function TermsAgreement({ needBirth, onDone }) {
       if (code === 'INVALID_INPUT') {
         setError('')
         setIsServerBirthError(true)
-      } else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요. 관리자에서 로그아웃한 뒤 로그인해 주세요')
-      else setError('가입하지 못했어요. 다시 시도해 주세요')
+      } else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요')
+      else setError('가입하지 못했어요.\n다시 시도해 주세요')
       setIsPending(false)
     }
   }
@@ -211,7 +216,7 @@ function TermsAgreement({ needBirth, onDone }) {
         </BirthField>
       )}
 
-      <InlineError>{error}</InlineError>
+      <ErrorText>{error}</ErrorText>
 
       <Actions>
         <Button $variant="outline" onClick={() => navigate('/login')}>

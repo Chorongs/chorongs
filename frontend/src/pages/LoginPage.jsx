@@ -8,9 +8,9 @@ import { Button, Panel } from '../styles/common'
 // 이미 로그인 → /my / 버튼 → API-18 (카카오, 네이버 로그인 화면으로 이동)
 // 주소의 error 값(API-19가 붙임)으로 안내 한 줄을 바꿈. 정해진 값이 아니면 기본 안내
 const ERROR_TEXT = {
-  ADMIN_LOGGED_IN: '관리자로 로그인 중이에요. 관리자에서 로그아웃한 뒤 로그인해 주세요',
+  ADMIN_LOGGED_IN: '관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요',
   CANCELLED: '로그인을 취소했어요',
-  FAILED: '로그인에 실패했어요. 다시 시도해 주세요',
+  FAILED: '로그인에 실패했어요.\n다시 시도해 주세요',
 }
 
 const Wrap = styled(Panel)`
@@ -27,7 +27,9 @@ const Title = styled.h1`
   font-weight: 800;
 `
 
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
 const Guide = styled.p`
+  white-space: pre-line;
   margin-bottom: 8px;
   color: ${({ $isError }) => ($isError ? 'var(--bad)' : 'var(--cocoa)')};
   font-weight: 600;

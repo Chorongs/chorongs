@@ -116,6 +116,11 @@ const DialogActions = styled.div`
   gap: 8px;
 `
 
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
+const ErrorText = styled(InlineError)`
+  white-space: pre-line;
+`
+
 const DialogText = styled.p`
   margin-bottom: 20px;
   font-size: var(--fs-lg);
@@ -191,7 +196,7 @@ function MemberInfo() {
       showToast('회원 정보를 저장했어요')
     } catch (err) {
       if (err.response?.status === 400) setError(err.response.data?.message ?? BIRTH_ERROR)
-      else if (err.response?.status !== 401) setError('저장하지 못했어요. 다시 시도해 주세요')
+      else if (err.response?.status !== 401) setError('저장하지 못했어요.\n다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
@@ -211,7 +216,7 @@ function MemberInfo() {
       sessionStorage.clear()
       setWithdrawStep('done')
     } catch {
-      setWithdrawError('탈퇴하지 못했어요. 다시 시도해 주세요')
+      setWithdrawError('탈퇴하지 못했어요.\n다시 시도해 주세요')
     } finally {
       setIsWithdrawing(false)
     }
@@ -253,7 +258,7 @@ function MemberInfo() {
             <InlineError>{birthError}</InlineError>
             <Hint>상품의 나이 조건 확인에만 써요</Hint>
           </Field>
-          <InlineError>{error}</InlineError>
+          <ErrorText>{error}</ErrorText>
           <Bottom>
             <Button $variant="ghost" onClick={openWithdraw}>
               회원 탈퇴
@@ -278,7 +283,7 @@ function MemberInfo() {
           <p>상품 조회 집계는 누구인지 알 수 없는 통계로만 남아요.</p>
           <p>소셜 계정 설정에서 연결을 끊을 수 있어요.</p>
           <Checkbox checked={isChecked} onChange={setIsChecked} label="위 내용을 확인했어요" />
-          <InlineError>{withdrawError}</InlineError>
+          <ErrorText>{withdrawError}</ErrorText>
         </DialogBody>
         <DialogActions>
           <Button $variant="outline" onClick={() => setWithdrawStep(null)}>
@@ -291,7 +296,11 @@ function MemberInfo() {
       </Modal>
 
       <Modal isOpen={withdrawStep === 'done'} onClose={handleDoneClose} label="탈퇴 완료" width={380} showClose={false}>
-        <DialogText>탈퇴했어요. 개인정보와 이용 기록을 모두 지웠어요</DialogText>
+        <DialogText>
+          탈퇴했어요.
+          <br />
+          개인정보와 이용 기록을 모두 지웠어요
+        </DialogText>
         <DialogActions>
           <Button onClick={handleDoneClose}>확인</Button>
         </DialogActions>

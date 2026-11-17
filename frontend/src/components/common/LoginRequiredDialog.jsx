@@ -16,9 +16,11 @@ const Title = styled.h2`
   font-weight: 800;
 `
 
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
 const Desc = styled.p`
   margin-bottom: 20px;
   color: var(--cocoa);
+  white-space: pre-line;
 `
 
 const Actions = styled.div`
@@ -50,7 +52,7 @@ function LoginRequiredDialog() {
   return (
     <Modal isOpen={loginDialogOpen} onClose={handleClose} label="로그인이 필요해요" width={420} isTop showClose={false}>
       <Title>로그인이 필요해요</Title>
-      <Desc>{loginDialogText} 카카오, 네이버 계정으로 간단하게 로그인할 수 있어요.</Desc>
+      <Desc>{`${loginDialogText}\n카카오, 네이버 계정으로 간단하게 로그인할 수 있어요.`}</Desc>
       <Actions>
         <Button onClick={() => handleLogin('kakao')}>카카오로 로그인</Button>
         <Button $variant="outline" onClick={() => handleLogin('naver')}>

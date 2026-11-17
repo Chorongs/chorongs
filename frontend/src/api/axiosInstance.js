@@ -22,7 +22,7 @@ api.interceptors.response.use(
         // 앱 시작 확인(/api/auth/me)은 안내 안 함
         useAuthStore.setState({ user: null, status: 'guest' })
         useMyStore.setState({ likedIds: [] })
-        useUiStore.getState().openLoginDialog('로그인이 풀렸어요. 다시 로그인해 주세요')
+        useUiStore.getState().openLoginDialog('로그인이 풀렸어요.\n다시 로그인해 주세요')
       }
     }
     return Promise.reject(error)

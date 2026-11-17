@@ -149,7 +149,11 @@ function AccountMenu() {
       </Modal>
 
       <Modal isOpen={logoutStep === 'done'} onClose={handleDoneClose} label="로그아웃 완료" width={380} showClose={false}>
-        <DialogText>로그아웃했어요. 메인 페이지로 이동할게요</DialogText>
+        <DialogText>
+          로그아웃했어요.
+          <br />
+          메인 페이지로 이동할게요
+        </DialogText>
         <DialogActions>
           <Button onClick={handleDoneClose}>확인</Button>
         </DialogActions>
