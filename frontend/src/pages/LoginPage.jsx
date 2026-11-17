@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../api/authApi'
 import kakaoSymbol from '../assets/images/kakao_symbol.svg'
 import naverSymbol from '../assets/images/naver_symbol.png'
 import useAuthStore from '../store/useAuthStore'
+import useUiStore from '../store/useUiStore'
 import { Button, Panel } from '../styles/common'
 
 // AU-01 로그인 화면 (/login): 소셜 로그인 시작. 자체 회원가입, 비밀번호 없음
@@ -48,14 +50,29 @@ const Status = styled.p`
 
 function LoginPage() {
   const status = useAuthStore((state) => state.status)
+  const showToast = useUiStore((state) => state.showToast)
   const [searchParams] = useSearchParams()
+  // 로그인 여부를 다시 확인하는 동안 버튼 잠금 (E5)
+  const [isChecking, setIsChecking] = useState(false)
   const errorText = ERROR_TEXT[searchParams.get('error')]
 
   if (status === 'checking') return <Status role="status">확인하는 중이에요</Status>
   if (status === 'member') return <Navigate to="/my" replace />
 
   // 이 화면에서 시작한 로그인은 돌아올 주소가 없음 → 로그인 뒤 /my
-  const handleLogin = (provider) => authApi.getLoginUrl(provider)
+  // 누르는 순간 서버(API-17)에 한 번 더 확인: 이미 로그인 중이면 소셜 로그인으로 보내지 않음
+  //   → '이미 로그인되어 있어요' + 로그인 상태를 다시 채움 → 회원이면 위의 Navigate가 /my로 보냄 (다시 로그인, 다른 계정 가입 막음)
+  const handleLogin = async (provider) => {
+    setIsChecking(true)
+    const me = await authApi.getMe().catch(() => null)
+    setIsChecking(false)
+    if (me?.memberNickname) {
+      showToast('이미 로그인되어 있어요')
+      useAuthStore.getState().fetchMe()
+      return
+    }
+    authApi.getLoginUrl(provider)
+  }
 
   return (
     <Wrap>
@@ -63,11 +80,11 @@ function LoginPage() {
       <Guide $isError={Boolean(errorText)} role={errorText ? 'alert' : undefined}>
         {errorText ?? '로그인 방법을 선택하세요'}
       </Guide>
-      <Button $variant="kakao" onClick={() => handleLogin('kakao')}>
+      <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking}>
         <img src={kakaoSymbol} alt="" />
         카카오 로그인
       </Button>
-      <Button $variant="naver" onClick={() => handleLogin('naver')}>
+      <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking}>
         <img src={naverSymbol} alt="" />
         네이버 로그인
       </Button>

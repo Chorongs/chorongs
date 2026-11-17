@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import kakaoSymbol from '../../assets/images/kakao_symbol.svg'
 import naverSymbol from '../../assets/images/naver_symbol.png'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
 import Modal from '../ui/Modal'
@@ -37,7 +38,10 @@ const Actions = styled.div`
 function LoginRequiredDialog() {
   const loginDialogOpen = useUiStore((state) => state.loginDialogOpen)
   const loginDialogText = useUiStore((state) => state.loginDialogText)
+  const showToast = useUiStore((state) => state.showToast)
   const { pathname, search } = useLocation()
+  // 로그인 여부를 다시 확인하는 동안 버튼 잠금 (E5)
+  const [isChecking, setIsChecking] = useState(false)
 
   // 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
@@ -52,18 +56,31 @@ function LoginRequiredDialog() {
   const handleClose = () => useUiStore.setState({ loginDialogOpen: false })
 
   // 돌아올 주소 검사(사이트 안 주소만, E12)는 getLoginUrl이 함
-  const handleLogin = (provider) => authApi.getLoginUrl(provider, `${pathname}${search}`)
+  // 누르는 순간 서버(API-17)에 한 번 더 확인: 이미 로그인 중이면 소셜 로그인으로 보내지 않고 창을 닫음
+  //   + '이미 로그인되어 있어요' + 로그인 상태를 다시 채움 (다시 로그인, 다른 계정 가입 막음)
+  const handleLogin = async (provider) => {
+    setIsChecking(true)
+    const me = await authApi.getMe().catch(() => null)
+    setIsChecking(false)
+    if (me?.memberNickname) {
+      handleClose()
+      showToast('이미 로그인되어 있어요')
+      useAuthStore.getState().fetchMe()
+      return
+    }
+    authApi.getLoginUrl(provider, `${pathname}${search}`)
+  }
 
   return (
     <Modal isOpen={loginDialogOpen} onClose={handleClose} label="로그인이 필요해요" width={420} isTop showClose={false}>
       <Title>로그인이 필요해요</Title>
       <Desc>{`${loginDialogText}\n카카오, 네이버 계정으로 간단하게 로그인할 수 있어요.`}</Desc>
       <Actions>
-        <Button $variant="kakao" onClick={() => handleLogin('kakao')}>
+        <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking}>
           <img src={kakaoSymbol} alt="" />
           카카오 로그인
         </Button>
-        <Button $variant="naver" onClick={() => handleLogin('naver')}>
+        <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking}>
           <img src={naverSymbol} alt="" />
           네이버 로그인
         </Button>

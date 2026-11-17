@@ -161,6 +161,12 @@ function TermsAgreement({ needBirth, onDone }) {
     }
     try {
       const user = await authApi.postSignup(body)
+      // 성공인데 회원 정보가 없으면 가입 실패로 안내 (화면이 멈추지 않게)
+      if (!user?.memberNickname) {
+        setError('가입하지 못했어요.\n다시 시도해 주세요')
+        setIsPending(false)
+        return
+      }
       onDone(user)
     } catch (err) {
       const code = err.response?.data?.code

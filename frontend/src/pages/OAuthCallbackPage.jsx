@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { RETURN_PATH_KEY } from '../api/authApi'
@@ -35,6 +35,8 @@ function OAuthCallbackPage() {
   const user = useAuthStore((state) => state.user)
   const showToast = useUiStore((state) => state.showToast)
   const navigate = useNavigate()
+  // 이 화면에서 가입을 마쳐 회원이 된 것인지 (아래 '이미 로그인' 처리와 구분)
+  const [isSignedUp, setIsSignedUp] = useState(false)
 
   // LOGIN: 확인이 끝나면 이동 (회원이 아니면 로그인 실패로 안내)
   useEffect(() => {
@@ -47,8 +49,18 @@ function OAuthCallbackPage() {
     }
   }, [result, status, user, showToast, navigate])
 
+  // SIGNUP인데 이미 회원으로 로그인 중이면 가입하지 않고 /my (다른 계정 가입 막음, 2026-11-17 버그 수정)
+  useEffect(() => {
+    if (result !== 'SIGNUP' || status !== 'member' || isSignedUp) return
+    showToast('이미 로그인되어 있어요')
+    navigate('/my', { replace: true })
+  }, [result, status, isSignedUp, showToast, navigate])
+
   if (result === 'SIGNUP') {
+    // 로그인 여부를 확인하는 동안, 또는 이미 로그인 중이라 /my로 가는 동안은 가입 폼을 보이지 않음
+    if (status !== 'guest' && !isSignedUp) return <Status role="status">확인하는 중이에요</Status>
     const handleDone = (member) => {
+      setIsSignedUp(true)
       useAuthStore.setState({ user: member, status: 'member' })
       showToast(`${member.memberNickname}님, 환영해요`)
       navigate(takeReturnPath(), { replace: true })

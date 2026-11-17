@@ -191,6 +191,11 @@ function MemberInfo() {
     setIsSaving(true)
     try {
       const updated = await myApi.patchMe(body)
+      // 성공인데 회원 정보가 없으면 저장 실패로 안내 (내 정보를 비우면 화면이 멈춤)
+      if (!updated?.memberNickname) {
+        setError('저장하지 못했어요.\n다시 시도해 주세요')
+        return
+      }
       useAuthStore.setState({ user: updated })
       setNickname(updated.memberNickname)
       showToast('회원 정보를 저장했어요')

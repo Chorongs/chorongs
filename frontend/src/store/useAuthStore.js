@@ -14,6 +14,11 @@ const useAuthStore = create((set) => ({
     set({ status: 'checking' })
     try {
       const user = await authApi.getMe()
+      // 성공(200)인데 내 정보가 없으면 비회원으로 (API 주소 설정이 없거나 틀려 화면 서버가 HTML을 돌려준 경우 등, 화면이 멈추지 않게)
+      if (!user?.memberNickname) {
+        set({ user: null, status: 'guest' })
+        return
+      }
       set({ user, status: 'member' })
       // 회원이면 찜한 상품 번호를 불러옴 (ST-02)
       useMyStore.getState().loadLikes()
