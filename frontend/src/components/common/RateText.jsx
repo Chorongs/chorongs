@@ -5,6 +5,7 @@ import { formatRate } from '../../utils/format'
 // value: 금리 하나 / min, max: 금리 범위 (앞 숫자만 크게, '4.50 ~9.80%'처럼 뒤는 작게) / 값이 없거나 숫자가 아니면 '-'
 // hasFixedLabel: 범위의 두 값이 같을 때 '% 고정'으로 표시 (상품 목록, 상세의 대표 금리)
 // weight, unitSize, unitTone: MoneyText와 같음
+// TODO(CM-12, CHORONG-68 조빌립): MoneyText.jsx에 똑같은 UNIT_SIZE, UNIT_WEIGHT가 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
 const UNIT_SIZE = { xs: 'var(--fs-xs)', sm: 'var(--fs-sm)', base: 'var(--fs-base)' }
 const UNIT_WEIGHT = { xs: 800, sm: 700, base: 800 }
 

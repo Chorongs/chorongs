@@ -1,9 +1,22 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import { PREPARING_TEXT } from '../api/axiosInstance'
 import Icon from '../components/ui/Icon'
 import { Button } from '../styles/common'
 
 // LY-16 없는 주소 화면: 안내 문구 + [홈으로]
+// '준비 중' (문서_반영_목록 Q5, CHORONG-43): 아직 화면이 올라오지 않은 주소면 '찾을 수 없음' 대신 준비 중 안내
+//   각 화면이 올라와 App.jsx에 Route가 생기면 그 화면이 먼저 잡히므로 여기 목록은 그대로 둬도 됨 (화면이 다 올라오면 지움)
+const PREPARING_PATHS = [
+  '/calc', // 대출 계산기 (CHORONG-49, 56)
+  '/search', // 상품 찾기 (CHORONG-64)
+  '/ranking', // 대출 랭킹 (CHORONG-60)
+  '/diagnosis/habit', // 소비 습관 분석 (CHORONG-59)
+  '/help', // 도움말 (CHORONG-63)
+]
+
+const isPreparingPath = (pathname) =>
+  PREPARING_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
@@ -26,11 +39,12 @@ const Desc = styled.p`
 
 function NotFoundPage() {
   const navigate = useNavigate()
+  const isPreparing = isPreparingPath(useLocation().pathname)
 
   return (
     <Wrap>
-      <Title>찾을 수 없는 주소예요</Title>
-      <Desc>주소가 잘못되었거나 없어진 화면이에요.</Desc>
+      <Title>{isPreparing ? PREPARING_TEXT : '찾을 수 없는 주소예요'}</Title>
+      <Desc>{isPreparing ? '곧 열릴 화면이에요.' : '주소가 잘못되었거나 없어진 화면이에요.'}</Desc>
       <Button onClick={() => navigate('/')}>
         홈으로
         <Icon name="arrow" size={13} />

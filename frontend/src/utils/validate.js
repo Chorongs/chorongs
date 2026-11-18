@@ -27,6 +27,28 @@ export const isLengthInRange = (text, min, max) => {
 // 닉네임: 앞뒤 공백을 뺀 2~12자
 export const isValidNickname = (nickname) => isLengthInRange(nickname, 2, 12)
 
+// 생년월일: 'YYYY-MM-DD' 형식, 실제 있는 날짜, 1900년 이후, 오늘보다 미래가 아님 (AU-03, MY-11)
+// today: 기준 날짜 (테스트에서 고정할 때만 넘김)
+export const isValidBirthDate = (text, today = new Date()) => {
+  const matched = typeof text === 'string' ? text.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null
+  if (!matched) return false
+  const year = Number(matched[1])
+  const month = Number(matched[2])
+  const day = Number(matched[3])
+  const date = new Date(year, month - 1, day)
+  // 2월 30일처럼 없는 날짜는 다음 달로 넘어가므로 다시 맞춰 봄
+  const isRealDate = date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  return isRealDate && year >= 1900 && date <= todayStart
+}
+
+// 생년월일 오류 문구 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 기획서 문구 6-2)
+export const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+
+// 로그인 뒤 돌아갈 주소: '/'로 시작하는 사이트 안 주소만 (E12). '//다른사이트', '/\다른사이트'는 외부로 나가므로 막음
+export const isSafeReturnPath = (path) =>
+  typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\')
+
 // 맞춤 추천 입력 (RC-03~05): 연소득 0~99,999만원
 export const isValidIncome = (income) => isNumberInRange(income, 0, 99999)
 

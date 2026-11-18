@@ -3,8 +3,9 @@ import styled from 'styled-components'
 import useCompareStore, { getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, CompareButton, IconButton, Tag } from '../../styles/common'
+import { Button, Card, CompareButton, Tag } from '../../styles/common'
 import { formatMatchRate, getCalcState, toManWon } from '../../utils/recommend'
+import LikeButton from '../common/LikeButton'
 import LimitText from '../common/LimitText'
 import Medal from '../common/Medal'
 import MoneyText from '../common/MoneyText'
@@ -46,8 +47,8 @@ const Top = styled.div`
   margin-bottom: -6px;
 `
 
-// 찜 버튼: 맨 윗줄 오른쪽 끝 (가안)
-const LikeSpot = styled(IconButton)`
+// 찜 버튼 자리: 맨 윗줄 오른쪽 끝 (가안). 안에 LikeButton (CM-06, CHORONG-43에서 연결)
+const LikeSpot = styled.div`
   margin-left: auto;
 `
 
@@ -186,7 +187,7 @@ const Note = styled.p`
     - [상세 보기] → 카드 클릭과 같음 (가안에 있는 버튼) / [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
     - TODO(LY-01, CHORONG-49 김진석): /calc 계산기 화면은 계산기 이슈가 라우트를 추가해야 생김. 그 전에는 [이자 계산]이 '찾을 수 없음' 화면으로 감 (넘기는 값은 utils/recommend.js getCalcState)
     - 판단 태그는 서버가 보낸 글 그대로, 순서도 그대로 (서버가 주의 먼저 정렬). 서버 글은 글자로만 출력 (E1)
-    - TODO(CM-06, CHORONG-43 Tong-B): 하트 버튼은 가안 모양과 자리만 있고 동작은 달지 않았음. LikeButton(찜 담기, 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 stopPropagation)으로 교체. 눌러도 반응이 없는 것에 대한 사용자 안내는 43이 시연 전 일괄 처리하기로 함
+    - 하트: LikeButton (CM-06. 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 LikeButton이 stopPropagation, CHORONG-43에서 연결)
     - [+ 비교] (ST-04, CHORONG-47): 누르면 상세 창이 아니라 바로 비교함에 담음 (useCompareStore.addTray, 클릭이 카드까지 안 퍼지게 stopPropagation). 담긴 상품은 'A 담음', 비교함 첫 상품과 용도나 상환 방식이 안 맞으면 '비교 불가'. 안 맞는 상품은 눌러도 안 담기고 알림 (addTray)
     - 모양은 가안(cashlink_21.html .rec.rc): 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 2:1:1
     - 금리가 없으면 [이자 계산] 숨김, 월 상환이 없으면 '계산 불가', 만기일시만 있는 상품은 '월 이자' (서버 월 상환이 매달 이자만이므로)
@@ -242,8 +243,8 @@ function RecommendCard({ item }) {
         {isTop && <Medal rank={rankNo} size={26} />}
         <RankText>추천 {rankNo}위</RankText>
         <MatchRate>일치도 {formatMatchRate(matchRate)}%</MatchRate>
-        <LikeSpot aria-label={`${product.productName} 찜하기`}>
-          <Icon name="heart" />
+        <LikeSpot>
+          <LikeButton productId={product.productId} />
         </LikeSpot>
       </Top>
 

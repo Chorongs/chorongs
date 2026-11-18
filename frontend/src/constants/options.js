@@ -24,6 +24,12 @@ export const REPAY_METHOD_CODE = {
   만기일시: 'BULLET',
 }
 
+// 로그인 방법 코드 → 화면 글 (MemberResponseDTO loginType)
+export const LOGIN_TYPE_LABEL = {
+  KAKAO: '카카오',
+  NAVER: '네이버',
+}
+
 // 신용 셀프 진단 문항 10개 (CR-02). 보기 번호 = 보기 순서 1, 2, ... / 0은 '잘 모르겠어요' (hasUnknown인 문항만)
 // 보기 순서와 허용 문항은 ml/app/credit.py OPTIONS, API-09와 같게. label은 결과 카드 항목 이름.
 // 문항 5(이용 금융권)는 여러 개 고르는 선택 문항 (대출이 있을 때만)

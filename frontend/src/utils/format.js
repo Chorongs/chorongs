@@ -64,3 +64,24 @@ export function formatRange(min, max, prefix = '', suffix = '') {
   if (high !== null) return `${prefix}${high}${suffix} 이하`
   return '정보 없음'
 }
+
+// 금리 범위 글: 둘 다 없으면 '금리는 기관 문의', 같으면 'a%', 다르면 'a ~ b%' (한쪽만 있으면 그 값 하나) (비교 카드, 비교할 상품 고르기)
+export function formatRateRange(rateMin, rateMax) {
+  if (rateMin == null && rateMax == null) return '금리는 기관 문의'
+  const low = formatRate(rateMin ?? rateMax)
+  const high = formatRate(rateMax ?? rateMin)
+  return low === high ? `${low}%` : `${low} ~ ${high}%`
+}
+
+// 상품 태그 글: 그 종류(tagType, 예: REPAY, TARGET) 태그 값을 쉼표로 이음, 없으면 '정보 없음' (비교 카드, 비교표)
+export function formatTagValues(product, tagType) {
+  const values = (product.tags ?? []).filter((tag) => tag.tagType === tagType).map((tag) => tag.tagValue)
+  return values.length > 0 ? values.join(', ') : '정보 없음'
+}
+
+// 오늘 날짜 'YYYY-MM-DD' (달력에서 미래 날짜를 못 고르게, 가입 단계와 MY 회원 정보) / today: 테스트에서 고정할 때만 넘김
+export function getTodayText(today = new Date()) {
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${today.getFullYear()}-${month}-${day}`
+}

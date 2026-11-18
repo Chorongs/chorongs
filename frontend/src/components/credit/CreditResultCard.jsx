@@ -6,6 +6,7 @@ import { CREDIT_BAND_LABEL, CREDIT_QUESTIONS } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, Tag } from '../../styles/common'
+import requireLogin from '../../utils/requireLogin'
 import ScoreGauge from '../chart/ScoreGauge'
 import TipList from '../common/TipList'
 import Accordion from '../ui/Accordion'
@@ -132,6 +133,8 @@ function CreditResultCard({ result, onRetry, onContinue }) {
 
   // [이 구간으로 추천받기]: 추천 입력의 신용 구간을 이 구간으로 채움 (구간만 담음, E6)
   // 추천받기 전: 추천 창을 '잠깐' 창 없이 1단계부터 열기 / 받은 뒤: 그 구간으로 다시 추천 실행 (E5 실행 중 버튼 잠금)
+  // TODO(CR-03, MY-09, CHORONG-51 김진석, CHORONG-43 Tong B): MY 진단 리포트(DiagnosisReport.jsx)에 같은 동작이 따로 있음.
+  //   나중에 공통 함수로 묶는다 (명세서 '폴더 구조'에 둘 파일을 먼저 추가한 뒤, 두 화면이 그 함수를 부르게)
   const handleRecommend = async () => {
     const bandLabel = CREDIT_BAND_LABEL[creditBand]
     setInput({ creditBand })
@@ -146,25 +149,30 @@ function CreditResultCard({ result, onRetry, onContinue }) {
       navigate(RECOMMEND_PATH)
       showToast(`${bandLabel} 구간으로 추천했어요`)
     } catch {
-      showToast('추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요')
+      // 문구는 추천 창(45), MY 진단 리포트(43)와 같게 (11-17 Tong B, 51 동의)
+      showToast('추천을 불러오지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsRecommending(false)
     }
   }
 
-  // [결과 저장]: 구간 + 시각만 보냄 (E5 저장 중 버튼 잠금)
-  // TODO(CM-17, CM-22, CHORONG-43): 비회원이면 요청 전에 requireLogin으로 로그인 안내 창을 띄운다.
-  const handleSave = async () => {
+  // [결과 저장]: 구간만 보냄, 진단 시각은 서버가 정함 (E5 저장 중 버튼 잠금)
+  const saveResult = async () => {
     setIsSaving(true)
     try {
       await putCreditReport(creditBand)
       showToast('진단 결과를 저장했어요')
-    } catch {
-      showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
+    } catch (error) {
+      // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
+      if (error.response?.status === 401) return
+      showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
   }
+
+  // 비회원이면 저장 대신 로그인 안내 창 (CM-22, 문구는 CM-17 '진단 결과 저장', CHORONG-43에서 연결)
+  const handleSave = () => requireLogin(saveResult, '진단 결과 저장은 회원 전용이에요.')
 
   return (
     <Wrap>

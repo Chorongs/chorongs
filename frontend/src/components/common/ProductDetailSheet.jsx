@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
-import { CREDIT_BAND_LABEL, FEATURE_LABEL, REPAY_METHOD_CODE } from '../../constants/options'
+import { CREDIT_BAND_LABEL, FEATURE_LABEL, MONTHS_DEFAULT, REPAY_METHOD_CODE } from '../../constants/options'
+import useAuthStore from '../../store/useAuthStore'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import ReasonList from '../recommend/ReasonList'
 import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
+import { FALLBACK_AMOUNT_MAN } from '../../utils/loanMath'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
 import Disclaimer from './Disclaimer'
+import LikeButton from './LikeButton'
 import EligibilityNotice from './EligibilityNotice'
 import MoneyText from './MoneyText'
 import RateText from './RateText'
@@ -22,14 +26,12 @@ import RateText from './RateText'
 // 열려 있는 동안 뒤 화면 스크롤을 잠근다.
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
-// TODO(CM-06, CHORONG-43 Tong-B): [찜하기] LikeButton을 버튼 줄에 연결 (버튼 줄을 3칸: 찜하기 / + 비교 / 이자 계산)
+// [찜하기] LikeButton (CM-06)을 버튼 줄 첫 칸에 연결함 (버튼 줄: 찜하기 / + 비교 / 이자 계산)
 // [+ 비교]: 비교함에 담기 (addTray가 true면 창 닫기, false면 그대로). 맞춤 추천, 상품 찾기 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
-// TODO(API-21, CHORONG-43 Tong-B): 회원이면 최근 본 대출 기록 myApi.postRecentView (명세서 CM-07: 회원만, useAuthStore가 올라온 뒤)
+// 회원이면 최근 본 대출 기록 myApi.postRecentView (API-21, 실패는 안내 안 함)
 // TODO(MEM-08, CHORONG-42): 최근 본 서버 API가 아직 develop에 없음 (2026-11-17 기준 42번은 로그인, 가입만 합쳐짐: 최근 본 MEM-08, 찜 MEM-04, 비교 내역 MEM-10 없음). 서버가 올라오면 위 기록을 연결한다.
 // TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
 // 내 조건 안내 EligibilityNotice (CM-08), 추천 이유 ReasonList (RC-09), [이자 계산] 금액(추천 입력 lastInput.need와 한도 중 작은 값)은 CHORONG-45에서 연결됨
-const DEFAULT_NEED_MAN = 1000
-const DEFAULT_MONTHS = 36
 const SOURCE_LABEL = { KINFA: '서민금융진흥원', FSS: '금융감독원' }
 
 const Body = styled.div`
@@ -169,7 +171,7 @@ const ExternalLink = styled.a`
   font-weight: 700;
 `
 
-// [+ 비교]가 있으면 2칸, 없으면 1칸. 찜하기가 올라오면 3칸(repeat(3, minmax(0, 1fr)))으로
+// 버튼 줄 칸 수: [+ 비교]가 있으면 3칸(찜하기 / + 비교 / 이자 계산), 없으면 2칸(찜하기 / 이자 계산)
 const Actions = styled.div`
   display: grid;
   grid-template-columns: repeat(${({ $count }) => $count}, minmax(0, 1fr));
@@ -287,7 +289,7 @@ function buildCalcState(product, needMan) {
 
   return {
     loanAmount: Math.min(needMan, limit) * 10000,
-    loanMonths: Math.min(DEFAULT_MONTHS, product.termMax > 0 ? product.termMax : DEFAULT_MONTHS),
+    loanMonths: Math.min(MONTHS_DEFAULT, product.termMax > 0 ? product.termMax : MONTHS_DEFAULT),
     interestRate,
     repayMethod: REPAY_METHOD_CODE[firstRepay] ?? 'EQUAL_PI',
   }
@@ -311,7 +313,7 @@ function ProductDetail({ product, onClose }) {
   const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
   const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking' && product.productStatus === 'ON'
   const lastNeed = useRecommendStore((state) => state.lastInput?.need)
-  const needMan = lastNeed > 0 ? lastNeed : DEFAULT_NEED_MAN
+  const needMan = lastNeed > 0 ? lastNeed : FALLBACK_AMOUNT_MAN
   const sector = getTagValues(product, 'SECTOR')[0]
 
   const head = (
@@ -418,7 +420,8 @@ function ProductDetail({ product, onClose }) {
         </SectionBox>
       ))}
 
-      <Actions $count={hasCompare ? 2 : 1}>
+      <Actions $count={hasCompare ? 3 : 2}>
+        <LikeButton productId={product.productId} hasLabel />
         {hasCompare && (
           <CompareButton
             $variant="outline"
@@ -496,6 +499,7 @@ function ProductDetailSheet() {
   useEffect(() => {
     if (productId === null) return
     productApi.postProductView(productId).catch(() => {})
+    if (useAuthStore.getState().status === 'member') myApi.postRecentView(productId).catch(() => {})
   }, [productId])
 
   // 열려 있는 동안 뒤 화면 스크롤 잠금

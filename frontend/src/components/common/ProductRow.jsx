@@ -3,8 +3,9 @@ import styled, { css } from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
-import { CompareButton, IconButton, Tag } from '../../styles/common'
+import { CompareButton, Tag } from '../../styles/common'
 import Icon from '../ui/Icon'
+import LikeButton from './LikeButton'
 import LimitText from './LimitText'
 import RateText from './RateText'
 
@@ -13,9 +14,8 @@ import RateText from './RateText'
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
 // rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '일치도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
 // 태그: (일치도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (시안 prodRow). 명세서는 '상품 특징 앞 2개'만 있어 소분류는 변경 요청 중
-// 오른쪽 끝 하트(찜): 시안 모양과 자리만 있고 동작은 달지 않았음 (연결 때 클릭이 줄까지 안 퍼지게 stopPropagation). 눌러도 반응이 없는 것에 대한 사용자 안내는 CHORONG-43이 시연 전 일괄 처리하기로 함
+// 오른쪽 끝 하트: 찜 버튼 LikeButton (CM-06, CHORONG-43에서 연결. 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation)
 //   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
-// TODO(CM-06, CHORONG-43 Tong-B): 하트를 LikeButton(찜 담기, 비회원은 requireLogin)으로 교체
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
 //   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
 //   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
@@ -260,9 +260,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
         </MetricValue>
       </Metric>
       <RowActions>
-        <IconButton aria-label={`${product.productName} 찜하기`}>
-          <Icon name="heart" />
-        </IconButton>
+        <LikeButton productId={product.productId} />
       </RowActions>
       {hasCompare && (
         <CompareCell data-compare-cell>

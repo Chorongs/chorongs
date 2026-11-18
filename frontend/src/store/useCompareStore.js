@@ -7,7 +7,7 @@ import useUiStore from './useUiStore'
 // tray: 담는 중 상품 { productId, companyName, productName, purposes } (최대 2, 첫 상품 = 자금 용도 기준)
 // pair: 비교 화면 두 상품 번호 [A, B] (빈 칸은 null) / swapSlot: 바꿀 칸 (null, 'A', 'B') / from: 담기 시작한 화면 주소
 // 저장: tray, pair만 sessionStorage (탭 닫으면 삭제). swapSlot, from은 메모리만
-// TODO(ST-01, CHORONG-43): 로그아웃, 탈퇴 때 비우기 (useAuthStore 쪽에서 clearTray()와 setPair(null, null) 호출). 401에는 그대로 둔다.
+// 로그아웃, 탈퇴 때 useAuthStore, MemberInfo가 clearTray()와 setPair(null, null)로 비움. 401에는 그대로 둔다
 
 const MAX_TRAY = 2
 const SAME_PURPOSE_MESSAGE = '자금 용도가 같은 상품끼리만 비교할 수 있어요'

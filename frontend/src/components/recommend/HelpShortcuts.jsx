@@ -161,7 +161,9 @@ const SampleItem = styled.li`
   }
 `
 
-const Panel = styled.div`
+// 바로가기 판 (공통 Panel(UI-05)과 여백이 달라 이름을 따로 둠)
+// TODO(RC, CHORONG-45 김채희): ToolShortcuts.jsx에 똑같은 ShortcutPanel이 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
+const ShortcutPanel = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -265,7 +267,7 @@ function HelpShortcuts() {
             </SampleList>
           </SampleCard>
         </Art>
-        <Panel>
+        <ShortcutPanel>
           <PanelText>
             어려운 말은 쉬운 말로, <br />
             준비할 서류는 내 상황에 맞게
@@ -278,7 +280,7 @@ function HelpShortcuts() {
               </Pill>
             ))}
           </Pills>
-        </Panel>
+        </ShortcutPanel>
       </Show>
     </Wrap>
   )

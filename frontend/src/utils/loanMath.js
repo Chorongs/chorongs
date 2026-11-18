@@ -4,7 +4,7 @@ import { REPAY_METHOD_CODE } from '../constants/options'
 // 지금은 비교 화면(CP-02, 03, 05)이 쓰는 상환 방식별(원리금균등, 원금균등, 만기일시) 계산과 유리 판정만 있다.
 // 계산기(CA-02)가 쓰는 상환 스케줄은 그 이슈(CHORONG-49)에서 이 파일에 추가한다.
 
-const isNumber = (value) => typeof value === 'number' && Number.isFinite(value)
+export const isNumber = (value) => typeof value === 'number' && Number.isFinite(value)
 
 // 금리 중간값: 최저, 최고가 둘 다 있으면 평균(소수 둘째 자리), 하나만 있으면 그 값, 없으면 null
 export function getMidRate(min, max) {

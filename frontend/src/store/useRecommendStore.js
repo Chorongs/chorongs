@@ -56,7 +56,6 @@ export const useRecommendStore = create(
       },
 
       // 입력값과 결과를 모두 비움 (로그아웃, 탈퇴 때)
-      // TODO(ST-01, CHORONG-43 Tong-B): useAuthStore의 logout()과 탈퇴 처리가 올라오면 거기서 이 함수를 부른다 (지금은 부르는 곳 없음)
       clear: () => {
         set({ input: initialInput, result: null, lastInput: null, diagBand: null })
       },

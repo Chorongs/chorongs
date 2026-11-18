@@ -196,7 +196,9 @@ const SampleChip = styled.span`
   font-weight: 800;
 `
 
-const Panel = styled.div`
+// 바로가기 판 (공통 Panel(UI-05)과 여백이 달라 이름을 따로 둠)
+// TODO(RC, CHORONG-45 김채희): HelpShortcuts.jsx에 똑같은 ShortcutPanel이 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
+const ShortcutPanel = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -330,7 +332,7 @@ function ToolShortcuts() {
             </SampleChips>
           </SampleCard>
         </Art>
-        <Panel>
+        <ShortcutPanel>
           <PanelText>
             조건에 맞는 대출을 찾고 비교하고, <br />
             매달 갚을 돈까지 미리 계산해 보세요
@@ -343,7 +345,7 @@ function ToolShortcuts() {
               </Pill>
             ))}
           </Pills>
-        </Panel>
+        </ShortcutPanel>
       </Show>
     </Wrap>
   )

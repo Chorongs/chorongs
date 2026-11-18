@@ -74,6 +74,14 @@ const GlobalStyle = createGlobalStyle`
     --r-lg: 22px;
     --r-pill: 999px;
 
+    /* 소셜 로그인 버튼 (CHORONG-43, 각 회사 가이드 색 그대로. 다크 모드에서도 같은 색) */
+    /* 카카오: 카카오 로그인 디자인 가이드 (컨테이너 #FEE500, 레이블 #000000 85%) */
+    /* 네이버: 네이버 로그인 버튼 사용 가이드 지정 컬러 (배경 #03A94D, 로고, 레이블 #FFFFFF) */
+    --kakao: #FEE500;
+    --on-kakao: rgba(0, 0, 0, .85);
+    --naver: #03A94D;
+    --on-naver: #FFFFFF;
+
     /* 전환 시간 (색, 바탕 0.15s / 창, 패널 0.2s) */
     --t-fast: .15s;
     --t-pop: .2s;

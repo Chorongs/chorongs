@@ -17,6 +17,7 @@ import useUiStore from '../../store/useUiStore'
 import { Button, IconButton, Panel, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import { formatMatchRate } from '../../utils/recommend'
+import requireLogin from '../../utils/requireLogin'
 import Disclaimer from '../common/Disclaimer'
 import ProductList from '../common/ProductList'
 import PurposeFilterBanner from '../common/PurposeFilterBanner'
@@ -217,7 +218,9 @@ const getConditionLabels = (input) => {
     - 서버가 준 안내 문구(notes, hint)와 제외 요약은 글자로만 출력 (E1)
     - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 일치도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
     - TODO(LY-01, 각 이슈 담당): 0건 바로가기의 /search(CHORONG-64 조빌립), /diagnosis/credit(CHORONG-51 김진석), /ranking(CHORONG-60 김채희) 화면은 각 이슈가 라우트를 추가해야 생김 (그 전에는 '찾을 수 없음' 화면)
-    - TODO(CM-22, CHORONG-43 Tong-B): [결과 저장]을 requireLogin(저장 함수, '로그인하면 결과를 저장할 수 있어요')로 감싸기 (지금은 비회원이면 서버 401 → 실패 알림)
+    - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
+    - TODO(RC-07, LOAN-04, CHORONG-45 김채희, CHORONG-43 Tong B): 같은 결과를 누를 때마다 다시 저장됨 (명세서에 중복 규칙 없음, 10개 넘으면 오래된 저장이 밀려 지워짐).
+      시연 뒤 A안: 저장 성공하면 버튼을 '저장했어요'로 잠그고, 새로 추천받으면 다시 풀기 (새로고침 뒤에도 막으려면 useRecommendStore에 저장한 결과 표시 추가). 문서_반영_목록 Q12
     - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
       (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
@@ -259,7 +262,7 @@ function RecommendResult() {
   const canSave = lastInput !== null && items.length > 0
   const excludedTotal = excluded.reduce((sum, entry) => sum + entry.count, 0)
 
-  const handleSave = async () => {
+  const saveResult = async () => {
     if (isSaving) return
     setIsSaving(true)
     try {
@@ -271,12 +274,17 @@ function RecommendResult() {
         productIds: items.map((item) => item.product.productId),
       })
       showToast('추천 결과를 저장했어요')
-    } catch {
-      showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요')
+    } catch (error) {
+      // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 실패 알림을 겹쳐 띄우지 않음 (E4)
+      if (error.response?.status === 401) return
+      showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
   }
+
+  // 비회원이면 저장 대신 로그인 안내 창 (RC-07 비회원: requireLogin, 문구는 CM-17 '추천 결과 저장', CHORONG-43에서 연결)
+  const handleSave = () => requireLogin(saveResult, '추천 결과 저장은 회원 전용이에요.')
 
   return (
     <Wrap aria-label="추천 결과">

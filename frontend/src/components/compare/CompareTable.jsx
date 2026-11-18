@@ -1,7 +1,8 @@
 import styled from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import { SlotBadge } from '../../styles/common'
-import { formatMoney, formatPrepayFee, formatRate } from '../../utils/format'
+import { formatMoney, formatPrepayFee, formatRate, formatTagValues } from '../../utils/format'
+import { isNumber } from '../../utils/loanMath'
 import Icon from '../ui/Icon'
 
 // CP-05 비교표: 항목별 A/B 비교. 시안과 같게 가운데 항목 이름, 왼쪽 A(주황 막대), 오른쪽 B(파랑 막대)로 마주 봄
@@ -130,12 +131,7 @@ const Fill = styled.span`
   opacity: ${({ $isWin }) => ($isWin ? 1 : 0.38)};
 `
 
-function getTagText(product, tagType) {
-  const values = (product.tags ?? []).filter((tag) => tag.tagType === tagType).map((tag) => tag.tagValue)
-  return values.length > 0 ? values.join(', ') : '정보 없음'
-}
 
-const isNumber = (value) => typeof value === 'number' && Number.isFinite(value)
 
 // 한도가 금액이 아니면 유형 글 (tags의 AMOUNT)
 function getLimitNa(product) {
@@ -292,8 +288,8 @@ function CompareTable({ productA, productB, resultA, resultB, winners, amountMan
           </Row>
         )
       })}
-      <TextRow label="상환 방식" textA={getTagText(productA, 'REPAY')} textB={getTagText(productB, 'REPAY')} />
-      <TextRow label="신청 대상" textA={getTagText(productA, 'TARGET')} textB={getTagText(productB, 'TARGET')} />
+      <TextRow label="상환 방식" textA={formatTagValues(productA, 'REPAY')} textB={formatTagValues(productB, 'REPAY')} />
+      <TextRow label="신청 대상" textA={formatTagValues(productA, 'TARGET')} textB={formatTagValues(productB, 'TARGET')} />
       <TextRow label="상품 특징" textA={getFeatureText(productA)} textB={getFeatureText(productB)} />
     </div>
   )

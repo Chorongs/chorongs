@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import logoImg from '../../assets/images/logo_main.png'
+import TermsDialog from '../common/TermsDialog'
 
 // LY-13 푸터: 로고 / 링크 / 서비스 고지 / 데이터 출처 (관리자 링크 없음)
 // 모양은 시안과 같게: 연회색 바탕, 위쪽에 로고 + 한 줄 소개 + 링크, 아래에 고지 글
-// TODO(CM-21, CHORONG-43): '이용약관', '개인정보 수집/이용' 링크는 약관 창 TermsDialog가 올라온 뒤 추가
+// '이용약관', '개인정보 처리방침' 링크 → 약관 창 TermsDialog (CM-21)
+// (링크 이름은 명세서 LY-13 '개인정보 수집/이용' 대신 회원 관리 기획서 6-1 '개인정보 처리방침'. 2026-11-17 사용자 결정)
 const Wrap = styled.footer`
   border-top: 1px solid var(--line);
   background: var(--mist);
@@ -60,9 +63,20 @@ const Links = styled.nav`
   gap: 6px 16px;
   color: var(--ink-2);
   font-weight: 700;
-  a:hover {
+  a:hover,
+  button:hover {
     color: var(--ink);
   }
+`
+
+// 약관 링크: 주소 이동 없이 약관 창을 여는 버튼 (모양은 옆 링크와 같게)
+const TermsButton = styled.button.attrs({ type: 'button' })`
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 `
 
 const Notice = styled.p`
@@ -72,6 +86,8 @@ const Notice = styled.p`
 `
 
 function Footer() {
+  const [termsKind, setTermsKind] = useState(null)
+
   return (
     <Wrap>
       <Inner>
@@ -81,6 +97,8 @@ function Footer() {
             <span>대출, 더 쉽게 연결되다</span>
           </Brand>
           <Links aria-label="하단 링크">
+            <TermsButton onClick={() => setTermsKind('service')}>이용약관</TermsButton>
+            <TermsButton onClick={() => setTermsKind('privacy')}>개인정보 처리방침</TermsButton>
             <Link to="/help/faq">자주 묻는 질문</Link>
             <Link to="/help/illegal">불법 금융 대응</Link>
             <Link to="/help/terms">용어 사전</Link>
@@ -93,6 +111,7 @@ function Footer() {
         </Notice>
         <Notice>데이터 출처: 서민금융진흥원 대출상품한눈에, 금융감독원 금융상품통합비교공시</Notice>
       </Inner>
+      <TermsDialog kind={termsKind} onClose={() => setTermsKind(null)} />
     </Wrap>
   )
 }
