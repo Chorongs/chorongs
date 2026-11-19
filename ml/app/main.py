@@ -8,7 +8,8 @@
     - POST /catalog/rollback          : 되돌리기 → 새 버전 (ADMIN-05)
     - POST /credit/score              : 진단 문항 답 → 점수, 문항별 점수 (CREDIT-01). 답과 점수는 로그 금지 (B8)
     /health 말고는 모두 Bearer 토큰 (B14)
-    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT, 422 detail: NOT_PUBLISHABLE (Spring FastApiClient가 바꿈)
+    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT / NOTHING_TO_ROLLBACK, 422 detail: NOT_PUBLISHABLE,
+    404 detail: JOB_NOT_FOUND / HISTORY_NOT_FOUND (Spring FastApiClient가 ErrorCode로 바꿈)
 
     실행: ml 폴더에서  fastapi dev app/main.py
 """
@@ -91,7 +92,7 @@ def publish_import(job_id: int, body: PublishRequest):
 
 @app.post("/catalog/rollback", response_model=VersionResponse, dependencies=[Depends(verify_token)])
 def rollback_catalog(body: RollbackRequest):
-    """고른 이력 시점으로 되돌리기 → 새 버전. 409 VERSION_CONFLICT / 404 없는 이력"""
+    """고른 이력 시점으로 되돌리기 → 새 버전. 409 VERSION_CONFLICT, NOTHING_TO_ROLLBACK / 404 없는 이력"""
     version = rollback(ENGINE, body.history_id, body.base_version, body.admin_id)
     return VersionResponse(version=version)
 

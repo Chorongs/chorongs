@@ -4,8 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.imports import to_json
-from app.load import PRODUCT_COLS
-from app.publish import before_data, product_values, publish_counts, publish_status, restore_plan, to_dt
+from app.load import PRODUCT_COLS, missing_counts
+from app.publish import (before_data, product_values, publish_count_json, publish_counts, publish_status, restore_plan,
+                         to_dt)
 
 
 def _current(**changes):
@@ -34,13 +35,13 @@ def test_before_data_상품_번호와_조회수는_빼고_상태_칩_금리는_�
             and data["product_status"] == "ON" and data["tags"] == current["tags"] and data["rates"] == current["rates"])
 
 
-def test_before_data는_JSON으로_바뀌고_Decimal과_날짜가_글이_된다():
+def test_before_data는_JSON으로_바뀌고_Decimal은_숫자_날짜는_yyyy_MM_dd_HH_mm_글이_된다():
     # Given
     data = before_data(_current())
     # When
     loaded = json.loads(to_json(data))
     # Then
-    assert (loaded["rate_min"], loaded["base_date"], loaded["rates"][0]["rate_min"]) == (3.5, "2026-11-10", 3.5)
+    assert (loaded["rate_min"], loaded["base_date"], loaded["rates"][0]["rate_min"]) == (3.5, "2026-11-10 00:00", 3.5)
 
 
 # ---------- restore_plan ----------
@@ -65,7 +66,7 @@ def test_restore_plan_상태만_있는_기록은_상태만():
 
 def test_restore_plan_다시_게시_기록은_상태와_종료일():
     # Given
-    before = json.dumps({"product_status": "CLOSED", "disclose_end": "2026-10-31"})
+    before = json.dumps({"product_status": "CLOSED", "disclose_end": "2026-10-31 00:00"})
     # When
     plan = restore_plan("SHOW", before)
     # Then
@@ -103,13 +104,13 @@ def test_product_values_날짜_글은_datetime으로_나머지는_그대로():
     assert values == {"base_date": datetime(2026, 11, 19), "disclose_end": None, "rate_min": 3.5}
 
 
-def test_to_dt_시각이_붙은_글도_읽는다():
+def test_to_dt_날짜만_초까지_ISO_T_형식_모두_읽는다():
     # Given
-    value = "2026-11-19 00:00:00"
+    values = ["2026-11-19", "2026-11-19 00:00:00", "2026-11-19T00:00:00"]
     # When
-    result = to_dt(value)
+    result = [to_dt(v) for v in values]
     # Then
-    assert result == datetime(2026, 11, 19)
+    assert result == [datetime(2026, 11, 19)] * 3
 
 
 # ---------- publish_status ----------
@@ -125,13 +126,32 @@ def test_publish_status_REMOVE는_CLOSED_REOPEN은_ON_CHANGE는_숨김_유지():
 
 # ---------- publish_counts ----------
 
-def test_publish_counts_변경은_CHANGE와_REOPEN을_더하고_칩_건수를_남긴다():
+def test_publish_counts_변경은_CHANGE와_REOPEN을_더한다():
     # Given
-    data = {"source": "FSS", "tags": [{"tag_type": "TARGET", "tag_value": "직장인"}]}
-    items = [("NEW", data), ("CHANGE", data), ("REOPEN", data), ("REMOVE", None)]
+    diff_types = ["NEW", "CHANGE", "REOPEN", "REMOVE"]
     # When
-    added, changed, removed, count_json = publish_counts(items)
+    result = publish_counts(diff_types)
     # Then
-    assert (added, changed, removed, json.loads(count_json)) == (
-        1, 2, 1, {"diff_type": {"NEW": 1, "CHANGE": 1, "REOPEN": 1, "REMOVE": 1},
-                  "source": {"FSS": 3}, "chips": {"TARGET:직장인": 3}})
+    assert result == (1, 2, 1)
+
+
+# ---------- missing_counts, publish_count_json ----------
+
+def test_missing_counts_그_종류_칩이_없는_상품_수():
+    # Given
+    products = [_current(), _current(tags=[]),
+                _current(tags=[{"tag_type": "REPAY", "tag_value": "만기일시"}])]
+    # When
+    missing = missing_counts(products)
+    # Then
+    assert (missing["TARGET"], missing["REPAY"], missing["REGION"]) == (2, 2, 3)
+
+
+def test_publish_count_json은_구분별_건수와_상품_전체_집계():
+    # Given
+    catalog = [_current(), _current(source="KINFA", loan_type="KINFA", tags=[])]
+    # When
+    loaded = json.loads(publish_count_json(["CHANGE", "CHANGE", "REMOVE"], catalog))
+    # Then
+    assert (loaded["diff_type"], loaded["source"], loaded["loan_type"], loaded["chips"], loaded["missing"]["TARGET"]) == (
+        {"CHANGE": 2, "REMOVE": 1}, {"FSS": 1, "KINFA": 1}, {"CREDIT": 1, "KINFA": 1}, {"TARGET:직장인": 1}, 1)

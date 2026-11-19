@@ -9,8 +9,10 @@
       → 이력 1건 (ROLLBACK, target_history_id) + 되돌린 상품마다 변경 기록 (되돌리기도 다시 되돌릴 수 있게)
 
     before_data JSON: 상품 칸 (PRODUCT_COLS + product_status) + "tags" [{tag_type, tag_value}] + "rates" [product_rate 줄]
+      날짜 글은 응답 규칙과 같은 'yyyy-MM-dd HH:mm' (읽을 때는 'yyyy-MM-dd', ISO 'T' 형식도 받음)
       Spring이 쓰는 상태만 바꾼 기록은 {"product_status": 값} (+ disclose_end)만 있음 → 그 칸만 되돌림
       ADD (신규 반영)는 before_data 없음 → 되돌리면 CLOSED
+    되돌릴 변경 기록이 0개(지금 마지막 이력을 고름)면 409 NOTHING_TO_ROLLBACK (빈 이력으로 버전만 올리지 않음)
     넣기 함수는 첫 적재 load.py와 같은 것 (ensure_tags, link_rows, insert_links)
 """
 import json
@@ -22,8 +24,8 @@ from sqlalchemy import CLOB, bindparam, text
 
 from app.imports import (KEEP_HOURS, LAST_VERSION, JobConflict, NotFound, NotPublishable, after_data, read_products,
                          to_json)
-from app.load import (DATE_COLS, INSERT_PRODUCT, PRODUCT_COLS, SELECT_PRODUCT_IDS, chip_counts, ensure_tags, id_map,
-                      insert_links, link_rows, product_key)
+from app.load import (DATE_COLS, INSERT_PRODUCT, PRODUCT_COLS, SELECT_PRODUCT_IDS, catalog_summary, ensure_tags,
+                      id_map, insert_links, link_rows, product_key)
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +43,10 @@ SELECT_JOB_ITEMS = text("SELECT item_id, diff_type, product_id, after_data FROM 
 PUBLISH_JOB = text("UPDATE import_job SET job_status = 'PUBLISHED' WHERE job_id = :job_id")
 
 INSERT_PUBLISH_HISTORY = text(
-    "INSERT INTO product_update_history (admin_id, action_type, source, added_count, changed_count, removed_count, "
-    "memo, count_json) VALUES (:admin_id, 'PUBLISH', :source, :added, :changed, :removed, :memo, :count_json)"
-).bindparams(bindparam("count_json", type_=CLOB))
+    "INSERT INTO product_update_history (admin_id, action_type, source, added_count, changed_count, removed_count, memo) "
+    "VALUES (:admin_id, 'PUBLISH', :source, :added, :changed, :removed, :memo)")
+UPDATE_COUNT_JSON = text("UPDATE product_update_history SET count_json = :count_json WHERE history_id = :history_id"
+                         ).bindparams(bindparam("count_json", type_=CLOB))
 INSERT_ROLLBACK_HISTORY = text(
     "INSERT INTO product_update_history (admin_id, action_type, target_history_id, changed_count, memo) "
     "VALUES (:admin_id, 'ROLLBACK', :target_history_id, :changed, :memo)")
@@ -104,13 +107,18 @@ def restore_plan(change_type, before_json):
     return {"product": product_values(before), "tags": before.get("tags"), "rates": before.get("rates")}
 
 
-def publish_counts(items_with_data):
-    """이력 건수: (added, changed, removed, count_json). 변경 = CHANGE + REOPEN"""
-    types = Counter(diff_type for diff_type, _ in items_with_data)
-    published = [data for _, data in items_with_data if data is not None]
-    count_json = to_json({"diff_type": dict(types), "source": dict(Counter(d["source"] for d in published)),
-                          "chips": chip_counts(published)})
-    return types["NEW"], types["CHANGE"] + types["REOPEN"], types["REMOVE"], count_json
+def publish_counts(diff_types):
+    """이력 건수 (added, changed, removed). 변경 = CHANGE + REOPEN"""
+    types = Counter(diff_types)
+    return types["NEW"], types["CHANGE"] + types["REOPEN"], types["REMOVE"]
+
+
+def publish_count_json(diff_types, catalog):
+    """
+        반영 이력 count_json: 이번 반영 구분별 건수 + 반영 뒤 상품 전체(판매 종료 제외) 집계
+        (출처별, 종류별, 칩별, 결측. 첫 적재 count_summary와 같은 모양이라 지난 반영과 비교 가능)
+    """
+    return to_json({"diff_type": dict(Counter(diff_types)), **catalog_summary(catalog)})
 
 
 # ---------- DB 쓰기 ----------
@@ -176,10 +184,11 @@ def publish(engine, job_id, item_ids, base_version, admin_id):
 
         items_with_data = [(item.diff_type, json.loads(item.after_data) if item.after_data else None)
                            for item in items]
-        added, changed, removed, count_json = publish_counts(items_with_data)
+        diff_types = [diff_type for diff_type, _ in items_with_data]
+        added, changed, removed = publish_counts(diff_types)
         conn.execute(INSERT_PUBLISH_HISTORY, {"admin_id": admin_id, "source": job.sources, "added": added,
                                               "changed": changed, "removed": removed,
-                                              "memo": f"불러오기 {job_id}번 반영", "count_json": count_json})
+                                              "memo": f"불러오기 {job_id}번 반영"})
         history_id = new_history_id(conn)
 
         current = {p["product_id"]: p for p in read_products(conn)}
@@ -210,6 +219,8 @@ def publish(engine, job_id, item_ids, base_version, admin_id):
                                                "change_type": "ADD", "before_data": None})
                 insert_links(conn, *link_rows(p, product_id, tag_ids))
 
+        catalog = [p for p in read_products(conn) if p[STATUS_COL] != "CLOSED"]     # 반영 뒤 상품 전체 집계
+        conn.execute(UPDATE_COUNT_JSON, {"history_id": history_id, "count_json": publish_count_json(diff_types, catalog)})
         conn.execute(PUBLISH_JOB, {"job_id": job_id})
         logger.info("반영 끝: 작업 %d, 이력 %d, 신규 %d 변경 %d 판매 중단 %d", job_id, history_id, added, changed, removed)
         return history_id
@@ -225,6 +236,8 @@ def rollback(engine, history_id, base_version, admin_id):
             raise NotFound("HISTORY_NOT_FOUND")
 
         snapshots = conn.execute(SELECT_SNAPSHOTS_AFTER, {"history_id": history_id}).all()
+        if not snapshots:               # 지금 마지막 이력을 고른 경우: 바뀌는 게 없는데 버전만 올라가지 않게 거절
+            raise JobConflict("NOTHING_TO_ROLLBACK")
         product_ids = list(dict.fromkeys(s.product_id for s in snapshots))
         conn.execute(INSERT_ROLLBACK_HISTORY, {"admin_id": admin_id, "target_history_id": history_id,
                                                "changed": len(product_ids), "memo": f"{history_id}번 시점으로 되돌리기"})

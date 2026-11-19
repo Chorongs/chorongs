@@ -276,14 +276,14 @@ def test_compare_after_data는_상품_칸과_칩_구간_금리():
 
 # ---------- item_row, split_list, source_results ----------
 
-def test_item_row_목록은_쉼표로_날짜는_YYYY_MM_DD():
+def test_item_row_목록은_쉼표로_날짜는_응답_규칙과_같은_yyyy_MM_dd_HH_mm():
     # Given
     item = compare([_existing()], [_product(rate_max=8.0, limit_amount=1)], ["FSS"])[0]
     # When
     row = item_row(7, item)
     # Then
     assert (row["job_id"], row["changed_fields"], row["check_reasons"],
-            json.loads(row["after_data"])["base_date"]) == (7, "rate_max,limit_amount", None, "2026-11-10")
+            json.loads(row["after_data"])["base_date"]) == (7, "rate_max,limit_amount", None, "2026-11-10 00:00")
 
 
 def test_split_list_NULL은_빈_목록():

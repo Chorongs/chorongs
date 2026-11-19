@@ -61,17 +61,35 @@ def make_engine():
         "user": os.environ["DB_USERNAME"], "password": os.environ["DB_PASSWORD"], "dsn": target})
 
 
+TAG_TYPES = ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "SECTOR", "COMPANY", "REGION", "CREDIT")   # 필터 8종
+
+
 def chip_counts(products):
-    """칩별 건수 {'TARGET:직장인': n, ...} (이력 count_json용, 반영 publish.py도 씀)"""
+    """칩별 건수 {'TARGET:직장인': n, ...}"""
     chips = Counter(f"{t['tag_type']}:{t['tag_value']}" for p in products for t in p["tags"])
     return dict(sorted(chips.items()))
 
 
+def missing_counts(products):
+    """결측 건수 {'REPAY': n, ...} = 그 종류 칩이 하나도 없는 상품 수 (정제 기준 3-5 괄호 숫자와 같은 정의)"""
+    return {tag_type: sum(all(t["tag_type"] != tag_type for t in p["tags"]) for p in products)
+            for tag_type in TAG_TYPES}
+
+
+def catalog_summary(products):
+    """
+        이력 count_json에 남기는 상품 전체 집계 (데이터 처리 기획서 3-7: 출처별, 칩별, 결측 개수를 지난 반영과 비교)
+        첫 적재(INIT)는 넣은 상품, 반영(PUBLISH)은 반영 뒤 판매 종료 아닌 상품 전체가 대상
+    """
+    return {"source": dict(Counter(p["source"] for p in products)),
+            "loan_type": dict(Counter(p["loan_type"] for p in products)),
+            "chips": chip_counts(products),
+            "missing": missing_counts(products)}
+
+
 def count_summary(products, skipped):
-    """반영 이력 count_json: 상품 종류별 건수, 칩별 건수, 넣지 않은 확인 필요 건수"""
-    return json.dumps({"loan_type": Counter(p["loan_type"] for p in products),
-                       "chips": chip_counts(products),
-                       "check_skipped": len(skipped)}, ensure_ascii=False)
+    """첫 적재 이력 count_json: 상품 전체 집계 + 넣지 않은 확인 필요 건수"""
+    return json.dumps({**catalog_summary(products), "check_skipped": len(skipped)}, ensure_ascii=False)
 
 
 def id_map(conn, sql):

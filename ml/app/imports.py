@@ -38,7 +38,10 @@ KEEP_HOURS = 24         # DONE 뒤 이 시간이 지나면 EXPIRED (반영 불�
 # ---------- 오류 (main.py가 상태 코드로 바꿈) ----------
 
 class JobConflict(Exception):
-    """409. detail: IMPORT_RUNNING 진행 중 / IMPORT_EXPIRED 24시간 지남 또는 DONE 아님 / VERSION_CONFLICT 기준 버전 다름"""
+    """
+        409. detail: IMPORT_RUNNING 진행 중 / IMPORT_EXPIRED 24시간 지남 또는 DONE 아님 / VERSION_CONFLICT 기준 버전 다름
+        / NOTHING_TO_ROLLBACK 되돌릴 변경 기록 없음
+    """
 
     def __init__(self, detail):
         super().__init__(detail)
@@ -199,12 +202,15 @@ def compare(existing, cleaned, sources):
     return items
 
 
+DATE_FORMAT = "%Y-%m-%d %H:%M"      # 저장 JSON의 날짜 글. Spring 응답 규칙 'yyyy-MM-dd HH:mm'과 같게 (be_common '날짜 응답')
+
+
 def json_default(value):
-    """JSON으로 못 바꾸는 값: 날짜는 'YYYY-MM-DD', Decimal은 숫자"""
+    """JSON으로 못 바꾸는 값: 날짜는 'yyyy-MM-dd HH:mm', Decimal은 숫자"""
     if isinstance(value, datetime):
-        return value.date().isoformat()
+        return value.strftime(DATE_FORMAT)
     if isinstance(value, date):
-        return value.isoformat()
+        return datetime(value.year, value.month, value.day).strftime(DATE_FORMAT)
     if isinstance(value, Decimal):
         return int(value) if value == value.to_integral_value() else float(value)
     return str(value)

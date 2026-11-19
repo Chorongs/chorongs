@@ -66,6 +66,27 @@ class FastApiClientTest {
 	}
 
 	@Test
+	void 되돌릴_변경이_없으면_CONFLICT와_그_문구() {
+		// Given
+		RestClientResponseException e = fastApiError(409, "{\"detail\":\"NOTHING_TO_ROLLBACK\"}");
+		// When
+		BusinessException result = FastApiClient.toBusinessException(e);
+		// Then
+		assertEquals(ErrorCode.CONFLICT + FastApiClient.MSG_NOTHING_TO_ROLLBACK,
+				result.getErrorCode() + result.getMessage());
+	}
+
+	@Test
+	void 없는_작업_번호_404는_NOT_FOUND() {
+		// Given
+		RestClientResponseException e = fastApiError(404, "{\"detail\":\"JOB_NOT_FOUND\"}");
+		// When
+		BusinessException result = FastApiClient.toBusinessException(e);
+		// Then
+		assertEquals(ErrorCode.NOT_FOUND, result.getErrorCode());
+	}
+
+	@Test
 	void 입력_검사_실패_422는_detail이_목록이라_SERVICE_UNAVAILABLE() {
 		// Given
 		RestClientResponseException e = fastApiError(422,

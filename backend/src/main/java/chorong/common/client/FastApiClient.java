@@ -28,8 +28,8 @@ import chorong.common.exception.ErrorCode;
  * FastAPI 서버 호출 (EXT-05): 주소 fastapi.base-url, 요청마다 Authorization: Bearer 토큰
  * 시간 제한: 연결 3초 (FastAPI가 꺼져 있으면 바로 503) / 응답 기다림: 신용 진단, 불러오기 시작, 진행 확인 3초 (B14), 반영, 되돌리기 5분
  * 실패(연결 안 됨, 시간 초과, 응답 형식 틀림)는 503 SERVICE_UNAVAILABLE
- * FastAPI 4xx 변환 (EXT-05): 409 VERSION_CONFLICT → VERSION_CONFLICT, IMPORT_RUNNING, IMPORT_EXPIRED → CONFLICT (문구는 ADMIN-04),
- *                           422 NOT_PUBLISHABLE → NOT_PUBLISHABLE, 그 밖의 실패 → SERVICE_UNAVAILABLE
+ * FastAPI 4xx 변환 (EXT-05): 409 VERSION_CONFLICT → VERSION_CONFLICT, IMPORT_RUNNING, IMPORT_EXPIRED, NOTHING_TO_ROLLBACK → CONFLICT (문구는 ADMIN-04, 05),
+ *                           422 NOT_PUBLISHABLE → NOT_PUBLISHABLE, 404 (없는 작업, 이력 번호) → NOT_FOUND, 그 밖의 실패 → SERVICE_UNAVAILABLE
  * 불러오기 시작, 반영, 되돌리기 요청 본문은 DTO 없이 Map.of (EXT-05 비고)
  */
 @Component
@@ -46,6 +46,7 @@ public class FastApiClient {
 	// 409 CONFLICT 문구 (ADMIN-04)
 	static final String MSG_IMPORT_RUNNING = "이미 불러오는 중이에요. 끝난 뒤 확인해 주세요";
 	static final String MSG_IMPORT_EXPIRED = "불러온 지 24시간이 지났어요. 다시 불러와 주세요";
+	static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
 
 	private final RestClient restClient;	// 신용 진단 점수, 불러오기 시작, 진행 확인 (응답 3초)
 	private final RestClient writeClient;	// 반영, 되돌리기 (응답 5분)
@@ -138,9 +139,15 @@ public class FastApiClient {
 			if ("IMPORT_EXPIRED".equals(detail)) {
 				return new BusinessException(ErrorCode.CONFLICT, MSG_IMPORT_EXPIRED);
 			}
+			if ("NOTHING_TO_ROLLBACK".equals(detail)) {
+				return new BusinessException(ErrorCode.CONFLICT, MSG_NOTHING_TO_ROLLBACK);
+			}
 		}
 		if (status == 422 && "NOT_PUBLISHABLE".equals(detail)) {
 			return new BusinessException(ErrorCode.NOT_PUBLISHABLE);
+		}
+		if (status == 404) {	// 없는 작업 번호, 없는 이력 번호 (JOB_NOT_FOUND, HISTORY_NOT_FOUND)
+			return new BusinessException(ErrorCode.NOT_FOUND);
 		}
 		return new BusinessException(ErrorCode.SERVICE_UNAVAILABLE);
 	}
