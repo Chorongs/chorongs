@@ -189,3 +189,46 @@ export const PRIORITY_OPTIONS = [
   { value: 'NO_PREPAY_FEE', label: '중도상환수수료 없음' },
 ]
 export const PRIORITY_MAX = 3
+
+// 관리자 화면 글자표 (CHORONG-55, AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
+export const ADMIN_ROLE_LABEL = {
+  APPROVER: '승인권자',
+  MANAGER: '관리자',
+}
+
+export const ADMIN_STATUS_LABEL = {
+  PENDING: '승인 대기',
+  ACTIVE: '정상',
+}
+
+// 불러오기 출처 (API-32 sources)
+export const IMPORT_SOURCE_OPTIONS = [
+  { value: 'KINFA', label: '서민금융진흥원' },
+  { value: 'FSS', label: '금융감독원' },
+]
+
+// 바뀐 상품 구분 (API-33). TODO(CHORONG-57 BE): 코드 값은 ImportStatusResponseDTO를 보고 맞춘다 (화면 글은 명세서 AD-05)
+export const IMPORT_CHANGE_TYPE_LABEL = {
+  NEW: '신규',
+  CHANGED: '변경',
+  CLOSED: '판매 중단',
+  REOPENED: '다시 게시',
+  REVIEW: '확인 필요',
+}
+
+// 반영 이력 종류 (API-35 actionType). TODO(CHORONG-57 BE): 코드 값은 HistoryResponseDTO를 보고 맞춘다 (화면 글은 명세서 AD-06)
+export const HISTORY_ACTION_TYPE_LABEL = {
+  INIT: '초기 적재',
+  PUBLISH: '반영',
+  AUTO_CLOSE: '자동 내림',
+  HIDE: '숨기기',
+  UNHIDE: '다시 보이기',
+  ROLLBACK: '되돌리기',
+}
+
+// 자동 내림 상태 (API-48 filter와 같은 코드)
+export const AUTO_CLOSED_STATUS_LABEL = {
+  UNCHECKED: '확인 전',
+  KEEP: '확인함',
+  REOPEN: '다시 게시함',
+}

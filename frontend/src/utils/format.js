@@ -85,3 +85,18 @@ export function getTodayText(today = new Date()) {
   const day = String(today.getDate()).padStart(2, '0')
   return `${today.getFullYear()}-${month}-${day}`
 }
+
+// 시각: '2026-11-19T14:32:10' → '14:32' (관리자 끝나는 시각 '14:32까지', AD-03)
+export function formatTime(value) {
+  const matched = typeof value === 'string' ? value.match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/) : null
+  if (!matched) return EMPTY
+  return `${matched[1]}:${matched[2]}`
+}
+
+// 날짜와 시각: '2026-11-19T14:32:10' → '2026.11.19 14:32' (관리자 이력, 마지막 로그인 등). 시각이 없으면 날짜만
+export function formatDateTime(value) {
+  const date = formatDate(value)
+  const time = formatTime(value)
+  if (date === EMPTY) return EMPTY
+  return time === EMPTY ? date : `${date} ${time}`
+}

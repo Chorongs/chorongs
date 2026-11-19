@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatDate,
+  formatDateTime,
   formatMoney,
   formatNumber,
   formatPrepayFee,
@@ -8,6 +9,7 @@ import {
   formatRate,
   formatRateRange,
   formatTagValues,
+  formatTime,
   getTodayText,
 } from './format'
 
@@ -262,5 +264,45 @@ describe('getTodayText', () => {
     const result = getTodayText(today)
     // Then
     expect(result).toBe('2026-01-05')
+  })
+})
+
+describe('formatTime', () => {
+  it('날짜와 시각 글에서 시:분만 꺼낸다', () => {
+    // Given
+    const value = '2026-11-19T14:32:10'
+    // When
+    const result = formatTime(value)
+    // Then
+    expect(result).toBe('14:32')
+  })
+
+  it('형식이 다르면 -를 돌려준다', () => {
+    // Given
+    const value = '14:32'
+    // When
+    const result = formatTime(value)
+    // Then
+    expect(result).toBe('-')
+  })
+})
+
+describe('formatDateTime', () => {
+  it('날짜와 시각을 점 날짜와 시:분으로 보여 준다', () => {
+    // Given
+    const value = '2026-11-19T14:32:10'
+    // When
+    const result = formatDateTime(value)
+    // Then
+    expect(result).toBe('2026.11.19 14:32')
+  })
+
+  it('시각이 없으면 날짜만 보여 준다', () => {
+    // Given
+    const value = '2026-11-19'
+    // When
+    const result = formatDateTime(value)
+    // Then
+    expect(result).toBe('2026.11.19')
   })
 })

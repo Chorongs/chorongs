@@ -8,6 +8,7 @@ import {
   isLengthInRange,
   isNumberInRange,
   isSafeReturnPath,
+  isValidAdminName,
   isValidBirthDate,
   isValidIncome,
   isValidMonths,
@@ -557,5 +558,25 @@ describe('getCreditError', () => {
     const result = getCreditError(input)
     // Then
     expect(result.field).toBe('priorities')
+  })
+})
+
+describe('isValidAdminName', () => {
+  it('앞뒤 공백을 뺀 2~20자는 통과한다', () => {
+    // Given
+    const name = ' 통비 '
+    // When
+    const result = isValidAdminName(name)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it('21자는 통과하지 않는다', () => {
+    // Given
+    const name = '가'.repeat(21)
+    // When
+    const result = isValidAdminName(name)
+    // Then
+    expect(result).toBe(false)
   })
 })
