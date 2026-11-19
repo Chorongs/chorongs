@@ -4,8 +4,9 @@
     - 시작 (main.py POST /imports): import_job 1행 (RUNNING) → 작업 번호 바로 응답
       base_version(기준 버전)은 시작 때 일단 넣고, 비교하려고 지금 상품을 읽는 시점의 마지막 이력 번호로 DONE 때 다시 씀 (ADMIN-04 '비교할 때의')
       동시에 1개 (B9): import_job 표를 잠그고 RUNNING이 있으면 IMPORT_RUNNING. 시작한 지 30분 넘은 RUNNING은 FAILED로 바꾸고 진행
-    - 응답 뒤 (BackgroundTasks → run_import): 수집 → 정제 (첫 적재와 같은 clean_products) → 지금 상품 읽기 → 비교
+    - 응답 뒤 (BackgroundTasks → run_import): 수집 → 지금 상품 읽기 → 정제 (첫 적재와 같은 clean_products) → 비교
       → 이전 작업의 import_item 삭제 → 바뀐 상품을 import_item에 저장 → DONE (출처 모두 실패, 정제 중 오류면 FAILED + 사유)
+      (지금 상품을 정제보다 먼저 읽는 이유: 금감원 수집이 빠졌을 때 DB 은행 이름을 정제에 넘기기 위해)
       이 단계에서 loan_product는 바꾸지 않음. 반영은 publish.py
     - 비교 구분: NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 (판매 종료 상품이 다시 옴) / CHECK 확인 필요 (반영 불가)
     - 비교하는 칸: 상품 내용 칸 (COMPARE_COLS) + 칩 (tags) + 구간 금리 (rates) + 금감원 공시월 (dcls_month)

@@ -295,7 +295,7 @@ def publish(engine, job_id, item_ids, base_version, admin_id):
 
 
 def rollback(engine, history_id, base_version, admin_id):
-    """history_id 시점으로 되돌리기 → 새 버전(이력 번호). 오류: NotFound, JobConflict(VERSION_CONFLICT)"""
+    """history_id 시점으로 되돌리기 → 새 버전(이력 번호). 오류: NotFound, JobConflict(VERSION_CONFLICT, NOTHING_TO_ROLLBACK)"""
     with engine.begin() as conn:    # 한 트랜잭션 (B16)
         conn.execute(LOCK_HISTORY)
         if conn.execute(LAST_VERSION).scalar() != base_version:
