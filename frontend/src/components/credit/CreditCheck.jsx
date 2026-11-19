@@ -20,23 +20,24 @@ const QUESTION_COUNT = CREDIT_QUESTIONS.length
 const FINANCE_QUESTION_NO = 5
 const LOAN_COUNT_QUESTION_NO = 4
 const NO_LOAN_VALUE = 1 // 문항 4 보기 '0건'
-const REQUIRED_NOS = CREDIT_QUESTIONS.filter((question) => question.no !== FINANCE_QUESTION_NO).map((question) => question.no)
+const NO_FINANCE_VALUE = 0 // 문항 5 보기 '없음' (화면에서만 쓰고, 서버에는 빈 목록으로 보냄)
+const REQUIRED_NOS = CREDIT_QUESTIONS.map((question) => question.no)
 
-// 답이 서로 안 맞는 경우 (화면에서만 확인, 막지 않고 경고)
-const CONFLICT_CHECKS = [
-  {
-    text: '대출이 0건인데 대출 잔액을 골랐어요',
-    isConflict: (a) => a[4] === NO_LOAN_VALUE && a[6] !== undefined && a[6] !== 1 && a[6] !== UNKNOWN_VALUE,
+// 앞 문항 답과 안 맞아서 뒤 문항에서 뺄 보기 값 (문항 번호 → 앞 답으로 뺄 값 목록). 모순 답은 고를 수 없다.
+const HIDDEN_RULES = {
+  2: (a) => (a[1] === 1 ? [4] : []), // 1년 내 연체 없음 → 3개월 내 '30일 이상' 뺌
+  5: (a) => {
+    if (a[LOAN_COUNT_QUESTION_NO] === NO_LOAN_VALUE) return [1, 2, 3, 4] // 대출 0건 → '없음'만
+    if (a[LOAN_COUNT_QUESTION_NO] > NO_LOAN_VALUE) return [NO_FINANCE_VALUE] // 대출 1건 이상 → '없음' 뺌
+    return []
   },
-  {
-    text: '1년 안에 30일 이상 연체가 없는데 3개월 안에 30일 이상 연체를 골랐어요',
-    isConflict: (a) => a[1] === 1 && a[2] === 4,
+  6: (a) => {
+    if (a[LOAN_COUNT_QUESTION_NO] === NO_LOAN_VALUE) return [UNKNOWN_VALUE, 2, 3, 4, 5, 6] // 대출 0건 → '없음'만
+    if (a[LOAN_COUNT_QUESTION_NO] > NO_LOAN_VALUE) return [1] // 대출 1건 이상 → '없음' 뺌
+    return []
   },
-  {
-    text: '카드가 없는데 현금서비스를 썼다고 골랐어요',
-    isConflict: (a) => a[7] === 1 && (a[8] === 2 || a[8] === 3),
-  },
-]
+  8: (a) => (a[7] === 1 ? [UNKNOWN_VALUE, 2, 3] : []), // 카드 없음 → 현금서비스 '없음'만
+}
 
 const Wrap = styled.div`
   display: flex;
@@ -64,23 +65,6 @@ const QuestionTitle = styled.h3`
   font-weight: 800;
 `
 
-const Hint = styled.p`
-  color: var(--cocoa);
-  font-size: var(--fs-sm);
-`
-
-const Warning = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px 18px;
-  border-radius: var(--r-sm);
-  background: var(--warn-soft);
-  color: var(--warn);
-  font-size: var(--fs-md);
-  font-weight: 600;
-`
-
 const Footer = styled.div`
   display: flex;
   flex-direction: column;
@@ -88,10 +72,30 @@ const Footer = styled.div`
   gap: 12px;
 `
 
+// 앞 답과 안 맞게 된 뒤 문항 답을 비움. 비운 문항 번호 목록도 같이 돌려줌 (문항 5는 값 목록이라 하나라도 안 맞으면 비움)
+// 빈 목록(문항 5를 다 해제한 경우, 예전 저장 답)은 답 안 한 것으로 보고 알림 없이 지움
+function removeConflicts(answers) {
+  const next = { ...answers }
+  const cleared = []
+  Object.entries(next).forEach(([no, value]) => {
+    if (Array.isArray(value) && value.length === 0) delete next[no]
+  })
+  Object.entries(HIDDEN_RULES).forEach(([no, getHidden]) => {
+    const hidden = getHidden(next)
+    const values = Array.isArray(next[no]) ? next[no] : [next[no]]
+    if (values.some((value) => hidden.includes(value))) {
+      delete next[no]
+      cleared.push(Number(no))
+    }
+  })
+  return { next, cleared: cleared.sort((a, b) => a - b) }
+}
+
+// 저장된 답을 불러올 때도 같은 정리를 거침
 function loadAnswers() {
   try {
     const parsed = JSON.parse(sessionStorage.getItem(STORAGE_KEY))
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? removeConflicts(parsed).next : {}
   } catch {
     return {}
   }
@@ -101,11 +105,11 @@ function isAllRequiredAnswered(answers) {
   return REQUIRED_NOS.every((no) => answers[no] !== undefined)
 }
 
-// 화면 답 → API-09 보내는 값 (문항 5는 보기 번호 목록, 대출 없으면 빈 목록 / 나머지는 [보기 번호])
+// 화면 답 → API-09 보내는 값 (문항 5는 보기 번호 목록, '없음'은 빈 목록 / 나머지는 [보기 번호])
 function toRequestAnswers(answers) {
   return CREDIT_QUESTIONS.map(({ no }) => ({
     questionNo: no,
-    choices: no === FINANCE_QUESTION_NO ? (answers[no] ?? []) : [answers[no]],
+    choices: no === FINANCE_QUESTION_NO ? (answers[no] ?? []).filter((value) => value !== NO_FINANCE_VALUE) : [answers[no]],
   }))
 }
 
@@ -124,7 +128,6 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
   const [result, setResult] = useState(null)
   const [isLoading, setIsLoading] = useState(() => isAllRequiredAnswered(initialAnswers))
   const [errorText, setErrorText] = useState('')
-  const [warnings, setWarnings] = useState([])
   const [missingNos, setMissingNos] = useState([])
   const questionRefs = useRef({})
 
@@ -170,14 +173,11 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     }
   }
 
+  // 고른 답과 안 맞게 된 뒤 문항 답은 비우고 알림
   const handleSelect = (no, value) => {
-    setAnswers((prev) => {
-      const next = { ...prev, [no]: value }
-      // 대출이 0건이면 이용 금융권은 비움
-      if (no === LOAN_COUNT_QUESTION_NO && value === NO_LOAN_VALUE) next[FINANCE_QUESTION_NO] = []
-      return next
-    })
-    setWarnings([])
+    const { next, cleared } = removeConflicts({ ...answers, [no]: value })
+    setAnswers(next)
+    if (cleared.length > 0) showToast(`앞 답이 바뀌어 ${cleared.join(', ')}번 답을 비웠어요`)
     setMissingNos((prev) => prev.filter((missingNo) => missingNo !== no))
   }
 
@@ -191,14 +191,6 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
       return
     }
 
-    // 답이 서로 안 맞으면 막지 않고 경고 → 한 번 더 누르면 그대로 진행
-    const conflicts = CONFLICT_CHECKS.filter((check) => check.isConflict(answers)).map((check) => check.text)
-    if (conflicts.length > 0 && warnings.length === 0) {
-      setWarnings(conflicts)
-      return
-    }
-
-    setWarnings([])
     requestCheck()
   }
 
@@ -207,14 +199,10 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     setAnswers({})
     setResult(null)
     setErrorText('')
-    setWarnings([])
     setMissingNos([])
   }
 
-  const answeredCount = CREDIT_QUESTIONS.filter(({ no }) => {
-    if (no === FINANCE_QUESTION_NO) return answers[4] === NO_LOAN_VALUE || answers[no]?.length > 0
-    return answers[no] !== undefined
-  }).length
+  const answeredCount = REQUIRED_NOS.filter((no) => answers[no] !== undefined).length
 
   return (
     <Wrap>
@@ -228,9 +216,12 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
           </Progress>
 
           {CREDIT_QUESTIONS.map((question) => {
-            const choices = question.options.map((label, index) => ({ value: index + 1, label }))
-            if (question.hasUnknown) choices.push({ value: UNKNOWN_VALUE, label: '잘 모르겠어요' })
-            const isNoLoan = question.no === FINANCE_QUESTION_NO && answers[LOAN_COUNT_QUESTION_NO] === NO_LOAN_VALUE
+            const allChoices = question.options.map((label, index) => ({ value: index + 1, label }))
+            if (question.hasUnknown) allChoices.push({ value: UNKNOWN_VALUE, label: '잘 모르겠어요' })
+            if (question.no === FINANCE_QUESTION_NO) allChoices.push({ value: NO_FINANCE_VALUE, label: '없음' })
+            // 앞 문항 답과 안 맞는 보기는 뺌
+            const hiddenValues = HIDDEN_RULES[question.no]?.(answers) ?? []
+            const choices = allChoices.filter((choice) => !hiddenValues.includes(choice.value))
 
             return (
               <QuestionCard
@@ -242,32 +233,19 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
                 <QuestionTitle>
                   {question.no}. {question.title}
                 </QuestionTitle>
-                {question.hint && <Hint>{question.hint}</Hint>}
-                {isNoLoan ? (
-                  <Hint>대출이 0건이라 고르지 않아도 돼요.</Hint>
-                ) : (
-                  <ChipGroup
-                    label={question.title}
-                    options={choices}
-                    value={answers[question.no]}
-                    isMultiple={question.isMultiple}
-                    onChange={(value) => handleSelect(question.no, value)}
-                  />
-                )}
+                <ChipGroup
+                  label={question.title}
+                  options={choices}
+                  value={answers[question.no]}
+                  isMultiple={question.isMultiple}
+                  onChange={(value) => handleSelect(question.no, value)}
+                />
                 {missingNos.includes(question.no) && <InlineError>답을 골라 주세요.</InlineError>}
               </QuestionCard>
             )
           })}
 
           <Footer>
-            {warnings.length > 0 && (
-              <Warning role="status">
-                {warnings.map((text) => (
-                  <span key={text}>확인해 보세요: {text}.</span>
-                ))}
-                <span>그대로 진행하려면 [{submitLabel}]을 한 번 더 눌러 주세요.</span>
-              </Warning>
-            )}
             {errorText && (
               <>
                 <InlineError>{errorText}</InlineError>
