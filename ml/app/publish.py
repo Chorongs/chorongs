@@ -61,6 +61,13 @@ DELETE_PRODUCT_TAGS = text("DELETE FROM product_tag WHERE product_id = :product_
 DELETE_RATES = text("DELETE FROM product_rate WHERE product_id = :product_id")
 DELETE_RATE_MONTH = text("DELETE FROM product_rate_month WHERE product_id = :product_id AND dcls_month = :dcls_month")
 
+# 상품 칸 전부 + 상태를 한 번에 (반영 CHANGE·REOPEN, 되돌리기 전체 기록). 칸 묶음이 다른 UPDATE는 update_sql로 만듦
+UPDATE_PRODUCT_ALL = text(
+    f"UPDATE loan_product SET {', '.join(f'{c} = :{c}' for c in PRODUCT_COLS)}, {STATUS_COL} = :{STATUS_COL} "
+    "WHERE product_id = :product_id"
+).bindparams(bindparam("raw_json", type_=CLOB))
+UPDATE_STATUS = text(f"UPDATE loan_product SET {STATUS_COL} = :{STATUS_COL} WHERE product_id = :product_id")
+
 
 # ---------- DB 없이 쓰는 함수 ----------
 
@@ -70,7 +77,7 @@ def before_data(product):
 
 
 def to_dt(value):
-    """JSON의 날짜 글 ('YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS') → datetime (DATE 칸에 넣을 값)"""
+    """JSON의 날짜 글 ('yyyy-MM-dd HH:mm', 'yyyy-MM-dd', ISO 'T' 형식) → datetime (DATE 칸에 넣을 값)"""
     if value is None or isinstance(value, datetime):
         return value
     if isinstance(value, date):
@@ -107,6 +114,24 @@ def restore_plan(change_type, before_json):
     return {"product": product_values(before), "tags": before.get("tags"), "rates": before.get("rates")}
 
 
+def merge_plans(snapshots):
+    """
+        되돌릴 변경 기록들(최신 → 오래된 순)을 상품마다 하나로 합침 → {product_id: {"product", "tags", "rates"}}
+        최신부터 거꾸로 적용하면 마지막에 적용되는 오래된 기록이 남으므로, 같은 칸은 오래된 기록 값이 이김
+        snapshots: (product_id, change_type, before_data JSON) 튜플 목록 (history_id DESC, snapshot_id DESC)
+    """
+    merged = {}
+    for product_id, change_type, before_json in snapshots:
+        plan = restore_plan(change_type, before_json)
+        final = merged.setdefault(product_id, {"product": {}, "tags": None, "rates": None})
+        final["product"].update(plan["product"])
+        if plan["tags"] is not None:
+            final["tags"] = plan["tags"]
+        if plan["rates"] is not None:
+            final["rates"] = plan["rates"]
+    return merged
+
+
 def publish_counts(diff_types):
     """이력 건수 (added, changed, removed). 변경 = CHANGE + REOPEN"""
     types = Counter(diff_types)
@@ -123,37 +148,72 @@ def publish_count_json(diff_types, catalog):
 
 # ---------- DB 쓰기 ----------
 
-def update_product(conn, product_id, values):
-    """loan_product 1행의 칸 바꾸기 (칸 이름은 RESTORE_COLS만, 값은 바인딩)"""
-    cols = [c for c in values if c in RESTORE_COLS]
-    if not cols:
-        return
+def update_sql(cols):
+    """칸 묶음(cols)만 바꾸는 UPDATE문. 칸 이름은 RESTORE_COLS에서만 (B1), 값은 바인딩"""
+    cols = sorted(set(cols) & RESTORE_COLS)
     sql = text(f"UPDATE loan_product SET {', '.join(f'{c} = :{c}' for c in cols)} WHERE product_id = :product_id")
-    if "raw_json" in cols:
-        sql = sql.bindparams(bindparam("raw_json", type_=CLOB))
-    conn.execute(sql, {**{c: values[c] for c in cols}, "product_id": product_id})
+    return sql.bindparams(bindparam("raw_json", type_=CLOB)) if "raw_json" in cols else sql
 
 
-def replace_links(conn, product_id, product, tag_ids):
-    """반영: 상품 1개의 칩, 구간 금리를 지우고 다시 넣기 + 그 공시월의 월별 금리 교체 (같은 달이면 덮어씀)"""
-    product_tags, rates, rate_months = link_rows(product, product_id, tag_ids)
-    conn.execute(DELETE_PRODUCT_TAGS, {"product_id": product_id})
-    conn.execute(DELETE_RATES, {"product_id": product_id})
-    if rate_months:
-        conn.execute(DELETE_RATE_MONTH, {"product_id": product_id, "dcls_month": rate_months[0]["dcls_month"]})
+def update_products(conn, rows):
+    """
+        loan_product 여러 행 바꾸기. rows = [{칸: 값, ..., "product_id": 번호}]
+        칸 묶음이 같은 행끼리 모아 UPDATE 1번씩 (전부 있는 묶음은 UPDATE_PRODUCT_ALL, 상태만은 UPDATE_STATUS)
+    """
+    groups = {}
+    for row in rows:
+        cols = frozenset(c for c in row if c in RESTORE_COLS)
+        if cols:
+            groups.setdefault(cols, []).append({**{c: row[c] for c in cols}, "product_id": row["product_id"]})
+    for cols, params in groups.items():
+        if cols == RESTORE_COLS:
+            sql = UPDATE_PRODUCT_ALL
+        elif cols == {STATUS_COL}:
+            sql = UPDATE_STATUS
+        else:
+            sql = update_sql(cols)
+        conn.execute(sql, params)
+
+
+def replace_links(conn, products_by_id, tag_ids):
+    """
+        반영: 여러 상품의 칩, 구간 금리를 지우고 다시 넣기 + 그 공시월의 월별 금리 교체 (같은 달이면 덮어씀)
+        products_by_id = {product_id: after_data}. 상품 수와 상관없이 DELETE 3번, INSERT 3번
+    """
+    if not products_by_id:
+        return
+    product_tags, rates, rate_months, months = [], [], [], []
+    for product_id, product in products_by_id.items():
+        pt, r, rm = link_rows(product, product_id, tag_ids)
+        product_tags += pt
+        rates += r
+        rate_months += rm
+        if rm:
+            months.append({"product_id": product_id, "dcls_month": rm[0]["dcls_month"]})
+
+    ids = [{"product_id": product_id} for product_id in products_by_id]
+    conn.execute(DELETE_PRODUCT_TAGS, ids)
+    conn.execute(DELETE_RATES, ids)
+    if months:
+        conn.execute(DELETE_RATE_MONTH, months)
     insert_links(conn, product_tags, rates, rate_months)
 
 
-def restore_links(conn, product_id, plan):
-    """되돌리기: before_data에 칩이 있으면 칩만, 구간 금리가 있으면 금리만 그 값으로 (월별 금리는 쌓기만 하므로 안 건드림)"""
-    if plan["tags"] is not None:
-        tag_ids, _ = ensure_tags(conn, [{"tags": plan["tags"]}])    # 지워진 칩 값은 다시 만듦
-        conn.execute(DELETE_PRODUCT_TAGS, {"product_id": product_id})
-        insert_links(conn, [{"tag_id": tag_ids[(t["tag_type"], t["tag_value"])], "product_id": product_id}
-                            for t in plan["tags"]], [], [])
-    if plan["rates"] is not None:
-        conn.execute(DELETE_RATES, {"product_id": product_id})
-        insert_links(conn, [], [{**r, "product_id": product_id} for r in plan["rates"]], [])
+def restore_links(conn, merged):
+    """
+        되돌리기: 합친 기록(merge_plans)에 칩이 있는 상품은 칩을, 구간 금리가 있는 상품은 금리를 그 값으로
+        (월별 금리는 쌓기만 하므로 안 건드림). 지워진 칩 값은 다시 만듦. 태그 번호 조회는 1번
+    """
+    with_tags = {pid: plan["tags"] for pid, plan in merged.items() if plan["tags"] is not None}
+    with_rates = {pid: plan["rates"] for pid, plan in merged.items() if plan["rates"] is not None}
+    if with_tags:
+        tag_ids, _ = ensure_tags(conn, [{"tags": tags} for tags in with_tags.values()])
+        conn.execute(DELETE_PRODUCT_TAGS, [{"product_id": pid} for pid in with_tags])
+        insert_links(conn, [{"tag_id": tag_ids[(t["tag_type"], t["tag_value"])], "product_id": pid}
+                            for pid, tags in with_tags.items() for t in tags], [], [])
+    if with_rates:
+        conn.execute(DELETE_RATES, [{"product_id": pid} for pid in with_rates])
+        insert_links(conn, [], [{**r, "product_id": pid} for pid, rates in with_rates.items() for r in rates], [])
 
 
 def new_history_id(conn):
@@ -194,30 +254,38 @@ def publish(engine, job_id, item_ids, base_version, admin_id):
         current = {p["product_id"]: p for p in read_products(conn)}
         tag_ids, _ = ensure_tags(conn, [data for _, data in items_with_data if data is not None])
 
-        new_products = []
+        # 상품별로 돌지 않고 모아서 한 번에 (상품 1,600개도 SQL 수십 번): 변경 기록, 상품 UPDATE, 칩·금리 교체
+        snapshots, updates, changed_products, new_products = [], [], {}, []
         for item, (diff_type, data) in zip(items, items_with_data):
             if diff_type == "NEW":
                 new_products.append(data)
                 continue
             before = current[item.product_id]
-            conn.execute(INSERT_SNAPSHOT, {"history_id": history_id, "product_id": item.product_id,
-                                           "change_type": SNAPSHOT_TYPE[diff_type],
-                                           "before_data": to_json(before_data(before))})
-            values = {STATUS_COL: publish_status(diff_type, before[STATUS_COL])}
+            snapshots.append({"history_id": history_id, "product_id": item.product_id,
+                              "change_type": SNAPSHOT_TYPE[diff_type], "before_data": to_json(before_data(before))})
+            values = {STATUS_COL: publish_status(diff_type, before[STATUS_COL]), "product_id": item.product_id}
             if data is not None:    # CHANGE, REOPEN: 새 값 전부 (base_date, raw_json 포함)
                 values.update(product_values(data))
-            update_product(conn, item.product_id, values)
-            if data is not None:
-                replace_links(conn, item.product_id, data, tag_ids)
+                changed_products[item.product_id] = data
+            updates.append(values)
+        if snapshots:
+            conn.execute(INSERT_SNAPSHOT, snapshots)
+        update_products(conn, updates)
+        replace_links(conn, changed_products, tag_ids)
 
         if new_products:
             conn.execute(INSERT_PRODUCT, [product_values({c: p[c] for c in PRODUCT_COLS}) for p in new_products])
             product_ids = id_map(conn, SELECT_PRODUCT_IDS)
-            for p in new_products:
-                product_id = product_ids[product_key(p)]
-                conn.execute(INSERT_SNAPSHOT, {"history_id": history_id, "product_id": product_id,
-                                               "change_type": "ADD", "before_data": None})
-                insert_links(conn, *link_rows(p, product_id, tag_ids))
+            added_ids = {product_ids[product_key(p)]: p for p in new_products}
+            conn.execute(INSERT_SNAPSHOT, [{"history_id": history_id, "product_id": product_id,
+                                            "change_type": "ADD", "before_data": None} for product_id in added_ids])
+            product_tags, rates, rate_months = [], [], []
+            for product_id, p in added_ids.items():
+                pt, r, rm = link_rows(p, product_id, tag_ids)
+                product_tags += pt
+                rates += r
+                rate_months += rm
+            insert_links(conn, product_tags, rates, rate_months)
 
         catalog = [p for p in read_products(conn) if p[STATUS_COL] != "CLOSED"]     # 반영 뒤 상품 전체 집계
         conn.execute(UPDATE_COUNT_JSON, {"history_id": history_id, "count_json": publish_count_json(diff_types, catalog)})
@@ -244,14 +312,14 @@ def rollback(engine, history_id, base_version, admin_id):
         new_id = new_history_id(conn)
 
         current = {p["product_id"]: p for p in read_products(conn)}
-        for product_id in product_ids:     # 되돌리기 전 값을 1번씩 남김 (이 되돌리기도 되돌릴 수 있게)
-            conn.execute(INSERT_SNAPSHOT, {"history_id": new_id, "product_id": product_id, "change_type": "CHANGE",
-                                           "before_data": to_json(before_data(current[product_id]))})
+        conn.execute(INSERT_SNAPSHOT, [{"history_id": new_id, "product_id": product_id, "change_type": "CHANGE",
+                                        "before_data": to_json(before_data(current[product_id]))}
+                                       for product_id in product_ids])    # 되돌리기 전 값을 1번씩 (이 되돌리기도 되돌릴 수 있게)
 
-        for snap in snapshots:             # 최신부터 거꾸로 → 마지막에 적용되는 값이 대상 시점의 값
-            plan = restore_plan(snap.change_type, snap.before_data)
-            update_product(conn, snap.product_id, plan["product"])
-            restore_links(conn, snap.product_id, plan)
+        # 최신부터 거꾸로 적용한 결과를 상품마다 하나로 합친 뒤 모아서 UPDATE (오래된 기록 값이 남음)
+        merged = merge_plans([(s.product_id, s.change_type, s.before_data) for s in snapshots])
+        update_products(conn, [{**plan["product"], "product_id": pid} for pid, plan in merged.items()])
+        restore_links(conn, merged)
 
         logger.info("되돌리기 끝: 대상 이력 %d, 새 이력 %d, 상품 %d개", history_id, new_id, len(product_ids))
         return new_id

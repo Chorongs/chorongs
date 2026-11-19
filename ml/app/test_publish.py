@@ -5,8 +5,8 @@ from decimal import Decimal
 
 from app.imports import to_json
 from app.load import PRODUCT_COLS, missing_counts
-from app.publish import (before_data, product_values, publish_count_json, publish_counts, publish_status, restore_plan,
-                         to_dt)
+from app.publish import (before_data, merge_plans, product_values, publish_count_json, publish_counts, publish_status,
+                         restore_plan, to_dt)
 
 
 def _current(**changes):
@@ -91,6 +91,29 @@ def test_restore_plan_모르는_칸은_되돌리지_않는다():
     plan = restore_plan("CHANGE", before)
     # Then
     assert plan["product"] == {"product_status": "ON"}
+
+
+# ---------- merge_plans ----------
+
+def test_merge_plans_같은_칸은_오래된_기록_값이_남는다():
+    # Given: 최신(HIDE, 상태 HIDDEN→ON 전 값 ON) → 오래된(CHANGE, 전체 행 상태 CLOSED) 순
+    newer = json.dumps({"product_status": "ON"})
+    older = to_json(before_data(_current(product_status="CLOSED", rate_min=Decimal("2.0"))))
+    # When
+    merged = merge_plans([(1, "HIDE", newer), (1, "CHANGE", older)])
+    # Then
+    assert (merged[1]["product"]["product_status"], merged[1]["product"]["rate_min"], merged[1]["tags"]) == (
+        "CLOSED", 2.0, [{"tag_type": "TARGET", "tag_value": "직장인"}])
+
+
+def test_merge_plans_상태만_있는_기록은_칩_금리를_건드리지_않는다():
+    # Given
+    snapshots = [(1, "HIDE", json.dumps({"product_status": "ON"})), (2, "ADD", None)]
+    # When
+    merged = merge_plans(snapshots)
+    # Then
+    assert merged == {1: {"product": {"product_status": "ON"}, "tags": None, "rates": None},
+                      2: {"product": {"product_status": "CLOSED"}, "tags": None, "rates": None}}
 
 
 # ---------- product_values, to_dt ----------

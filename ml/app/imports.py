@@ -1,7 +1,8 @@
 """
     상품 불러오기 작업 (ADMIN-04, EXT-01·02의 6번 비교 저장, EXT-05)
 
-    - 시작 (main.py POST /imports): import_job 1행 (RUNNING, base_version = 지금 마지막 반영 이력 번호) → 작업 번호 바로 응답
+    - 시작 (main.py POST /imports): import_job 1행 (RUNNING) → 작업 번호 바로 응답
+      base_version(기준 버전)은 시작 때 일단 넣고, 비교하려고 지금 상품을 읽는 시점의 마지막 이력 번호로 DONE 때 다시 씀 (ADMIN-04 '비교할 때의')
       동시에 1개 (B9): import_job 표를 잠그고 RUNNING이 있으면 IMPORT_RUNNING. 시작한 지 30분 넘은 RUNNING은 FAILED로 바꾸고 진행
     - 응답 뒤 (BackgroundTasks → run_import): 수집 → 정제 (첫 적재와 같은 clean_products) → 지금 상품 읽기 → 비교
       → 이전 작업의 import_item 삭제 → 바뀐 상품을 import_item에 저장 → DONE (출처 모두 실패, 정제 중 오류면 FAILED + 사유)
@@ -71,6 +72,7 @@ NEW_JOB_ID = text("SELECT MAX(job_id) FROM import_job WHERE job_status = 'RUNNIN
 FINISH_JOB = text("UPDATE import_job SET job_status = :status, source_result = :source_result, error_msg = :error, "
                   "finished_at = SYSDATE WHERE job_id = :job_id AND job_status = 'RUNNING'"
                   ).bindparams(bindparam("source_result", type_=CLOB))
+SET_BASE_VERSION = text("UPDATE import_job SET base_version = :base_version WHERE job_id = :job_id")   # 비교할 때의 버전
 DELETE_OLD_ITEMS = text("DELETE FROM import_item WHERE job_id <> :job_id")
 INSERT_ITEM = text(
     "INSERT INTO import_item (job_id, diff_type, product_id, source, product_name, company_name, "
@@ -323,8 +325,9 @@ def run_import(engine, job_id, sources):
             results = source_results(sources, collected, errors, [])
             raise RuntimeError("출처 모두 실패: " + ", ".join(f"{s} {e}" for s, e in errors.items()))
 
-        with engine.connect() as conn:
+        with engine.connect() as conn:      # 지금 상품과 그 시점의 마지막 이력 번호(기준 버전)를 같이 읽음
             existing = read_products(conn)
+            base_version = conn.execute(LAST_VERSION).scalar()
         today = date.today()
         bank_names = None if "FSS" in collected else db_bank_names(existing)   # 금감원이 빠지면 DB 은행 이름으로
         products = clean_products(tables, collected, today, today, bank_names)
@@ -337,6 +340,7 @@ def run_import(engine, job_id, sources):
             if done.rowcount == 0:      # 30분 넘어 FAILED로 바뀐 뒤 늦게 끝난 작업 → 결과 버림
                 logger.warning("불러오기 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
                 return
+            conn.execute(SET_BASE_VERSION, {"job_id": job_id, "base_version": base_version})
             conn.execute(DELETE_OLD_ITEMS, {"job_id": job_id})
             if items:
                 conn.execute(INSERT_ITEM, [item_row(job_id, item) for item in items])
