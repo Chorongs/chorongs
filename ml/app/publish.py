@@ -20,9 +20,10 @@ from datetime import date, datetime
 
 from sqlalchemy import CLOB, bindparam, text
 
-from app.imports import (KEEP_HOURS, LAST_VERSION, DATE_COLS, JobConflict, NotFound, NotPublishable, read_products,
+from app.imports import (KEEP_HOURS, LAST_VERSION, JobConflict, NotFound, NotPublishable, after_data, read_products,
                          to_json)
-from app.load import INSERT_PRODUCT, PRODUCT_COLS, ensure_tags, id_map, insert_links, link_rows, product_key
+from app.load import (DATE_COLS, INSERT_PRODUCT, PRODUCT_COLS, SELECT_PRODUCT_IDS, chip_counts, ensure_tags, id_map,
+                      insert_links, link_rows, product_key)
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,8 @@ DELETE_RATE_MONTH = text("DELETE FROM product_rate_month WHERE product_id = :pro
 # ---------- DB 없이 쓰는 함수 ----------
 
 def before_data(product):
-    """변경 기록에 남길 바뀌기 전 값 (read_products 행 1개). 상품 번호, 조회수는 빼고 칩, 구간 금리는 값으로"""
-    return {**{c: product[c] for c in PRODUCT_COLS}, STATUS_COL: product[STATUS_COL],
-            "tags": product["tags"], "rates": product["rates"]}
+    """변경 기록에 남길 바뀌기 전 값 (read_products 행 1개) = after_data 모양 + product_status. 상품 번호, 조회수는 안 넣음"""
+    return {**after_data(product), STATUS_COL: product[STATUS_COL]}
 
 
 def to_dt(value):
@@ -107,10 +107,9 @@ def restore_plan(change_type, before_json):
 def publish_counts(items_with_data):
     """이력 건수: (added, changed, removed, count_json). 변경 = CHANGE + REOPEN"""
     types = Counter(diff_type for diff_type, _ in items_with_data)
-    sources = Counter(data["source"] for _, data in items_with_data if data is not None)
-    chips = Counter(f"{t['tag_type']}:{t['tag_value']}" for _, data in items_with_data if data is not None
-                    for t in data["tags"])
-    count_json = to_json({"diff_type": dict(types), "source": dict(sources), "chips": dict(sorted(chips.items()))})
+    published = [data for _, data in items_with_data if data is not None]
+    count_json = to_json({"diff_type": dict(types), "source": dict(Counter(d["source"] for d in published)),
+                          "chips": chip_counts(published)})
     return types["NEW"], types["CHANGE"] + types["REOPEN"], types["REMOVE"], count_json
 
 
@@ -204,7 +203,7 @@ def publish(engine, job_id, item_ids, base_version, admin_id):
 
         if new_products:
             conn.execute(INSERT_PRODUCT, [product_values({c: p[c] for c in PRODUCT_COLS}) for p in new_products])
-            product_ids = id_map(conn, "SELECT source, loan_type, source_code, product_id FROM loan_product")
+            product_ids = id_map(conn, SELECT_PRODUCT_IDS)
             for p in new_products:
                 product_id = product_ids[product_key(p)]
                 conn.execute(INSERT_SNAPSHOT, {"history_id": history_id, "product_id": product_id,

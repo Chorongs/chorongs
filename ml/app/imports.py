@@ -22,7 +22,7 @@ from decimal import Decimal
 import requests
 from sqlalchemy import CLOB, bindparam, text
 
-from app.clean import clean_products
+from app.clean import WORDS, clean_products
 from app.collect import collect_fss, collect_kinfa
 from app.load import PRODUCT_COLS, dcls_month, product_key
 
@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 COLLECTORS = {"KINFA": collect_kinfa, "FSS": collect_fss}
 SOURCE_ORDER = ("KINFA", "FSS")             # import_job.sources, product_update_history.source 값 순서 ('KINFA,FSS')
 COMPARE_COLS = [c for c in PRODUCT_COLS if c not in ("base_date", "raw_json")]
-DATE_COLS = ("base_date", "disclose_start", "disclose_end")
 STALE_MINUTES = 30      # 이 시간 넘게 RUNNING이면 멈춘 작업으로 보고 FAILED
 KEEP_HOURS = 24         # DONE 뒤 이 시간이 지나면 EXPIRED (반영 불가)
 
@@ -65,8 +64,10 @@ INSERT_JOB = text("INSERT INTO import_job (job_status, sources, base_version, re
                   "VALUES ('RUNNING', :sources, :base_version, :admin_id)")
 NEW_JOB_ID = text("SELECT MAX(job_id) FROM import_job WHERE job_status = 'RUNNING'")   # 표를 잠근 뒤라 방금 넣은 행
 
+# RUNNING일 때만 끝냄: 30분 넘어 FAILED로 바뀐 옛 작업이 늦게 끝나도 DONE으로 되살아나지 않게 (바뀐 행 0이면 결과 버림)
 FINISH_JOB = text("UPDATE import_job SET job_status = :status, source_result = :source_result, error_msg = :error, "
-                  "finished_at = SYSDATE WHERE job_id = :job_id").bindparams(bindparam("source_result", type_=CLOB))
+                  "finished_at = SYSDATE WHERE job_id = :job_id AND job_status = 'RUNNING'"
+                  ).bindparams(bindparam("source_result", type_=CLOB))
 DELETE_OLD_ITEMS = text("DELETE FROM import_item WHERE job_id <> :job_id")
 INSERT_ITEM = text(
     "INSERT INTO import_item (job_id, diff_type, product_id, source, product_name, company_name, "
@@ -234,6 +235,16 @@ def split_list(value):
     return value.split(",") if value else []
 
 
+def db_bank_names(existing):
+    """
+        금감원 수집이 빠진 불러오기에서 서민 취급기관 대조에 쓸 은행 이름: DB 금감원 상품의 원본 권역 코드로
+        (clean.fss_bank_names와 같은 기준. 빈 목록으로 정제하면 은행 상품이 '기타'가 되어 서민 상품이 대량 CHANGE로 뜸)
+    """
+    group = WORDS["COMPANY"]["kinfa_bank"]["group"]
+    return {p["company_name"] for p in existing
+            if p["source"] == "FSS" and json.loads(p["raw_json"]).get("base", {}).get("top_fin_grp_no") == group}
+
+
 def source_results(sources, collected, errors, products):
     """출처별 결과 (import_job.source_result, 응답 source_results)"""
     return [{"source": source,
@@ -302,26 +313,37 @@ def run_import(engine, job_id, sources):
     results = None
     try:
         tables, collected, errors = collect_sources(sources)
-        today = date.today()
-        products = clean_products(tables, collected, today, today) if collected else []
-        results = source_results(sources, collected, errors, products)
         if not collected:
+            results = source_results(sources, collected, errors, [])
             raise RuntimeError("출처 모두 실패: " + ", ".join(f"{s} {e}" for s, e in errors.items()))
 
+        with engine.connect() as conn:
+            existing = read_products(conn)
+        today = date.today()
+        bank_names = None if "FSS" in collected else db_bank_names(existing)   # 금감원이 빠지면 DB 은행 이름으로
+        products = clean_products(tables, collected, today, today, bank_names)
+        results = source_results(sources, collected, errors, products)
+        items = compare(existing, products, collected)
+
         with engine.begin() as conn:
-            items = compare(read_products(conn), products, collected)
+            done = conn.execute(FINISH_JOB, {"job_id": job_id, "status": "DONE", "source_result": to_json(results),
+                                             "error": None})
+            if done.rowcount == 0:      # 30분 넘어 FAILED로 바뀐 뒤 늦게 끝난 작업 → 결과 버림
+                logger.warning("불러오기 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
+                return
             conn.execute(DELETE_OLD_ITEMS, {"job_id": job_id})
             if items:
                 conn.execute(INSERT_ITEM, [item_row(job_id, item) for item in items])
-            conn.execute(FINISH_JOB, {"job_id": job_id, "status": "DONE", "source_result": to_json(results),
-                                      "error": None})
         logger.info("불러오기 작업 %d 끝: 정제 %d개, 바뀐 상품 %d개", job_id, len(products), len(items))
     except Exception as e:     # 어떤 오류든 작업을 FAILED로 남겨야 다음 불러오기가 막히지 않음
         logger.exception("불러오기 작업 %d 실패", job_id)
-        with engine.begin() as conn:
-            conn.execute(FINISH_JOB, {"job_id": job_id, "status": "FAILED",
-                                      "source_result": to_json(results) if results else None,
-                                      "error": f"{type(e).__name__}: {e}"[:500]})
+        try:
+            with engine.begin() as conn:
+                conn.execute(FINISH_JOB, {"job_id": job_id, "status": "FAILED",
+                                          "source_result": to_json(results) if results else None,
+                                          "error": f"{type(e).__name__}: {e}"[:500]})
+        except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 불러오기가 FAILED로 바꿈)
+            logger.exception("불러오기 작업 %d FAILED 기록 실패", job_id)
 
 
 def read_job(conn, job_id):

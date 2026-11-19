@@ -29,6 +29,8 @@ PRODUCT_COLS = ["source", "source_code", "company_name", "product_name", "loan_t
                 "income_max", "income_basis", "income_note", "prepay_fee_max", "no_prepay_fee_yn", "online_yn",
                 "policy_yn", "rate_type", "extra_cond", "target_detail", "note", "raw_json", "base_date",
                 "disclose_start", "disclose_end"]
+DATE_COLS = ("base_date", "disclose_start", "disclose_end")     # DATE 칸 (JSON 글 ↔ datetime 변환 대상)
+SELECT_PRODUCT_IDS = "SELECT source, loan_type, source_code, product_id FROM loan_product"   # id_map용
 
 INSERT_PRODUCT = text(
     f"INSERT INTO loan_product ({', '.join(PRODUCT_COLS)}) VALUES ({', '.join(':' + c for c in PRODUCT_COLS)})"
@@ -59,11 +61,16 @@ def make_engine():
         "user": os.environ["DB_USERNAME"], "password": os.environ["DB_PASSWORD"], "dsn": target})
 
 
+def chip_counts(products):
+    """칩별 건수 {'TARGET:직장인': n, ...} (이력 count_json용, 반영 publish.py도 씀)"""
+    chips = Counter(f"{t['tag_type']}:{t['tag_value']}" for p in products for t in p["tags"])
+    return dict(sorted(chips.items()))
+
+
 def count_summary(products, skipped):
     """반영 이력 count_json: 상품 종류별 건수, 칩별 건수, 넣지 않은 확인 필요 건수"""
-    chips = Counter(f"{t['tag_type']}:{t['tag_value']}" for p in products for t in p["tags"])
     return json.dumps({"loan_type": Counter(p["loan_type"] for p in products),
-                       "chips": dict(sorted(chips.items())),
+                       "chips": chip_counts(products),
                        "check_skipped": len(skipped)}, ensure_ascii=False)
 
 
@@ -119,7 +126,7 @@ def insert_links(conn, product_tags, rates, rate_months):
 def load(conn, products, skipped):
     """빈 상품 표에 넣기 (conn은 트랜잭션 안)"""
     conn.execute(INSERT_PRODUCT, [{c: p[c] for c in PRODUCT_COLS} for p in products])
-    product_ids = id_map(conn, "SELECT source, loan_type, source_code, product_id FROM loan_product")
+    product_ids = id_map(conn, SELECT_PRODUCT_IDS)
     tag_ids, new_tag_count = ensure_tags(conn, products)
 
     product_tags, rates, rate_months = [], [], []

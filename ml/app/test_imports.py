@@ -3,11 +3,12 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.imports import (changed_fields, compare, item_row, match_products, norm, read_job, source_results,
-                         split_list)
+from app.imports import (changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
+                         source_results, split_list)
 from app.load import PRODUCT_COLS
 
-RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200"}, "options": []})
+RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200", "top_fin_grp_no": "020000"},
+                      "options": []})
 
 
 def _product(**changes):
@@ -26,13 +27,14 @@ def _product(**changes):
 
 
 def _existing(product_id=1, status="ON", **changes):
-    """지금 상품 1개 (DB에서 읽은 모양: Decimal, datetime)"""
-    current = _product(**changes)
+    """지금 상품 1개 (DB에서 읽은 모양: Decimal, datetime). 바꿀 칸(changes)은 DB 모양으로 바꾼 뒤 덮어씀"""
+    current = _product()
     current.update({"product_id": product_id, "product_status": status,
                     "rate_min": Decimal("3.50"), "rate_max": Decimal("7.25"),
                     "base_date": datetime(2026, 11, 10, 0, 0)})
     current["rates"] = [{**r, "rate_min": Decimal("3.5"), "rate_max": Decimal("3.5")} for r in current["rates"]]
     del current["check_reasons"]
+    current.update(changes)
     return current
 
 
@@ -301,6 +303,20 @@ def test_source_results_실패한_출처는_count_0과_사유():
     # Then
     assert results == [{"source": "KINFA", "success": False, "count": 0, "error": "ConnectTimeout"},
                        {"source": "FSS", "success": True, "count": 1, "error": None}]
+
+
+# ---------- db_bank_names ----------
+
+def test_db_bank_names_금감원_은행_권역_회사명만_서민은_뺀다():
+    # Given
+    savings = json.dumps({"base": {"top_fin_grp_no": "030300"}, "options": []})
+    existing = [_existing(product_id=1, company_name="가은행"),
+                _existing(product_id=2, company_name="나저축은행", raw_json=savings),
+                _existing(**{**{k: v for k, v in _kinfa().items() if k != "check_reasons"}, "product_id": 3})]
+    # When
+    names = db_bank_names(existing)
+    # Then
+    assert names == {"가은행"}
 
 
 # ---------- read_job (가짜 conn) ----------

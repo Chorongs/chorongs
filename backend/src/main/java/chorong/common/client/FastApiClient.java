@@ -153,17 +153,11 @@ public class FastApiClient {
 
 	// 신용 진단 점수: 문항 답을 보내면 점수 (1~1000) + 문항별 점수를 돌려줌 (답, 점수는 로그 금지, B8)
 	public FastApiScoreResponseDTO scoreCredit(FastApiScoreRequestDTO request) {
-		try {
-			FastApiScoreResponseDTO response = restClient.post()
-					.uri("/credit/score")
-					.body(request)
-					.retrieve()
-					.body(FastApiScoreResponseDTO.class);
-			return requireBody(response);
-		} catch (RestClientException e) {
-			log.warn("FastAPI 신용 진단 호출 실패: {}", e.getClass().getSimpleName());
-			throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE);
-		}
+		return call("신용 진단", () -> restClient.post()
+				.uri("/credit/score")
+				.body(request)
+				.retrieve()
+				.body(FastApiScoreResponseDTO.class));
 	}
 
 	// 본문이 비어 있으면 503
