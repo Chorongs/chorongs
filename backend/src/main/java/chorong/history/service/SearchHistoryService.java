@@ -1,7 +1,7 @@
-package chorong.history.service.searchHistory;
+package chorong.history.service;
 
-import chorong.history.dto.searchHistory.SearchHistoryRequestDTO;
-import chorong.history.dto.searchHistory.SearchHistoryResponseDTO;
+import chorong.history.dto.SearchHistoryRequestDTO;
+import chorong.history.dto.SearchHistoryResponseDTO;
 
 import java.util.List;
 

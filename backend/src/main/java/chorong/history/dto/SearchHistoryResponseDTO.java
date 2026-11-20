@@ -1,4 +1,4 @@
-package chorong.history.dto.searchHistory;
+package chorong.history.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;

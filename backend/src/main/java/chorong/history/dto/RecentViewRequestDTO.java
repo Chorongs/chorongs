@@ -1,4 +1,4 @@
-package chorong.history.dto.recentView;
+package chorong.history.dto;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

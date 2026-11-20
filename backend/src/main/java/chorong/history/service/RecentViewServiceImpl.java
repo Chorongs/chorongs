@@ -1,8 +1,8 @@
-package chorong.history.service.recentView;
+package chorong.history.service;
 
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
-import chorong.history.dto.recentView.RecentViewResponseDTO;
+import chorong.history.dto.RecentViewResponseDTO;
 import chorong.history.entity.RecentView;
 import chorong.history.repository.RecentViewRepository;
 import chorong.product.dto.ProductSummaryDTO;

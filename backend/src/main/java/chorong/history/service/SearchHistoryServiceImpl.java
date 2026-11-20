@@ -1,16 +1,15 @@
-package chorong.history.service.searchHistory;
+package chorong.history.service;
 
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
-import chorong.history.dto.searchHistory.SearchHistoryRequestDTO;
-import chorong.history.dto.searchHistory.SearchHistoryResponseDTO;
+import chorong.history.dto.SearchHistoryRequestDTO;
+import chorong.history.dto.SearchHistoryResponseDTO;
 import chorong.history.entity.SearchHistory;
 import chorong.history.repository.SearchHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 import java.util.*;
 

@@ -1,4 +1,4 @@
-package chorong.history.dto.recentView;
+package chorong.history.dto;
 
 import chorong.product.dto.ProductSummaryDTO;
 import lombok.AllArgsConstructor;

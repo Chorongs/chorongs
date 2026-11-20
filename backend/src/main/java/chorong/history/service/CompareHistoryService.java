@@ -1,4 +1,9 @@
-package chorong.history.service.compareHistory;
+package chorong.history.service;
+
+import chorong.history.dto.CompareHistoryRequestDTO;
+import chorong.history.dto.CompareHistoryResponseDTO;
+
+import java.util.List;
 
 /*
  * 비교 내역 목록, 기록, 삭제 (MEM-10)
@@ -9,14 +14,15 @@ package chorong.history.service.compareHistory;
 public interface CompareHistoryService {
 
     // 비교 내역 목록 (최근 10개: compareId, comparedAt, productA, productB)
-    void getCompareHistories();
+    List<CompareHistoryResponseDTO> getCompareHistories(Long memberId);
 
     // 기록 (A, B 다름 확인 → 같은 조합 있으면 409, 없으면 추가 → 10개 넘으면 오래된 것 삭제)
-    void saveCompareHistory();
+    void saveCompareHistory(Long memberId, CompareHistoryRequestDTO compareReqDTO);
 
     // 한 건 삭제 (내 기록 중 그 1건, 없거나 남의 기록은 404)
-    void deleteCompareHistory();
+    void deleteCompareHistory(Long memberId, Long compareId);
 
     // 전체 삭제 (내 기록 전체)
-    void deleteCompareHistories();
+    void deleteCompareHistories(Long memberId);
+
 }

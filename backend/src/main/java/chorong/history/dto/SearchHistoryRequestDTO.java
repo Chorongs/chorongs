@@ -1,4 +1,4 @@
-package chorong.history.dto.searchHistory;
+package chorong.history.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

@@ -1,5 +1,6 @@
-package chorong.history.dto.compareHistory;
+package chorong.history.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -9,4 +10,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class CompareHistoryRequestDTO {
+    @NotNull
+    private Long productAId;
+    @NotNull
+    private Long productBId;
+
 }

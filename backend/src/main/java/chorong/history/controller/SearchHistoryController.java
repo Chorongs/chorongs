@@ -2,9 +2,9 @@ package chorong.history.controller;
 
 import chorong.common.dto.ApiResponse;
 import chorong.common.util.LoginUtil;
-import chorong.history.dto.searchHistory.SearchHistoryRequestDTO;
-import chorong.history.dto.searchHistory.SearchHistoryResponseDTO;
-import chorong.history.service.searchHistory.SearchHistoryService;
+import chorong.history.dto.SearchHistoryRequestDTO;
+import chorong.history.dto.SearchHistoryResponseDTO;
+import chorong.history.service.SearchHistoryService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +25,9 @@ public class SearchHistoryController {
     // GET /api/me/searches (최근 검색 10개, 응답 data는 items)
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, List<SearchHistoryResponseDTO>>>> getSearchHistories(HttpSession session) {
-        List<SearchHistoryResponseDTO> searchHistories = searchHistoryService.getSearchHistories(LoginUtil.getMemberId(session));
+        List<SearchHistoryResponseDTO> items = searchHistoryService.getSearchHistories(LoginUtil.getMemberId(session));
 
-        return ResponseEntity.ok(ApiResponse.success(Map.of("items", searchHistories)));
+        return ResponseEntity.ok(ApiResponse.success(Map.of("items", items)));
     }
 
     // POST /api/me/searches (본문: type, label, condition, 응답 204)

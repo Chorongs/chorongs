@@ -2,9 +2,9 @@ package chorong.history.controller;
 
 import chorong.common.dto.ApiResponse;
 import chorong.common.util.LoginUtil;
-import chorong.history.dto.recentView.RecentViewRequestDTO;
-import chorong.history.dto.recentView.RecentViewResponseDTO;
-import chorong.history.service.recentView.RecentViewService;
+import chorong.history.dto.RecentViewRequestDTO;
+import chorong.history.dto.RecentViewResponseDTO;
+import chorong.history.service.RecentViewService;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +25,8 @@ public class RecentViewController {
     // GET /api/me/recent-views (최근 본 10개)
     @GetMapping
     public ResponseEntity<ApiResponse<Map<String, List<RecentViewResponseDTO>>>> getRecentViews(HttpSession session) {
-        List<RecentViewResponseDTO> recentViewList = recentViewService.getRecentViews(LoginUtil.getMemberId(session)); // 세션 회원의 최근 본 목록
-        return ResponseEntity.ok(ApiResponse.success(Map.of("items", recentViewList)));                                // "items" 키로 감싸서 200
+        List<RecentViewResponseDTO> items = recentViewService.getRecentViews(LoginUtil.getMemberId(session)); // 세션 회원의 최근 본 목록
+        return ResponseEntity.ok(ApiResponse.success(Map.of("items", items)));                                // "items" 키로 감싸서 200
     }
 
     // POST /api/me/recent-views (본문: productId, 응답 204)

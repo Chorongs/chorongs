@@ -1,6 +1,6 @@
-package chorong.history.service.recentView;
+package chorong.history.service;
 
-import chorong.history.dto.recentView.RecentViewResponseDTO;
+import chorong.history.dto.RecentViewResponseDTO;
 
 import java.util.List;
 
