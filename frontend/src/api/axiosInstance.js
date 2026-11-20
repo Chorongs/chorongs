@@ -16,7 +16,6 @@ const PREPARING_APIS = [
   /^\/api\/me\/recent-views(\/|$)/, // API-21 최근 본 (CHORONG-42)
   /^\/api\/me\/searches(\/|$)/, // API-22 최근 검색 (CHORONG-42)
   /^\/api\/me\/compares(\/|$)/, // API-23 비교 내역 (CHORONG-42)
-  /^\/api\/me\/calcs(\/|$)/, // API-24 계산 기록 (CHORONG-48)
   /^\/api\/me$/, // API-28 회원 정보 수정, 탈퇴 (CHORONG-42)
   /^\/api\/me\/summary$/, // API-51 MY 요약 (CHORONG-42)
   /^\/api\/products\/[^/]+\/views$/, // API-05 상품 조회 기록 (실패해도 안내 안 함)

@@ -5,13 +5,21 @@ import {
   calcEqualPayment,
   calcEqualPrincipal,
   calcPayment,
+  createCalcForm,
+  getCalcErrors,
+  getCalcTermOptions,
   getCompareDefaults,
   getCompareWinners,
+  getInitialCalc,
   getLoanResult,
+  getMethodInterests,
   getMethodPlan,
   getMidRate,
+  getPrepayModeResults,
   getRepayCode,
+  getSchedule,
   getSupportedMethods,
+  toScheduleParams,
 } from './loanMath'
 
 describe('getMidRate', () => {
@@ -900,5 +908,653 @@ describe('getLoanResult 방식을 고른 경우', () => {
     const result = getLoanResult(product, 1200, 12)
     // Then
     expect(result.method).toBe('BULLET')
+  })
+})
+
+// ---- 계산기 (CA-02~06, CHORONG-49) ----
+
+// 1,000만원, 연 6%, 24개월 기준 입력
+const scheduleBase = { method: 'EQUAL_PI', principal: 10000000, rate: 6, months: 24 }
+
+describe('getSchedule 원리금균등', () => {
+  it('첫 달 납입액이 calcEqualPayment의 월 상환액과 같다', () => {
+    // Given
+    const expected = calcEqualPayment(10000000, 6, 24).monthly
+    // When
+    const result = getSchedule(scheduleBase)
+    // Then
+    expect(result.firstPayment).toBe(expected)
+  })
+
+  it('총이자가 calcEqualPayment의 총이자와 같다', () => {
+    // Given
+    const expected = calcEqualPayment(10000000, 6, 24).totalInterest
+    // When
+    const result = getSchedule(scheduleBase)
+    // Then
+    expect(result.totalInterest).toBe(expected)
+  })
+
+  it('마지막 회차의 남은 원금은 0이다', () => {
+    // Given
+    const params = scheduleBase
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[23].balance).toBe(0)
+  })
+
+  it('회차 수는 대출 기간과 같다', () => {
+    // Given
+    const params = scheduleBase
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows).toHaveLength(24)
+  })
+
+  it('금리 0%면 원금을 똑같이 나눠 갚고 이자는 0이다', () => {
+    // Given
+    const params = { ...scheduleBase, rate: 0 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.totalInterest).toBe(0)
+  })
+})
+
+describe('getSchedule 원금균등, 만기일시', () => {
+  it('원금균등 총이자가 calcEqualPrincipal의 총이자와 같다', () => {
+    // Given
+    const expected = calcEqualPrincipal(10000000, 6, 24).totalInterest
+    // When
+    const result = getSchedule({ ...scheduleBase, method: 'EQUAL_P' })
+    // Then
+    expect(result.totalInterest).toBe(expected)
+  })
+
+  it('원금균등 첫 달 납입액이 가장 크다', () => {
+    // Given
+    const params = { ...scheduleBase, method: 'EQUAL_P' }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[0].payment).toBeGreaterThan(result.rows[23].payment)
+  })
+
+  it('만기일시 총이자가 calcBullet의 총이자와 같다', () => {
+    // Given
+    const expected = calcBullet(10000000, 6, 24).totalInterest
+    // When
+    const result = getSchedule({ ...scheduleBase, method: 'BULLET' })
+    // Then
+    expect(result.totalInterest).toBe(expected)
+  })
+
+  it('만기일시는 마지막 회차에 원금을 한 번에 갚는다', () => {
+    // Given
+    const params = { ...scheduleBase, method: 'BULLET' }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[23].principal).toBe(10000000)
+  })
+
+  it('만기일시는 거치 기간을 줘도 무시한다', () => {
+    // Given
+    const params = { ...scheduleBase, method: 'BULLET', graceMonths: 6 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.totalInterest).toBe(calcBullet(10000000, 6, 24).totalInterest)
+  })
+})
+
+describe('getSchedule 거치기간', () => {
+  it('거치 중에는 원금을 갚지 않는다', () => {
+    // Given
+    const params = { ...scheduleBase, graceMonths: 6 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows.slice(0, 6).every((row) => row.principal === 0)).toBe(true)
+  })
+
+  it('거치가 끝난 뒤에도 마지막 회차에 다 갚는다', () => {
+    // Given
+    const params = { ...scheduleBase, graceMonths: 6 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[23].balance).toBe(0)
+  })
+
+  it('거치가 있으면 총이자가 더 많다', () => {
+    // Given
+    const withoutGrace = getSchedule(scheduleBase)
+    // When
+    const withGrace = getSchedule({ ...scheduleBase, graceMonths: 6 })
+    // Then
+    expect(withGrace.totalInterest).toBeGreaterThan(withoutGrace.totalInterest)
+  })
+
+  it('거치 기간이 대출 기간 이상이면 null이다', () => {
+    // Given
+    const params = { ...scheduleBase, graceMonths: 24 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
+  })
+})
+
+describe('getSchedule 체증식', () => {
+  const graduated = { ...scheduleBase, method: 'GRADUATED', growth: 10 }
+
+  it('13개월째 납입액이 12개월째보다 크다', () => {
+    // Given
+    const params = graduated
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[12].payment).toBeGreaterThan(result.rows[11].payment)
+  })
+
+  it('마지막 회차의 남은 원금은 0이다', () => {
+    // Given
+    const params = graduated
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[23].balance).toBe(0)
+  })
+
+  it('증가율이 0%면 원리금균등과 총이자가 같다', () => {
+    // Given
+    const expected = getSchedule(scheduleBase).totalInterest
+    // When
+    const result = getSchedule({ ...graduated, growth: 0 })
+    // Then
+    expect(result.totalInterest).toBe(expected)
+  })
+
+  it('처음에 원금이 늘어나는 조건이면 null이다', () => {
+    // Given
+    const params = { method: 'GRADUATED', principal: 10000000, rate: 20, months: 600, growth: 20 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
+  })
+})
+
+describe('getSchedule 중도상환', () => {
+  const prepayParams = { ...scheduleBase, prepay: { round: 6, amount: 3000000, feeRate: 1.5 } }
+
+  it('중도상환 회차에 중도상환 금액이 표시된다', () => {
+    // Given
+    const params = prepayParams
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[5].prepay).toBe(3000000)
+  })
+
+  it('수수료는 중도상환액 x 수수료율이다', () => {
+    // Given
+    const params = prepayParams
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.prepayFee).toBe(45000)
+  })
+
+  it('월 납입액 줄이기는 다음 달 납입액이 줄고 기간은 그대로다', () => {
+    // Given
+    const before = getSchedule(prepayParams).rows[5].payment
+    // When
+    const result = getSchedule({ ...prepayParams, prepayMode: 'REDUCE_PAYMENT' })
+    // Then
+    expect(result.rows[6].payment).toBeLessThan(before)
+  })
+
+  it('월 납입액 줄이기는 기간이 그대로다', () => {
+    // Given
+    const params = { ...prepayParams, prepayMode: 'REDUCE_PAYMENT' }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.lastRound).toBe(24)
+  })
+
+  it('기간 줄이기는 대출이 일찍 끝난다', () => {
+    // Given
+    const params = { ...prepayParams, prepayMode: 'SHORTEN_TERM' }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.lastRound).toBeLessThan(24)
+  })
+
+  it('기간 줄이기는 월 납입액 줄이기보다 총이자가 적다', () => {
+    // Given
+    const reduce = getSchedule({ ...prepayParams, prepayMode: 'REDUCE_PAYMENT' })
+    // When
+    const shorten = getSchedule({ ...prepayParams, prepayMode: 'SHORTEN_TERM' })
+    // Then
+    expect(shorten.totalInterest).toBeLessThan(reduce.totalInterest)
+  })
+
+  it('중도상환액이 남은 원금보다 크면 남은 원금까지만 갚는다', () => {
+    // Given
+    const params = { ...scheduleBase, prepay: { round: 6, amount: 999999999, feeRate: 0 } }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[5].balance).toBe(0)
+  })
+
+  it('중도상환을 하면 총이자가 줄어든다', () => {
+    // Given
+    const without = getSchedule(scheduleBase)
+    // When
+    const result = getSchedule(prepayParams)
+    // Then
+    expect(result.totalInterest).toBeLessThan(without.totalInterest)
+  })
+})
+
+describe('getSchedule 금리 변동', () => {
+  it('금리가 오르면 총이자가 늘어난다', () => {
+    // Given
+    const without = getSchedule(scheduleBase)
+    // When
+    const result = getSchedule({ ...scheduleBase, rateChange: { round: 7, rate: 9 } })
+    // Then
+    expect(result.totalInterest).toBeGreaterThan(without.totalInterest)
+  })
+
+  it('변동 전 회차의 납입액은 그대로다', () => {
+    // Given
+    const without = getSchedule(scheduleBase)
+    // When
+    const result = getSchedule({ ...scheduleBase, rateChange: { round: 7, rate: 9 } })
+    // Then
+    expect(result.rows[5].payment).toBe(without.rows[5].payment)
+  })
+
+  it('금리가 올라도 마지막 회차에 다 갚는다', () => {
+    // Given
+    const params = { ...scheduleBase, rateChange: { round: 7, rate: 9 } }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result.rows[23].balance).toBe(0)
+  })
+})
+
+describe('getSchedule 잘못된 입력', () => {
+  it('금액이 0이면 null이다', () => {
+    // Given
+    const params = { ...scheduleBase, principal: 0 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('금리가 음수면 null이다', () => {
+    // Given
+    const params = { ...scheduleBase, rate: -1 }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('모르는 상환 방식이면 null이다', () => {
+    // Given
+    const params = { ...scheduleBase, method: 'UNKNOWN' }
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
+  })
+})
+
+describe('getMethodInterests', () => {
+  it('상환 방식 4개의 총이자를 돌려준다', () => {
+    // Given
+    const params = scheduleBase
+    // When
+    const result = getMethodInterests(params)
+    // Then
+    expect(result.map((item) => item.code)).toEqual(['EQUAL_PI', 'EQUAL_P', 'BULLET', 'GRADUATED'])
+  })
+
+  it('만기일시 총이자가 가장 많다', () => {
+    // Given
+    const params = scheduleBase
+    // When
+    const result = getMethodInterests(params)
+    // Then
+    const bullet = result.find((item) => item.code === 'BULLET').totalInterest
+    expect(result.every((item) => item.totalInterest <= bullet)).toBe(true)
+  })
+})
+
+describe('getPrepayModeResults', () => {
+  it('중도상환이 없으면 null이다', () => {
+    // Given
+    const params = scheduleBase
+    // When
+    const result = getPrepayModeResults(params)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('기간 줄이기가 월 납입액 줄이기보다 일찍 끝난다', () => {
+    // Given
+    const params = { ...scheduleBase, prepay: { round: 6, amount: 3000000, feeRate: 0 } }
+    // When
+    const result = getPrepayModeResults(params)
+    // Then
+    expect(result.SHORTEN_TERM.lastRound).toBeLessThan(result.REDUCE_PAYMENT.lastRound)
+  })
+})
+
+describe('getCalcTermOptions', () => {
+  it('36개월이면 12, 36, 60개월이다', () => {
+    // Given
+    const months = 36
+    // When
+    const result = getCalcTermOptions(months)
+    // Then
+    expect(result).toEqual([12, 36, 60])
+  })
+
+  it('120개월이면 60, 120, 180개월이다', () => {
+    // Given
+    const months = 120
+    // When
+    const result = getCalcTermOptions(months)
+    // Then
+    expect(result).toEqual([60, 120, 180])
+  })
+
+  it('60개월이면 용도를 알 수 없어 5개 전부다', () => {
+    // Given
+    const months = 60
+    // When
+    const result = getCalcTermOptions(months)
+    // Then
+    expect(result).toEqual([12, 36, 60, 120, 180])
+  })
+})
+
+describe('getInitialCalc', () => {
+  it('넘어온 값이 없으면 기본값이다', () => {
+    // Given
+    const state = null
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result).toMatchObject({ amount: 1000, months: 36, rate: 5, method: 'EQUAL_PI' })
+  })
+
+  it('넘어온 금액(원)을 만원으로 바꿔 넣는다', () => {
+    // Given
+    const state = { loanAmount: 20000000 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.amount).toBe(2000)
+  })
+
+  it('넘어온 기간, 금리, 상환 방식을 처음 값으로 쓴다', () => {
+    // Given
+    const state = { loanMonths: 120, interestRate: 4.35, repayMethod: 'EQUAL_P' }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result).toMatchObject({ months: 120, rate: 4.35, method: 'EQUAL_P' })
+  })
+
+  it('기간 선택지에 없는 기간은 무시한다', () => {
+    // Given
+    const state = { loanMonths: 24 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.months).toBe(36)
+  })
+
+  it('범위 밖 금리는 무시한다', () => {
+    // Given
+    const state = { interestRate: 35 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.rate).toBe(5)
+  })
+
+  it('1만원보다 작은 금액은 무시한다', () => {
+    // Given
+    const state = { loanAmount: 100 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.amount).toBe(1000)
+  })
+
+  it('모르는 상환 방식은 무시한다', () => {
+    // Given
+    const state = { repayMethod: 'UNKNOWN' }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.method).toBe('EQUAL_PI')
+  })
+})
+
+describe('getCalcErrors', () => {
+  it('처음 값은 오류가 없다', () => {
+    // Given
+    const form = createCalcForm()
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors).toEqual({})
+  })
+
+  it('금액이 비면 금액 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), amount: '' }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.amount).toBe('빌릴 금액을 입력해 주세요')
+  })
+
+  it('금액이 0이면 금액 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), amount: 0 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.amount).toContain('1만원 이상')
+  })
+
+  it('이자율이 20%를 넘으면 이자율 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), rate: 21 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.rate).toContain('20%')
+  })
+
+  it('이자율 0%는 오류가 아니다', () => {
+    // Given
+    const form = { ...createCalcForm(), rate: 0 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.rate).toBeUndefined()
+  })
+
+  it('거치 기간이 대출 기간 이상이면 거치 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), graceMonths: 36 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.graceMonths).toContain('36개월 미만')
+  })
+
+  it('만기일시는 거치 기간을 검사하지 않는다', () => {
+    // Given
+    const form = { ...createCalcForm(), method: 'BULLET', graceMonths: 99 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.graceMonths).toBeUndefined()
+  })
+
+  it('체증식이 아니면 증가율을 검사하지 않는다', () => {
+    // Given
+    const form = { ...createCalcForm(), growth: 99 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.growth).toBeUndefined()
+  })
+
+  it('체증식 증가율이 범위 밖이면 증가율 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), method: 'GRADUATED', growth: 25 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.growth).toContain('20%')
+  })
+
+  it('중도상환을 체크만 하고 비워 두면 오류가 아니다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors).toEqual({})
+  })
+
+  it('중도상환 회차가 대출 기간을 넘으면 회차 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 40, prepayAmount: 100 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.prepayRound).toContain('36회차')
+  })
+
+  it('중도상환 금액만 적고 회차가 비면 회차 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayAmount: 100 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.prepayRound).toBe('중도상환 회차를 입력해 주세요')
+  })
+
+  it('중도상환액이 그때 남은 원금보다 크면 금액 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 1000 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.prepayAmount).toContain('남은 원금')
+  })
+
+  it('중도상환액이 남은 원금 이하면 오류가 없다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 500 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors).toEqual({})
+  })
+
+  it('수수료율이 5%를 넘으면 수수료율 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 100, prepayFee: 6 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.prepayFee).toContain('5%')
+  })
+
+  it('변동 회차가 0이면 금리 변동을 적용하지 않고 오류도 없다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: '' }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors).toEqual({})
+  })
+
+  it('변동 회차를 적었는데 변동 후 금리가 비면 금리 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 12 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.changeRate).toBe('변동 후 금리를 입력해 주세요')
+  })
+
+  it('변동 회차가 대출 기간을 넘으면 회차 오류가 난다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 40, changeRate: 7 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.changeRound).toContain('36회차')
+  })
+})
+
+describe('toScheduleParams', () => {
+  it('금액(만원)을 원으로 바꾼다', () => {
+    // Given
+    const form = { ...createCalcForm(), amount: 2000 }
+    // When
+    const params = toScheduleParams(form)
+    // Then
+    expect(params.principal).toBe(20000000)
+  })
+
+  it('중도상환을 체크하지 않으면 중도상환 값이 없다', () => {
+    // Given
+    const form = { ...createCalcForm(), prepayRound: 6, prepayAmount: 100 }
+    // When
+    const params = toScheduleParams(form)
+    // Then
+    expect(params.prepay).toBeNull()
+  })
+
+  it('중도상환액(만원)을 원으로 바꾼다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 300, prepayFee: 1.2 }
+    // When
+    const params = toScheduleParams(form)
+    // Then
+    expect(params.prepay).toEqual({ round: 6, amount: 3000000, feeRate: 1.2 })
+  })
+
+  it('변동 회차가 0이면 금리 변동 값이 없다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: 8 }
+    // When
+    const params = toScheduleParams(form)
+    // Then
+    expect(params.rateChange).toBeNull()
   })
 })

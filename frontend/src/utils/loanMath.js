@@ -1,8 +1,9 @@
-import { REPAY_METHOD_CODE } from '../constants/options'
+import { LONG_TERM_MONTHS, REPAY_METHOD_CODE, SHORT_TERM_MONTHS } from '../constants/options'
+import { formatMoney, formatNumber } from './format'
 
 // 대출 계산 함수 (화면 없는 계산)
-// 지금은 비교 화면(CP-02, 03, 05)이 쓰는 상환 방식별(원리금균등, 원금균등, 만기일시) 계산과 유리 판정만 있다.
-// 계산기(CA-02)가 쓰는 상환 스케줄은 그 이슈(CHORONG-49)에서 이 파일에 추가한다.
+// 위쪽은 비교 화면(CP-02, 03, 05)이 쓰는 상환 방식별(원리금균등, 원금균등, 만기일시) 계산과 유리 판정,
+// 맨 아래는 계산기(CA-02~06, CHORONG-49)가 쓰는 상환 스케줄(4개 방식, 거치, 중도상환, 금리 변동)과 입력 검사.
 
 export const isNumber = (value) => typeof value === 'number' && Number.isFinite(value)
 
@@ -220,4 +221,352 @@ export function getCompareWinners(productA, productB, resultA, resultB, isSameMe
     monthly: isBothOk && isSameMethod ? pickWinner(resultA.monthly, resultB.monthly, false) : null,
     totalInterest: isBothOk ? pickWinner(resultA.totalInterest, resultB.totalInterest, false) : null,
   }
+}
+
+// ---------------------------------------------------------------------------
+// 대출 이자 계산기 (CA-01~07, CHORONG-49)
+// ---------------------------------------------------------------------------
+
+// 계산기 입력 한도 (금액은 만원 단위, 나머지는 %). 금액 위, 수수료율, 증가율 한도는 명세서에 없어 정한 값
+export const CALC_LIMITS = { amountMin: 1, amountMax: 100000, rateMax: 20, feeMax: 5, growthMax: 20 }
+
+// 계산기 상환 방식 4개 (코드는 API-24 repayMethod와 같게)
+export const CALC_METHODS = [
+  { code: 'EQUAL_PI', label: '원리금균등' },
+  { code: 'EQUAL_P', label: '원금균등' },
+  { code: 'BULLET', label: '만기일시' },
+  { code: 'GRADUATED', label: '체증식' },
+]
+
+// 바로 열었을 때 처음 값 (금액 만원, 기간 개월, 연 이자율 %)
+export const CALC_DEFAULTS = { amount: FALLBACK_AMOUNT_MAN, months: 36, rate: 5, method: 'EQUAL_PI' }
+
+// 기간 선택지 전체 (12, 36, 60, 120, 180개월)
+const ALL_TERM_MONTHS = [...new Set([...SHORT_TERM_MONTHS, ...LONG_TERM_MONTHS])].sort((a, b) => a - b)
+
+// 넘어온 기간으로 기간 칩 목록 정하기: 계산기는 넘어온 용도를 모르므로 기간으로 짐작한다.
+// 12, 36은 그 밖 용도(12, 36, 60), 120, 180은 전월세, 주택 구입(60, 120, 180), 60이나 모르는 값은 용도를 알 수 없어 전체
+export function getCalcTermOptions(months) {
+  const isShort = SHORT_TERM_MONTHS.includes(months)
+  const isLong = LONG_TERM_MONTHS.includes(months)
+  if (isShort && !isLong) return SHORT_TERM_MONTHS
+  if (isLong && !isShort) return LONG_TERM_MONTHS
+  return ALL_TERM_MONTHS
+}
+
+// 다른 화면에서 navigate state로 넘긴 값 → 계산기 처음 값 (CA-01)
+// state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 기본값
+// 결과: { amount 만원, months, rate, method, termOptions }
+export function getInitialCalc(state) {
+  const initial = { ...CALC_DEFAULTS, termOptions: ALL_TERM_MONTHS }
+
+  const amount = isNumber(state?.loanAmount) ? Math.round(state.loanAmount / 10000) : null
+  if (amount !== null && amount >= CALC_LIMITS.amountMin && amount <= CALC_LIMITS.amountMax) initial.amount = amount
+
+  if (ALL_TERM_MONTHS.includes(state?.loanMonths)) {
+    initial.months = state.loanMonths
+    initial.termOptions = getCalcTermOptions(state.loanMonths)
+  }
+
+  const rate = state?.interestRate
+  if (isNumber(rate) && rate >= 0 && rate <= CALC_LIMITS.rateMax) initial.rate = rate
+
+  if (CALC_METHODS.some((method) => method.code === state?.repayMethod)) initial.method = state.repayMethod
+
+  return initial
+}
+
+// 계산기 입력 칸 묶음(form)의 처음 모양. 금액 만원, 중도상환액 만원, 나머지는 개월, 회차, %
+// 칸이 비어 있으면 ''. 거치, 수수료율, 변동 회차의 빈 칸은 0으로 본다.
+// prepayMode: REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기
+export function createCalcForm(initial = getInitialCalc()) {
+  return {
+    method: initial.method,
+    amount: initial.amount,
+    months: initial.months,
+    rate: initial.rate,
+    graceMonths: 0,
+    growth: 5,
+    isPrepay: false,
+    prepayRound: '',
+    prepayAmount: '',
+    prepayFee: 0,
+    prepayMode: 'REDUCE_PAYMENT',
+    isRateChange: false,
+    changeRound: 0,
+    changeRate: '',
+  }
+}
+
+const isEmptyValue = (value) => value === '' || value === null || value === undefined
+const orZero = (value) => (isEmptyValue(value) ? 0 : value)
+const isInRange = (value, min, max) => isNumber(value) && value >= min && value <= max
+
+// 중도상환 칸이 계산에 들어가는지: 체크했고 회차, 금액 중 하나라도 적었을 때 (둘 다 비어 있으면 아직 안 정한 것)
+const isPrepayApplied = (form) => form.isPrepay && !(isEmptyValue(form.prepayRound) && isEmptyValue(form.prepayAmount))
+
+// 금리 변동 칸이 계산에 들어가는지: 체크했고 변동 회차가 1 이상 (0이면 적용 안 함)
+const isRateChangeApplied = (form) => form.isRateChange && orZero(form.changeRound) > 0
+
+// 입력 칸 → 상환 스케줄 계산 값 (getSchedule에 그대로 넣음. 금액은 원 단위)
+export function toScheduleParams(form) {
+  return {
+    method: form.method,
+    principal: form.amount * 10000,
+    rate: form.rate,
+    months: form.months,
+    graceMonths: orZero(form.graceMonths),
+    growth: form.growth,
+    prepayMode: form.prepayMode,
+    prepay: isPrepayApplied(form)
+      ? { round: form.prepayRound, amount: orZero(form.prepayAmount) * 10000, feeRate: orZero(form.prepayFee) }
+      : null,
+    rateChange: isRateChangeApplied(form) ? { round: form.changeRound, rate: form.changeRate } : null,
+  }
+}
+
+// 상환 스케줄 계산 오차: 0.5원 아래 남은 원금은 다 갚은 것으로 본다
+const PAID_OFF = 0.005
+
+// 연금식(원리금균등, 체증식)의 첫 달 기준 납입액: 남은 원금을 남은 회차(count)에 갚도록 현재가치를 맞춘다
+// factor(index) = 상환 시작 후 index번째 달의 납입액 배수 (원리금균등은 항상 1, 체증식은 해마다 늘어남)
+function solveBasePayment(balance, monthlyRate, startIndex, count, factor) {
+  let discounted = 0
+  for (let step = 0; step < count; step += 1) {
+    discounted += factor(startIndex + step) / (1 + monthlyRate) ** (step + 1)
+  }
+  return balance / discounted
+}
+
+// 회차별 상환 스케줄 (CA-02, 05, 06)
+// params: { method, principal 원, rate 연 %, months, graceMonths = 0, growth = 0 (체증식 연 증가율 %),
+//   prepay = { round, amount 원, feeRate % } 또는 null, prepayMode = 'REDUCE_PAYMENT' | 'SHORTEN_TERM',
+//   rateChange = { round, rate 연 % } 또는 null }
+// - 거치기간: 그동안은 이자만 내고, 그 뒤 남은 회차에 원금을 갚는다 (만기일시는 거치 없음)
+// - 체증식: 납입액이 12개월마다 growth %씩 늘어남 (처음 값은 전체를 갚도록 맞춤). 원금이 늘어나는 달이 생기면 계산 불가(null)
+// - 중도상환: round회차 납입 뒤에 amount만큼 원금을 갚음 (남은 원금보다 크면 남은 원금까지, 수수료 = amount x feeRate%)
+//     월 납입액 줄이기: 다음 회차부터 남은 회차에 맞춰 납입액(원금균등은 매달 원금)을 다시 계산 / 기간 줄이기: 납입액을 그대로 두어 일찍 끝남 (만기일시는 둘 다 같음)
+// - 금리 변동: round회차부터 새 금리 (연금식은 남은 원래 회차 기준으로 납입액을 다시 계산)
+// 결과: { rows [{ round, payment, principal, interest, prepay, balance }], totalInterest, prepayFee, totalPayment, firstPayment, lastRound }
+//   (금액은 원 단위 반올림, 총이자는 반올림 전 합을 반올림) / 입력이 이상하거나 계산이 안 되면 null
+export function getSchedule({
+  method,
+  principal,
+  rate,
+  months,
+  graceMonths = 0,
+  growth = 0,
+  prepay = null,
+  prepayMode = 'REDUCE_PAYMENT',
+  rateChange = null,
+}) {
+  if (!isValidLoan(principal, rate, months)) return null
+  if (!CALC_METHODS.some((item) => item.code === method)) return null
+
+  const isBullet = method === 'BULLET'
+  const isAnnuity = method === 'EQUAL_PI' || method === 'GRADUATED'
+  const grace = isBullet ? 0 : graceMonths
+  if (!Number.isInteger(grace) || grace < 0 || grace >= months) return null
+  const growthRate = method === 'GRADUATED' ? growth : 0
+  if (!isNumber(growthRate) || growthRate < 0) return null
+
+  const factor = (index) => (1 + growthRate / 100) ** Math.floor(index / 12)
+
+  let balance = principal
+  let monthlyRate = rate / 12 / 100
+  let basePayment = 0 // 연금식 첫 달 기준 납입액
+  let principalUnit = 0 // 원금균등 매달 원금
+  let needBase = true
+  let needUnit = true
+  let prepaidInGrace = 0 // 거치 중 중도상환한 돈 (기간 줄이기는 이 돈을 빼지 않고 납입액을 정함)
+  let sumInterest = 0
+  let sumFee = 0
+  const rows = []
+
+  for (let round = 1; round <= months && balance > PAID_OFF; round += 1) {
+    if (rateChange && round === rateChange.round) {
+      monthlyRate = rateChange.rate / 12 / 100
+      needBase = true
+    }
+
+    const interest = balance * monthlyRate
+    let principalPart
+    if (isBullet) {
+      principalPart = round === months ? balance : 0
+    } else if (round <= grace) {
+      principalPart = 0
+    } else {
+      const index = round - grace - 1 // 상환 시작 후 몇 번째 달인지 (0부터)
+      const left = months - round + 1
+      const planBalance = round === grace + 1 ? balance + prepaidInGrace : balance
+      if (isAnnuity) {
+        if (needBase) {
+          basePayment = solveBasePayment(planBalance, monthlyRate, index, left, factor)
+          needBase = false
+        }
+        principalPart = basePayment * factor(index) - interest
+      } else {
+        if (needUnit) {
+          principalUnit = planBalance / left
+          needUnit = false
+        }
+        principalPart = Math.min(principalUnit, balance)
+      }
+    }
+
+    if (!isNumber(principalPart) || principalPart < -PAID_OFF) return null // 원금이 늘어나는 달이 있으면 계산 불가
+    principalPart = Math.max(0, principalPart)
+    // 마지막 회차(또는 납입액이 남은 원금을 넘는 회차)는 남은 원금을 전부 갚음
+    if (round === months || principalPart > balance - PAID_OFF) principalPart = balance
+    balance -= principalPart
+
+    let prepayAmount = 0
+    if (prepay && round === prepay.round && balance > PAID_OFF) {
+      prepayAmount = Math.min(prepay.amount, balance)
+      balance -= prepayAmount
+      sumFee += (prepayAmount * prepay.feeRate) / 100
+      if (prepayMode === 'SHORTEN_TERM') {
+        if (round <= grace) prepaidInGrace += prepayAmount
+      } else {
+        needBase = true
+        needUnit = true
+      }
+    }
+
+    sumInterest += interest
+    rows.push({ round, payment: principalPart + interest, principal: principalPart, interest, prepay: prepayAmount, balance })
+  }
+
+  const roundedRows = rows.map((row) => ({
+    round: row.round,
+    payment: Math.round(row.payment),
+    principal: Math.round(row.principal),
+    interest: Math.round(row.interest),
+    prepay: Math.round(row.prepay),
+    balance: Math.max(0, Math.round(row.balance)),
+  }))
+  const totalInterest = Math.round(sumInterest)
+  const prepayFee = Math.round(sumFee)
+  const totalPayment = Math.round(principal + sumInterest + sumFee)
+  const isAllNumber = [totalInterest, prepayFee, totalPayment].every(isNumber)
+  if (roundedRows.length === 0 || !isAllNumber || totalInterest < 0) return null
+
+  return {
+    rows: roundedRows,
+    totalInterest,
+    prepayFee,
+    totalPayment,
+    firstPayment: roundedRows[0].payment,
+    lastRound: roundedRows.length,
+  }
+}
+
+// 같은 입력으로 상환 방식 4개의 총이자 (CA-06 방식별 총이자). 계산이 안 되는 방식은 totalInterest가 null
+export function getMethodInterests(params) {
+  return CALC_METHODS.map(({ code, label }) => ({
+    code,
+    label,
+    totalInterest: getSchedule({ ...params, method: code })?.totalInterest ?? null,
+  }))
+}
+
+// 중도상환 후 방식 2개 비교 (CA-04): 방식 코드마다 { nextPayment 다음 회차 납입액 (없으면 null), totalInterest, lastRound } 또는 null
+// 중도상환이 없으면 null
+export function getPrepayModeResults(params) {
+  if (!params.prepay) return null
+  const results = {}
+  for (const mode of ['REDUCE_PAYMENT', 'SHORTEN_TERM']) {
+    const schedule = getSchedule({ ...params, prepayMode: mode })
+    results[mode] = schedule
+      ? {
+          nextPayment: schedule.rows[params.prepay.round]?.payment ?? null,
+          totalInterest: schedule.totalInterest,
+          lastRound: schedule.lastRound,
+        }
+      : null
+  }
+  return results
+}
+
+// 중도상환 칸 오류 (비어 있으면 아직 안 정한 것이라 오류 아님)
+function getPrepayErrors(form) {
+  const errors = {}
+  if (!isPrepayApplied(form)) return errors
+  const months = form.months
+  if (isEmptyValue(form.prepayRound)) {
+    errors.prepayRound = '중도상환 회차를 입력해 주세요'
+  } else if (!Number.isInteger(form.prepayRound) || form.prepayRound < 1 || form.prepayRound > months) {
+    errors.prepayRound = `회차는 1회차부터 ${months}회차 사이로 입력해 주세요`
+  }
+  if (isEmptyValue(form.prepayAmount) || form.prepayAmount < 1) {
+    errors.prepayAmount = '중도상환액을 1만원 이상 입력해 주세요'
+  }
+  if (!isEmptyValue(form.prepayFee) && !isInRange(form.prepayFee, 0, CALC_LIMITS.feeMax)) {
+    errors.prepayFee = `수수료율은 0% 이상 ${CALC_LIMITS.feeMax}% 이하로 입력해 주세요`
+  }
+  return errors
+}
+
+// 금리 변동 칸 오류 (변동 회차가 0이거나 비어 있으면 적용 안 함이라 오류 아님)
+function getRateChangeErrors(form) {
+  const errors = {}
+  if (!isRateChangeApplied(form)) return errors
+  if (!Number.isInteger(form.changeRound) || form.changeRound > form.months) {
+    errors.changeRound = `변동 회차는 1회차부터 ${form.months}회차 사이로 입력해 주세요`
+  }
+  if (isEmptyValue(form.changeRate)) {
+    errors.changeRate = '변동 후 금리를 입력해 주세요'
+  } else if (!isInRange(form.changeRate, 0, CALC_LIMITS.rateMax)) {
+    errors.changeRate = `금리는 0% 이상 ${CALC_LIMITS.rateMax}% 이하로 입력해 주세요`
+  }
+  return errors
+}
+
+// 계산기 입력 검사 (E2): 칸 이름(amount, rate, months, graceMonths, growth, prepayRound, prepayAmount, prepayFee, changeRound, changeRate)별 오류 문구
+// 오류가 없으면 빈 객체 = 계산할 수 있음
+export function getCalcErrors(form) {
+  const errors = {}
+  const { amountMin, amountMax, rateMax, growthMax } = CALC_LIMITS
+
+  if (isEmptyValue(form.amount)) {
+    errors.amount = '빌릴 금액을 입력해 주세요'
+  } else if (!isInRange(form.amount, amountMin, amountMax)) {
+    errors.amount = `금액은 ${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하로 입력해 주세요`
+  }
+
+  if (isEmptyValue(form.rate)) {
+    errors.rate = '연 이자율을 입력해 주세요'
+  } else if (!isInRange(form.rate, 0, rateMax)) {
+    errors.rate = `연 이자율은 0% 이상 ${rateMax}% 이하로 입력해 주세요`
+  }
+
+  if (!Number.isInteger(form.months) || form.months < 1) {
+    errors.months = '상환 기간을 골라 주세요'
+    return errors
+  }
+
+  if (form.method !== 'BULLET') {
+    const grace = orZero(form.graceMonths)
+    if (!Number.isInteger(grace) || grace < 0 || grace >= form.months) {
+      errors.graceMonths = `거치 기간은 0개월 이상 ${form.months}개월 미만으로 입력해 주세요`
+    }
+  }
+
+  if (form.method === 'GRADUATED') {
+    if (isEmptyValue(form.growth)) errors.growth = '연 증가율을 입력해 주세요'
+    else if (!isInRange(form.growth, 0, growthMax)) errors.growth = `연 증가율은 0% 이상 ${growthMax}% 이하로 입력해 주세요`
+  }
+
+  Object.assign(errors, getPrepayErrors(form), getRateChangeErrors(form))
+
+  // 중도상환액은 그 회차에 남은 원금 이하 (다른 칸이 다 맞아야 남은 원금을 계산할 수 있음)
+  if (Object.keys(errors).length === 0 && isPrepayApplied(form)) {
+    const base = getSchedule({ ...toScheduleParams(form), prepay: null })
+    const remaining = base?.rows[form.prepayRound - 1]?.balance
+    if (isNumber(remaining) && orZero(form.prepayAmount) * 10000 > remaining) {
+      errors.prepayAmount = `중도상환액은 그때 남은 원금(${formatMoney(remaining, '원')}) 이하로 입력해 주세요`
+    }
+  }
+
+  return errors
 }
