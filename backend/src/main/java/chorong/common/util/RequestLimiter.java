@@ -25,6 +25,20 @@ public class RequestLimiter {
 	// "기능 이름:세션 아이디 또는 IP" -> 최근 1분 요청 시각 목록
 	private final Map<String, Deque<Long>> requestTimes = new ConcurrentHashMap<>();
 
+	// "기능 이름:키(이메일, IP)" -> 마지막 요청 시각 (60초에 한 번 제한, ADMIN-02, 07)
+	private final Map<String, Long> lastRequestTimes = new ConcurrentHashMap<>();
+
+	/** 같은 키(이메일, IP)는 60초에 한 번, 넘으면 429 (관리자 토큰, 가입 인증 메일 폭탄 방지, B10, B17) */
+	public synchronized void checkOncePerMinute(String action, String key) {
+		String mapKey = action + ":" + key;
+		long now = System.currentTimeMillis();
+		Long last = lastRequestTimes.get(mapKey);
+		if (last != null && now - last < WINDOW_MILLIS) {
+			throw new BusinessException(ErrorCode.TOO_MANY_REQUESTS);
+		}
+		lastRequestTimes.put(mapKey, now);
+	}
+
 	public void check(String action, HttpServletRequest request) {
 		String key = action + ":" + getRequester(request);
 		long now = System.currentTimeMillis();

@@ -1,0 +1,96 @@
+package chorong.admin.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import chorong.admin.dto.ImportRequestDTO;
+import chorong.admin.dto.PublishRequestDTO;
+import chorong.common.client.FastApiClient;
+import chorong.common.dto.FastApiVersionResponseDTO;
+import chorong.common.exception.BusinessException;
+import chorong.common.exception.ErrorCode;
+import chorong.common.util.MemoryCache;
+import chorong.product.entity.Source;
+
+/*
+ * 불러오기 시작, 반영 (ADMIN-04) / FastAPI 대신 가짜 FastApiClient
+ */
+class AdminImportServiceImplTest {
+
+	private static final Long ADMIN_ID = 1L;
+	private static final Long JOB_ID = 3L;
+
+	private FastApiClient fastApiClient;
+	private MemoryCache memoryCache;
+	private AdminImportServiceImpl service;
+
+	@BeforeEach
+	void setUp() {
+		fastApiClient = mock(FastApiClient.class);
+		memoryCache = new MemoryCache();
+		service = new AdminImportServiceImpl(fastApiClient, memoryCache);
+		memoryCache.put(MemoryCache.RANKING, "RATE", "랭킹");
+	}
+
+	@Test
+	void 같은_출처를_두_번_보내면_400() {
+		// Given
+		ImportRequestDTO request = new ImportRequestDTO(List.of(Source.KINFA, Source.KINFA));
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> service.startImport(ADMIN_ID, request));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 반영에_성공하면_상품_캐시_비움() {
+		// Given
+		when(fastApiClient.publishImport(any(), anyList(), any(), any())).thenReturn(new FastApiVersionResponseDTO(8L));
+
+		// When
+		service.publishImport(ADMIN_ID, JOB_ID, new PublishRequestDTO(List.of(1L, 2L), 7L));
+
+		// Then
+		assertNull(memoryCache.get(MemoryCache.RANKING, "RATE"));
+	}
+
+	@Test
+	void 반영에_실패하면_캐시_그대로() {
+		// Given
+		when(fastApiClient.publishImport(any(), anyList(), any(), any()))
+				.thenThrow(new BusinessException(ErrorCode.VERSION_CONFLICT));
+
+		// When
+		assertThrows(BusinessException.class,
+				() -> service.publishImport(ADMIN_ID, JOB_ID, new PublishRequestDTO(List.of(1L), 7L)));
+
+		// Then
+		assertNotNull(memoryCache.get(MemoryCache.RANKING, "RATE"));
+	}
+
+	@Test
+	void 반영_기준_버전은_받은_값_그대로_보냄() {
+		// Given
+		when(fastApiClient.publishImport(any(), anyList(), any(), any())).thenReturn(new FastApiVersionResponseDTO(8L));
+
+		// When
+		service.publishImport(ADMIN_ID, JOB_ID, new PublishRequestDTO(List.of(1L, 2L, 2L), 7L));
+
+		// Then: 같은 번호는 한 번만, 기준 버전 7, 관리자 번호는 세션 값
+		verify(fastApiClient).publishImport(JOB_ID, List.of(1L, 2L), 7L, ADMIN_ID);
+	}
+}
