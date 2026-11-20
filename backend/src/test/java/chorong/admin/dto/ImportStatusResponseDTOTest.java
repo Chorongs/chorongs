@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import chorong.common.dto.FastApiImportResponseDTO;
 
 /*
- * FastAPI 응답 목록을 복사해 담는지 (backend/Skills.md SpotBugs 제외 구역 dto)
+ * FastAPI 응답 목록을 복사해 담는지 (원본 목록이 바뀌어도 응답은 그대로)
  */
 class ImportStatusResponseDTOTest {
 

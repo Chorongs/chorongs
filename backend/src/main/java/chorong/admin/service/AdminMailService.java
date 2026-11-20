@@ -3,7 +3,7 @@ package chorong.admin.service;
 import chorong.admin.entity.AdminRole;
 
 /*
- * 관리자 메일 (EXT-06): 가입 인증, 승인 안내, 로그인 토큰 / 글자만 (SimpleMailMessage), 거절은 메일 없음
+ * 관리자 메일 (EXT-06): 가입 인증, 승인 안내, 로그인 토큰 / HTML 템플릿 1개 (templates/mail/admin-mail.html), 거절은 메일 없음
  */
 public interface AdminMailService {
 

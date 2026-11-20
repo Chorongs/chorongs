@@ -45,7 +45,7 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 	private static final String UNCHECKED = "UNCHECKED";
 	private static final DateTimeFormatter JSON_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-	// 409 문구: 이미 처리함, 동시에 먼저 처리됨, 상품이 이미 판매 종료가 아님 (fe_admin API-48과 같은 글)
+	// 409 문구: 이미 처리함, 동시에 먼저 처리됨, 상품이 이미 판매 종료가 아님
 	static final String MSG_ALREADY_DONE = "다른 작업이 먼저 됨";
 
 	private final LoanProductRepository loanProductRepository;

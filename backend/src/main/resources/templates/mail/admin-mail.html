@@ -2,7 +2,6 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <!--/*
     관리자 메일 3종 (로그인 토큰, 가입 인증, 승인 안내)이 같이 쓰는 틀 (EXT-06, AdminMailServiceImpl)
-    디자인은 팀원 시안 admin-login-token.html 그대로, 글자 자리만 변수 (이 주석은 보낼 때 빠짐)
     subject 제목 / introLines 첫 문장 줄들 / codeLabel + codeDigits 번호 칸 (codeDigits가 없으면 숨김)
     notice 굵은 안내 / loginUrl 로그인 버튼 (없으면 숨김) / warning 노란 안내 (없으면 숨김)
     로고 cid:logo = 메일에 붙인 그림 (resources/mail/logo.png)
@@ -71,7 +70,7 @@
             </table>
           </td>
         </tr>
-        <!--/* 카드 아래 여백 (시안은 노란 안내 칸 아래 32px. 칸이 숨겨져도 여백이 남게 따로 둠) */-->
+        <!--/* 카드 아래 여백 (안내 칸을 숨겨도 남게 따로 둠) */-->
         <tr>
           <td style="height:32px;line-height:32px;font-size:0;">&nbsp;</td>
         </tr>

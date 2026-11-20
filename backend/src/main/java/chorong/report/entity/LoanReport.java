@@ -19,7 +19,6 @@ import lombok.NoArgsConstructor;
 /*
  * loan_report 테이블 (대출 상품 신고)
  * 신고자(memberId)는 관리자 화면에만, 일반 이용자 API에는 내리지 않음
- * CHORONG-57(관리자 현황, 이력 개수)에서 먼저 만듦 / 신고 저장, 처리 메서드는 CHORONG-50에서 추가
  */
 @Entity
 @Table(name = "loan_report")

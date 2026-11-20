@@ -12,7 +12,7 @@ import chorong.report.entity.LoanReport;
 import chorong.report.entity.ReportStatus;
 
 /*
- * loan_report 테이블 Repository (CHORONG-57에서 관리자 개수용으로 먼저 만듦, 신고 기능 메서드는 CHORONG-50에서 추가)
+ * loan_report 테이블 Repository
  */
 public interface LoanReportRepository extends JpaRepository<LoanReport, Long> {
 

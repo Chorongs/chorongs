@@ -35,48 +35,44 @@ public class AdminMailServiceImpl implements AdminMailService {
 
 	private final JavaMailSender sender;
 	private final SpringTemplateEngine templateEngine;
-	private final String frontUrl;
+	private final String loginUrl;	// 로그인 버튼 주소 = 화면 주소 + /admin/login
 
 	public AdminMailServiceImpl(JavaMailSender sender, SpringTemplateEngine templateEngine,
 			@Value("${front.url}") String frontUrl) {
 		this.sender = sender;
 		this.templateEngine = templateEngine;
-		this.frontUrl = frontUrl;
+		this.loginUrl = frontUrl + LOGIN_PATH;
 	}
 
 	@Override
 	public void sendJoinToken(String email, String token) {
-		String subject = "[캐링 관리자] 가입 인증 번호";
-		Context context = newContext(subject, List.of("관리자 가입 신청을 위한", "인증 번호를 보내 드립니다."),
+		Context context = newContext(List.of("관리자 가입 신청을 위한", "인증 번호를 보내 드립니다."),
 				"10분 동안 유효합니다.", "본인이 신청하지 않았다면 이 메일은 무시해 주세요.");
 		setCode(context, "인증 번호", token);	// 버튼 없음: 가입 화면에 바로 입력
-		sendMail(subject, context, email, "가입 인증");
+		sendMail("[캐링 관리자] 가입 인증 번호", context, email, "가입 인증");
 	}
 
 	@Override
 	public void sendApproved(String email, AdminRole adminRole) {
 		String roleName = adminRole == AdminRole.APPROVER ? "승인권자" : "관리자";
-		String subject = "[캐링 관리자] 가입이 승인되었습니다";
-		Context context = newContext(subject, List.of("관리자 가입이 승인되었습니다."),
+		Context context = newContext(List.of("관리자 가입이 승인되었습니다."),
 				"역할은 " + roleName + "입니다. 아래 버튼에서 로그인해 주세요.", null);	// 번호 칸, 노란 안내 없음
-		context.setVariable("loginUrl", frontUrl + LOGIN_PATH);
-		sendMail(subject, context, email, "승인 안내");
+		context.setVariable("loginUrl", loginUrl);
+		sendMail("[캐링 관리자] 가입이 승인되었습니다", context, email, "승인 안내");
 	}
 
 	@Override
 	public void sendLoginToken(String email, String token) {
-		String subject = "[캐링 관리자] 로그인 토큰";
-		Context context = newContext(subject, List.of("관리자 페이지 로그인을 위한", "로그인 토큰을 보내 드립니다."),
+		Context context = newContext(List.of("관리자 페이지 로그인을 위한", "로그인 토큰을 보내 드립니다."),
 				"2시간 동안 유효하며 한 번만 사용할 수 있습니다.", "본인이 요청하지 않았다면 승인권자에게 알려 주세요.");
 		setCode(context, "로그인 토큰", token);
-		context.setVariable("loginUrl", frontUrl + LOGIN_PATH);
-		sendMail(subject, context, email, "로그인 토큰");
+		context.setVariable("loginUrl", loginUrl);
+		sendMail("[캐링 관리자] 로그인 토큰", context, email, "로그인 토큰");
 	}
 
-	// 템플릿 칸 값 (메일마다 다른 문구): 제목, 첫 문장 줄들, 굵은 안내, 노란 안내 (null이면 칸이 숨겨짐)
-	private static Context newContext(String subject, List<String> introLines, String notice, String warning) {
+	// 템플릿 칸 값 (메일마다 다른 문구): 첫 문장 줄들, 굵은 안내, 노란 안내 (null이면 칸이 숨겨짐) / 제목은 sendMail이 넣음
+	private static Context newContext(List<String> introLines, String notice, String warning) {
 		Context context = new Context();
-		context.setVariable("subject", subject);
 		context.setVariable("introLines", introLines);
 		context.setVariable("notice", notice);
 		context.setVariable("warning", warning);
@@ -89,8 +85,9 @@ public class AdminMailServiceImpl implements AdminMailService {
 		context.setVariable("codeDigits", List.of(token.split("")));
 	}
 
-	// 메일 한 통 보내기: 템플릿으로 HTML을 만들고, 로고 그림을 붙여 보냄
+	// 메일 한 통 보내기: 제목을 넣어 템플릿으로 HTML을 만들고 (메일 제목 = HTML title), 로고 그림을 붙여 보냄
 	private void sendMail(String subject, Context context, String to, String what) {
+		context.setVariable("subject", subject);
 		String html = templateEngine.process(TEMPLATE, context);
 		try {
 			MimeMessage message = sender.createMimeMessage();

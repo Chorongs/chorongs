@@ -20,7 +20,7 @@ public class AdminUtil {
 
 	private AdminUtil() {}
 
-	/** 관리자 로그인 유지 시간: 로그인 + 2시간 고정, 활동해도 연장 없음 (B4, AdminInterceptor, 관리자 서비스가 같이 씀) */
+	/** 관리자 로그인 유지 시간: 로그인 + 2시간 고정, 활동해도 연장 없음 (B4) */
 	public static final long LOGIN_HOURS = 2;
 
 	/** 관리자 401 문구 (관리자 상세 기획 4-11 문구 12, 13): 2시간 지남 / 해제, 탈퇴됨 */

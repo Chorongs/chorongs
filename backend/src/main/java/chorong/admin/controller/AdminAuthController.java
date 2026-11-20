@@ -47,7 +47,7 @@ public class AdminAuthController {
 			HttpServletRequest request) {
 		requestLimiter.check("adminLogin", request);
 		AdminResponseDTO response = adminAuthService.login(request.getSession(), requestDTO);
-		request.changeSessionId();	// 로그인 성공 시 세션 아이디 새로 발급 (B5, AuthController와 같은 방식)
+		request.changeSessionId();	// 로그인 성공 시 세션 아이디 새로 발급 (세션 고정 공격 방지, B5)
 		return ResponseEntity.ok(ApiResponse.success(response));
 	}
 

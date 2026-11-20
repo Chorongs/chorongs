@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginAdminDTO implements Serializable {	// 세션에 넣는 값 (LoginMemberDTO와 같이, SpotBugs J2EE_STORE_OF_NON_SERIALIZABLE_OBJECT_INTO_SESSION)
+public class LoginAdminDTO implements Serializable {	// 세션에 넣는 값이라 Serializable (세션을 저장, 복원할 때 필요)
 	private static final long serialVersionUID = 1L;
 	private Long adminId;			// 관리자 번호
 	private String adminName;		// 이름
