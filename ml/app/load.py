@@ -5,6 +5,7 @@
                    python -m app.load          (실제로 넣음)
     - 입력: ml/data/csv/ 의 수집 CSV (python -m app.collect로 받은 것). 수집일 = 서민 CSV 파일 날짜
     - 넣는 표: loan_product, tag(없는 값만), product_tag, product_rate, product_rate_month, product_update_history(INIT 1건)
+    - 넣기 함수(ensure_tags, link_rows, insert_links)는 반영(publish.py)도 같이 씀
     - 확인 필요 상품(check_reasons)은 넣지 않음 (be_admin ADMIN-04: 확인 필요는 반영 불가)
     - 한 트랜잭션: 중간에 실패하면 전부 되돌림 / 상품 표가 비어 있지 않으면 멈춤 (첫 적재는 1번만)
     - DB 접속: Spring과 같은 환경변수 DB_URL(jdbc:oracle:thin:@...), DB_USERNAME, DB_PASSWORD (B12)
@@ -28,6 +29,8 @@ PRODUCT_COLS = ["source", "source_code", "company_name", "product_name", "loan_t
                 "income_max", "income_basis", "income_note", "prepay_fee_max", "no_prepay_fee_yn", "online_yn",
                 "policy_yn", "rate_type", "extra_cond", "target_detail", "note", "raw_json", "base_date",
                 "disclose_start", "disclose_end"]
+DATE_COLS = ("base_date", "disclose_start", "disclose_end")     # DATE 칸 (JSON 글 ↔ datetime 변환 대상)
+SELECT_PRODUCT_IDS = "SELECT source, loan_type, source_code, product_id FROM loan_product"   # id_map용
 
 INSERT_PRODUCT = text(
     f"INSERT INTO loan_product ({', '.join(PRODUCT_COLS)}) VALUES ({', '.join(':' + c for c in PRODUCT_COLS)})"
@@ -58,12 +61,35 @@ def make_engine():
         "user": os.environ["DB_USERNAME"], "password": os.environ["DB_PASSWORD"], "dsn": target})
 
 
-def count_summary(products, skipped):
-    """반영 이력 count_json: 상품 종류별 건수, 칩별 건수, 넣지 않은 확인 필요 건수"""
+TAG_TYPES = ("TARGET", "PURPOSE", "AMOUNT", "REPAY", "SECTOR", "COMPANY", "REGION", "CREDIT")   # 필터 8종
+
+
+def chip_counts(products):
+    """칩별 건수 {'TARGET:직장인': n, ...}"""
     chips = Counter(f"{t['tag_type']}:{t['tag_value']}" for p in products for t in p["tags"])
-    return json.dumps({"loan_type": Counter(p["loan_type"] for p in products),
-                       "chips": dict(sorted(chips.items())),
-                       "check_skipped": len(skipped)}, ensure_ascii=False)
+    return dict(sorted(chips.items()))
+
+
+def missing_counts(products):
+    """결측 건수 {'REPAY': n, ...} = 그 종류 칩이 하나도 없는 상품 수 (정제 기준 3-5 괄호 숫자와 같은 정의)"""
+    return {tag_type: sum(all(t["tag_type"] != tag_type for t in p["tags"]) for p in products)
+            for tag_type in TAG_TYPES}
+
+
+def catalog_summary(products):
+    """
+        이력 count_json에 남기는 상품 전체 집계 (데이터 처리 기획서 3-7: 출처별, 칩별, 결측 개수를 지난 반영과 비교)
+        첫 적재(INIT)는 넣은 상품, 반영(PUBLISH)은 반영 뒤 판매 종료 아닌 상품 전체가 대상
+    """
+    return {"source": dict(Counter(p["source"] for p in products)),
+            "loan_type": dict(Counter(p["loan_type"] for p in products)),
+            "chips": chip_counts(products),
+            "missing": missing_counts(products)}
+
+
+def count_summary(products, skipped):
+    """첫 적재 이력 count_json: 상품 전체 집계 + 넣지 않은 확인 필요 건수"""
+    return json.dumps({**catalog_summary(products), "check_skipped": len(skipped)}, ensure_ascii=False)
 
 
 def id_map(conn, sql):
@@ -71,34 +97,67 @@ def id_map(conn, sql):
     return {tuple(row[:-1]): row[-1] for row in conn.execute(text(sql))}
 
 
-def load(conn, products, skipped):
-    """빈 상품 표에 넣기 (conn은 트랜잭션 안)"""
-    conn.execute(INSERT_PRODUCT, [{c: p[c] for c in PRODUCT_COLS} for p in products])
-    product_ids = id_map(conn, "SELECT source, loan_type, source_code, product_id FROM loan_product")
+# ---------- 반영(publish.py)과 같이 쓰는 넣기 함수 ----------
 
+def product_key(product):
+    """같은 상품인지 가르는 열쇠 (unique(source, loan_type, source_code))"""
+    return (product["source"], product["loan_type"], product["source_code"])
+
+
+def dcls_month(product):
+    """금감원 상품의 공시월 YYYYMM (raw_json의 기본 행 dcls_month). 서민, 없으면 None"""
+    if product["source"] != "FSS" or not product.get("raw_json"):
+        return None
+    return json.loads(product["raw_json"]).get("base", {}).get("dcls_month")
+
+
+def ensure_tags(conn, products):
+    """상품들의 칩 중 tag 표에 없는 값만 넣고 {(tag_type, tag_value): tag_id}와 새로 넣은 수를 돌려줌"""
     tag_ids = id_map(conn, "SELECT tag_type, tag_value, tag_id FROM tag")
     new_tags = sorted({(t["tag_type"], t["tag_value"]) for p in products for t in p["tags"]} - set(tag_ids))
     if new_tags:
         conn.execute(INSERT_TAG, [{"tag_type": k, "tag_value": v} for k, v in new_tags])
         tag_ids = id_map(conn, "SELECT tag_type, tag_value, tag_id FROM tag")
+    return tag_ids, len(new_tags)
+
+
+def link_rows(product, product_id, tag_ids):
+    """상품 1개의 product_tag, product_rate, product_rate_month 행 (공시월이 없으면 월별 금리 없음)"""
+    product_tags = [{"tag_id": tag_ids[(t["tag_type"], t["tag_value"])], "product_id": product_id}
+                    for t in product["tags"]]
+    rates = [{**r, "product_id": product_id} for r in product["rates"]]
+    month = dcls_month(product) if rates else None     # 금감원만 금리 줄이 있음
+    rate_months = [{**r, "dcls_month": month} for r in rates] if month else []
+    return product_tags, rates, rate_months
+
+
+def insert_links(conn, product_tags, rates, rate_months):
+    """product_tag, product_rate, product_rate_month 행 넣기 (빈 목록은 건너뜀)"""
+    if product_tags:
+        conn.execute(INSERT_PRODUCT_TAG, product_tags)
+    if rates:
+        conn.execute(INSERT_RATE, rates)
+    if rate_months:
+        conn.execute(INSERT_RATE_MONTH, rate_months)
+
+
+def load(conn, products, skipped):
+    """빈 상품 표에 넣기 (conn은 트랜잭션 안)"""
+    conn.execute(INSERT_PRODUCT, [{c: p[c] for c in PRODUCT_COLS} for p in products])
+    product_ids = id_map(conn, SELECT_PRODUCT_IDS)
+    tag_ids, new_tag_count = ensure_tags(conn, products)
 
     product_tags, rates, rate_months = [], [], []
     for p in products:
-        product_id = product_ids[(p["source"], p["loan_type"], p["source_code"])]
-        product_tags += [{"tag_id": tag_ids[(t["tag_type"], t["tag_value"])], "product_id": product_id}
-                         for t in p["tags"]]
-        rates += [{**r, "product_id": product_id} for r in p["rates"]]
-        if p["rates"]:   # 금감원만 금리 줄이 있음, 공시월은 원본 기본 행
-            month = json.loads(p["raw_json"])["base"]["dcls_month"]
-            rate_months += [{**r, "product_id": product_id, "dcls_month": month} for r in p["rates"]]
+        pt, r, rm = link_rows(p, product_ids[product_key(p)], tag_ids)
+        product_tags += pt
+        rates += r
+        rate_months += rm
 
-    conn.execute(INSERT_PRODUCT_TAG, product_tags)
-    if rates:
-        conn.execute(INSERT_RATE, rates)
-        conn.execute(INSERT_RATE_MONTH, rate_months)
+    insert_links(conn, product_tags, rates, rate_months)
     conn.execute(INSERT_HISTORY, {"added_count": len(products), "memo": "첫 적재 (ml/app/load.py)",
                                   "count_json": count_summary(products, skipped)})
-    return {"상품": len(products), "새 태그": len(new_tags), "상품 태그": len(product_tags),
+    return {"상품": len(products), "새 태그": new_tag_count, "상품 태그": len(product_tags),
             "구간 금리": len(rates), "월별 금리": len(rate_months)}
 
 

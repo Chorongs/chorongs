@@ -1156,16 +1156,19 @@ def check_product(product):
     return reasons
 
 
-def clean_products(tables, sources, collected_on, today):
+def clean_products(tables, sources, collected_on, today, bank_names=None):
     """
         수집한 출처의 원본 → 정제, 판매 종료 제외, 검증까지 끝난 상품 목록 (EXT-01, EXT-02)
 
         - sources: 수집에 성공한 출처 ('KINFA', 'FSS'). 없는 출처는 정제하지 않음
-        - 서민 취급기관 은행 대조는 같이 받은 금감원 은행 이름으로 (금감원이 없으면 빈 목록)
+        - 서민 취급기관 은행 대조는 같이 받은 금감원 은행 이름으로. 금감원 수집이 빠진 불러오기는
+          bank_names에 DB의 금감원 은행 이름을 넘김 (imports.py, 없으면 빈 목록이라 은행이 '기타'가 됨)
     """
     products = []
     if "KINFA" in sources:
-        products += clean_kinfa(tables["kinfa_loan_products"], collected_on, fss_bank_names(tables))
+        if bank_names is None:
+            bank_names = fss_bank_names(tables)
+        products += clean_kinfa(tables["kinfa_loan_products"], collected_on, bank_names)
     if "FSS" in sources:
         products += clean_fss(tables)
 
