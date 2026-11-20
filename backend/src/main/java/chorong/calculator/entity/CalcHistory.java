@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 
 /*
  * calc_history 테이블 (이자 계산 기록, 회원당 최근 10개)
- * 기본 입력값과 결과만 저장 (중도상환, 금리 변동은 저장 안 함) / 금액 칸은 원 단위
+ * 기본 입력값, 옵션(체증식 증가율, 중도상환, 금리 변동), 결과 저장 / 금액 칸은 원 단위
  */
 @Entity
 @Table(name = "calc_history")
@@ -58,6 +58,29 @@ public class CalcHistory {
 
 	@Column(name = "first_payment")
 	private Long firstPayment;			// 첫 달 납부액 (원)
+
+	// 아래 7칸은 옵션을 안 썼으면 null (중도상환 4칸은 함께, 금리 변동 2칸은 함께)
+	@Column(name = "growth_rate")
+	private BigDecimal growthRate;		// 체증식 연 증가율 (%)
+
+	@Column(name = "prepay_round")
+	private Integer prepayRound;		// 중도상환 회차
+
+	@Column(name = "prepay_amount")
+	private Long prepayAmount;			// 중도상환액 (원)
+
+	@Column(name = "prepay_fee_rate")
+	private BigDecimal prepayFeeRate;	// 중도상환수수료율 (%)
+
+	@Enumerated(EnumType.STRING)
+	@Column(name = "prepay_mode")
+	private PrepayMode prepayMode;
+
+	@Column(name = "change_round")
+	private Integer changeRound;		// 금리 변동 회차
+
+	@Column(name = "change_rate")
+	private BigDecimal changeRate;		// 변동 후 연 금리 (%)
 
 	@Column(name = "calc_at")
 	private LocalDateTime calcAt;		// 계산 시각

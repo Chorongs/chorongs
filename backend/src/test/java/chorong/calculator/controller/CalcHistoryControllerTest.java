@@ -1,5 +1,6 @@
 package chorong.calculator.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -12,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
@@ -57,6 +59,16 @@ class CalcHistoryControllerTest {
 				 "graceMonths": 0, "totalInterest": 1234567, "firstPayment": 860000}
 				""".formatted(loanAmount, interestRate, repayMethod);
 	}
+
+	// 기본 값에 옵션 칸을 덧붙인 본문 (extra는 "칸": 값, ... 형태)
+	private static String bodyWith(String extra) {
+		return """
+				{"loanAmount": 10000000, "loanMonths": 36, "interestRate": 4.5, "repayMethod": "EQUAL_PI",
+				 "graceMonths": 0, "totalInterest": 1234567, "firstPayment": 860000, %s}
+				""".formatted(extra);
+	}
+
+	private static final String PREPAY_OK = "\"prepayRound\": 12, \"prepayAmount\": 3000000, \"prepayFeeRate\": 1.2, \"prepayMode\": \"SHORTEN_TERM\"";
 
 	private void assertPostStatus(String body, int expected) throws Exception {
 		mockMvc.perform(post(URL).session(memberSession()).contentType(MediaType.APPLICATION_JSON).content(body))
@@ -194,5 +206,81 @@ class CalcHistoryControllerTest {
 	void 본문_형식이_틀리면_400() throws Exception {
 		// Given, When, Then
 		assertPostStatus("{not json", 400);
+	}
+
+	// ---- 입력 검사: 옵션 칸 (B2) ----
+
+	@Test
+	void 중도상환_4칸이_모두_있으면_201() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWith(PREPAY_OK), 201);
+	}
+
+	@Test
+	void 옵션_칸은_서비스로_그대로_넘어간다() throws Exception {
+		// Given
+		String body = bodyWith(PREPAY_OK + ", \"changeRound\": 6, \"changeRate\": 7.5");
+
+		// When
+		assertPostStatus(body, 201);
+
+		// Then
+		ArgumentCaptor<CalcHistoryRequestDTO> captor = ArgumentCaptor.forClass(CalcHistoryRequestDTO.class);
+		verify(calcHistoryService).saveCalc(eq(MEMBER_ID), captor.capture());
+		assertEquals(12, captor.getValue().getPrepayRound());
+	}
+
+	@Test
+	void 모르는_중도상환_방식이면_400() throws Exception {
+		// Given
+		String body = bodyWith("\"prepayRound\": 12, \"prepayAmount\": 3000000, \"prepayFeeRate\": 1.2, \"prepayMode\": \"UNKNOWN\"");
+
+		// When, Then
+		assertPostStatus(body, 400);
+	}
+
+	@Test
+	void 중도상환_금액이_1만원_미만이면_400() throws Exception {
+		// Given
+		String body = bodyWith("\"prepayRound\": 12, \"prepayAmount\": 9999, \"prepayFeeRate\": 1.2, \"prepayMode\": \"SHORTEN_TERM\"");
+
+		// When, Then
+		assertPostStatus(body, 400);
+	}
+
+	@Test
+	void 중도상환_수수료율이_5_초과면_400() throws Exception {
+		// Given
+		String body = bodyWith("\"prepayRound\": 12, \"prepayAmount\": 3000000, \"prepayFeeRate\": 5.01, \"prepayMode\": \"SHORTEN_TERM\"");
+
+		// When, Then
+		assertPostStatus(body, 400);
+	}
+
+	@Test
+	void 중도상환_회차가_0이면_400() throws Exception {
+		// Given
+		String body = bodyWith("\"prepayRound\": 0, \"prepayAmount\": 3000000, \"prepayFeeRate\": 1.2, \"prepayMode\": \"SHORTEN_TERM\"");
+
+		// When, Then
+		assertPostStatus(body, 400);
+	}
+
+	@Test
+	void 금리_변동이_올바르면_201() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWith("\"changeRound\": 6, \"changeRate\": 7.5"), 201);
+	}
+
+	@Test
+	void 변동_후_금리가_20_초과면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWith("\"changeRound\": 6, \"changeRate\": 20.01"), 400);
+	}
+
+	@Test
+	void 증가율이_20_초과면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWith("\"growthRate\": 20.01"), 400);
 	}
 }

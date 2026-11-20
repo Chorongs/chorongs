@@ -1,6 +1,7 @@
 package chorong.calculator.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -22,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import chorong.calculator.dto.CalcHistoryRequestDTO;
 import chorong.calculator.dto.CalcHistoryResponseDTO;
 import chorong.calculator.entity.CalcHistory;
+import chorong.calculator.entity.PrepayMode;
 import chorong.calculator.entity.RepayMethod;
 import chorong.calculator.repository.CalcHistoryRepository;
 import chorong.common.exception.BusinessException;
@@ -49,7 +51,28 @@ class CalcHistoryServiceImplTest {
 
 	private static CalcHistoryRequestDTO request(int loanMonths) {
 		return new CalcHistoryRequestDTO(10000000L, loanMonths, new BigDecimal("4.5"), RepayMethod.EQUAL_PI, 0,
-				1234567L, 860000L);
+				1234567L, 860000L, null, null, null, null, null, null, null);
+	}
+
+	/** 중도상환 4칸을 모두 채운 요청 (6회차, 300만원, 수수료율 1.2%, 월 납입액 줄이기) */
+	private static CalcHistoryRequestDTO prepayRequest(int loanMonths) {
+		CalcHistoryRequestDTO request = request(loanMonths);
+		request.setPrepayRound(6);
+		request.setPrepayAmount(3000000L);
+		request.setPrepayFeeRate(new BigDecimal("1.2"));
+		request.setPrepayMode(PrepayMode.REDUCE_PAYMENT);
+		return request;
+	}
+
+	private CalcHistory saved() {
+		ArgumentCaptor<CalcHistory> captor = ArgumentCaptor.forClass(CalcHistory.class);
+		verify(calcHistoryRepository).save(captor.capture());
+		return captor.getValue();
+	}
+
+	private void assertRejected(CalcHistoryRequestDTO request) {
+		BusinessException e = assertThrows(BusinessException.class, () -> calcHistoryService.saveCalc(MEMBER_ID, request));
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
 	}
 
 	private static CalcHistory calc(long calcId, long memberId) {
@@ -121,6 +144,166 @@ class CalcHistoryServiceImplTest {
 		assertEquals(new BigDecimal("4.57"), captor.getValue().getInterestRate());
 	}
 
+	// ---- 칸 사이 규칙: 거치, 만기일시 ----
+
+	@Test
+	void 거치_기간이_대출_기간_이상이면_400이고_저장하지_않는다() {
+		// Given
+		CalcHistoryRequestDTO request = request(12);
+		request.setGraceMonths(12);
+
+		// When, Then
+		assertRejected(request);
+		verify(calcHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	void 거치_기간이_대출_기간보다_짧으면_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = request(12);
+		request.setGraceMonths(11);
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertEquals(11, saved().getGraceMonths());
+	}
+
+	@Test
+	void 만기일시에_거치_기간이_있으면_400() {
+		// Given
+		CalcHistoryRequestDTO request = request(36);
+		request.setRepayMethod(RepayMethod.BULLET);
+		request.setGraceMonths(3);
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	// ---- 칸 사이 규칙: 체증식 증가율 ----
+
+	@Test
+	void 체증식이_아닌데_증가율이_있으면_400() {
+		// Given
+		CalcHistoryRequestDTO request = request(36);
+		request.setGrowthRate(new BigDecimal("5"));
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	@Test
+	void 체증식_증가율은_소수_2자리로_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = request(36);
+		request.setRepayMethod(RepayMethod.GRADUATED);
+		request.setGrowthRate(new BigDecimal("8.555"));
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertEquals(new BigDecimal("8.56"), saved().getGrowthRate());
+	}
+
+	// ---- 칸 사이 규칙: 중도상환 ----
+
+	@Test
+	void 중도상환이_일부만_있으면_400() {
+		// Given: 회차와 금액만 있고 수수료율, 방식이 없음
+		CalcHistoryRequestDTO request = request(36);
+		request.setPrepayRound(6);
+		request.setPrepayAmount(3000000L);
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	@Test
+	void 중도상환_회차가_대출_기간을_넘으면_400() {
+		// Given
+		CalcHistoryRequestDTO request = prepayRequest(12);
+		request.setPrepayRound(13);
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	@Test
+	void 중도상환_금액을_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = prepayRequest(36);
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertEquals(3000000L, saved().getPrepayAmount());
+	}
+
+	@Test
+	void 중도상환_방식을_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = prepayRequest(36);
+		request.setPrepayMode(PrepayMode.SHORTEN_TERM);
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertEquals(PrepayMode.SHORTEN_TERM, saved().getPrepayMode());
+	}
+
+	// ---- 칸 사이 규칙: 금리 변동 ----
+
+	@Test
+	void 금리_변동이_일부만_있으면_400() {
+		// Given: 회차만 있고 변동 후 금리가 없음
+		CalcHistoryRequestDTO request = request(36);
+		request.setChangeRound(12);
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	@Test
+	void 금리_변동_회차가_대출_기간을_넘으면_400() {
+		// Given
+		CalcHistoryRequestDTO request = request(12);
+		request.setChangeRound(13);
+		request.setChangeRate(new BigDecimal("7.5"));
+
+		// When, Then
+		assertRejected(request);
+	}
+
+	@Test
+	void 변동_후_금리는_소수_2자리로_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = request(36);
+		request.setChangeRound(12);
+		request.setChangeRate(new BigDecimal("7.555"));
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertEquals(new BigDecimal("7.56"), saved().getChangeRate());
+	}
+
+	@Test
+	void 옵션을_안_쓰면_옵션_칸은_null로_저장한다() {
+		// Given
+		CalcHistoryRequestDTO request = request(36);
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request);
+
+		// Then
+		assertNull(saved().getPrepayRound());
+	}
+
 	@Test
 	void 기록이_10개_이하면_삭제하지_않는다() {
 		// Given
@@ -163,6 +346,34 @@ class CalcHistoryServiceImplTest {
 		assertEquals(2, response.getItems().size());
 		assertEquals(2L, response.getItems().get(0).getCalcId());
 		assertEquals(RepayMethod.EQUAL_PI, response.getItems().get(0).getRepayMethod());
+	}
+
+	@Test
+	void 목록은_옵션_칸도_돌려준다() {
+		// Given
+		CalcHistory withPrepay = CalcHistory.builder()
+				.calcId(7L)
+				.memberId(MEMBER_ID)
+				.loanAmount(10000000L)
+				.loanMonths(36)
+				.interestRate(new BigDecimal("4.50"))
+				.repayMethod(RepayMethod.EQUAL_PI)
+				.graceMonths(0)
+				.totalInterest(1234567L)
+				.firstPayment(860000L)
+				.prepayRound(6)
+				.prepayAmount(3000000L)
+				.prepayFeeRate(new BigDecimal("1.20"))
+				.prepayMode(PrepayMode.SHORTEN_TERM)
+				.calcAt(LocalDateTime.of(2026, 11, 20, 10, 30))
+				.build();
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(withPrepay));
+
+		// When
+		CalcHistoryResponseDTO response = calcHistoryService.getCalcs(MEMBER_ID);
+
+		// Then
+		assertEquals(PrepayMode.SHORTEN_TERM, response.getItems().get(0).getPrepayMode());
 	}
 
 	// ---- 삭제 ----
