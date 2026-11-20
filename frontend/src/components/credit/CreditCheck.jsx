@@ -74,23 +74,56 @@ const Footer = styled.div`
   gap: 12px;
 `
 
-// 앞 답과 안 맞게 된 뒤 문항 답을 비움. 비운 문항 번호 목록도 같이 돌려줌 (문항 5는 값 목록이라 하나라도 안 맞으면 비움)
+// 문항의 전체 보기 (6번 이후는 끝에 '잘 모르겠어요', 5번은 끝에 '없음'이 붙음)
+function getAllChoices(question) {
+  const choices = question.options.map((label, index) => ({ value: index + 1, label }))
+  if (question.hasUnknown) choices.push({ value: UNKNOWN_VALUE, label: '잘 모르겠어요' })
+  if (question.no === FINANCE_QUESTION_NO) choices.push({ value: NO_FINANCE_VALUE, label: '없음' })
+  return choices
+}
+
+// 앞 문항 답과 안 맞는 보기를 뺀 보기
+function getChoices(question, answers) {
+  const hiddenValues = HIDDEN_RULES[question.no]?.(answers) ?? []
+  return getAllChoices(question).filter((choice) => !hiddenValues.includes(choice.value))
+}
+
+// 맞는 보기가 하나만 남으면 그 답 (자동으로 골라짐, 문항 5는 값 목록). 아니면 undefined
+function getForcedAnswer(question, answers) {
+  if (!HIDDEN_RULES[question.no]) return undefined
+  const choices = getChoices(question, answers)
+  if (choices.length !== 1) return undefined
+  return question.isMultiple ? [choices[0].value] : choices[0].value
+}
+
+// 앞 답과 안 맞게 된 뒤 문항 답을 비우고, 보기가 하나만 남은 문항은 그 답으로 채움
+// 비운 문항 번호 목록도 같이 돌려줌 (문항 5는 값 목록이라 하나라도 안 맞으면 비움)
+// previous: 바뀌기 전 답. 그때 자동으로 골라져 있던 답은 알림 없이 비움
 // 빈 목록(문항 5를 다 해제한 경우, 예전 저장 답)은 답 안 한 것으로 보고 알림 없이 지움
-function removeConflicts(answers) {
+function removeConflicts(answers, previous = {}) {
   const next = { ...answers }
   const cleared = []
   Object.entries(next).forEach(([no, value]) => {
     if (Array.isArray(value) && value.length === 0) delete next[no]
   })
-  Object.entries(HIDDEN_RULES).forEach(([no, getHidden]) => {
-    const hidden = getHidden(next)
-    const values = Array.isArray(next[no]) ? next[no] : [next[no]]
-    if (values.some((value) => hidden.includes(value))) {
-      delete next[no]
-      cleared.push(Number(no))
+  CREDIT_QUESTIONS.filter((question) => HIDDEN_RULES[question.no]).forEach((question) => {
+    const hidden = HIDDEN_RULES[question.no](next)
+    const value = next[question.no]
+    const values = Array.isArray(value) ? value : [value]
+    const previousForced = getForcedAnswer(question, previous)
+    const wasForced = previousForced !== undefined && JSON.stringify(previousForced) === JSON.stringify(value)
+    if (values.some((item) => hidden.includes(item))) {
+      delete next[question.no]
+      if (!wasForced) cleared.push(question.no)
+    }
+    const forced = getForcedAnswer(question, next)
+    if (forced !== undefined) {
+      next[question.no] = forced
+    } else if (wasForced) {
+      delete next[question.no] // 자동으로 골라졌던 답은 더 이상 자동이 아니면 비워서 직접 고르게 함 (알림 없음)
     }
   })
-  return { next, cleared: cleared.sort((a, b) => a - b) }
+  return { next, cleared }
 }
 
 // 저장된 답을 불러올 때도 같은 정리를 거침
@@ -180,7 +213,11 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
 
   // 고른 답과 안 맞게 된 뒤 문항 답은 비우고 알림
   const handleSelect = (no, value) => {
-    const { next, cleared } = removeConflicts({ ...answers, [no]: value })
+    // 보기가 하나뿐이라 자동으로 골라진 문항은 눌러도 안 풀림
+    const question = CREDIT_QUESTIONS.find((item) => item.no === no)
+    if (getForcedAnswer(question, answers) !== undefined) return
+
+    const { next, cleared } = removeConflicts({ ...answers, [no]: value }, answers)
     setAnswers(next)
     sessionStorage.removeItem(CHECKED_KEY) // 답을 바꿨으니 결과 버튼을 다시 눌러야 결과가 나옴
     if (cleared.length > 0) showToast(`앞 답이 바뀌어 ${cleared.join(', ')}번 답을 비웠어요`)
@@ -223,12 +260,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
           </Progress>
 
           {CREDIT_QUESTIONS.map((question) => {
-            const allChoices = question.options.map((label, index) => ({ value: index + 1, label }))
-            if (question.hasUnknown) allChoices.push({ value: UNKNOWN_VALUE, label: '잘 모르겠어요' })
-            if (question.no === FINANCE_QUESTION_NO) allChoices.push({ value: NO_FINANCE_VALUE, label: '없음' })
-            // 앞 문항 답과 안 맞는 보기는 뺌
-            const hiddenValues = HIDDEN_RULES[question.no]?.(answers) ?? []
-            const choices = allChoices.filter((choice) => !hiddenValues.includes(choice.value))
+            const choices = getChoices(question, answers)
 
             return (
               <QuestionCard
