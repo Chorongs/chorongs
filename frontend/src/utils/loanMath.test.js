@@ -19,6 +19,7 @@ import {
   getRepayCode,
   getSchedule,
   getSupportedMethods,
+  toCalcRecord,
   toScheduleParams,
 } from './loanMath'
 
@@ -1354,6 +1355,351 @@ describe('getInitialCalc', () => {
     const result = getInitialCalc(state)
     // Then
     expect(result.method).toBe('EQUAL_PI')
+  })
+})
+
+// 저장한 기록 한 줄 (API-24 목록 항목, 옵션 칸은 null)
+const savedRecord = {
+  calcId: 1,
+  loanAmount: 10000000,
+  loanMonths: 36,
+  interestRate: 4.5,
+  repayMethod: 'EQUAL_PI',
+  graceMonths: 0,
+  totalInterest: 1234567,
+  firstPayment: 860000,
+  growthRate: null,
+  prepayRound: null,
+  prepayAmount: null,
+  prepayFeeRate: null,
+  prepayMode: null,
+  changeRound: null,
+  changeRate: null,
+}
+const savedPrepay = { prepayRound: 12, prepayAmount: 3000000, prepayFeeRate: 1.2, prepayMode: 'SHORTEN_TERM' }
+
+describe('getInitialCalc 저장한 기록의 옵션', () => {
+  it('저장한 거치 기간을 처음 값으로 쓴다', () => {
+    // Given
+    const record = { ...savedRecord, graceMonths: 6 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.graceMonths).toBe(6)
+  })
+
+  it('만기일시의 거치 기간은 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, repayMethod: 'BULLET', graceMonths: 6 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.graceMonths).toBeUndefined()
+  })
+
+  it('대출 기간 이상인 거치 기간은 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, graceMonths: 36 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.graceMonths).toBeUndefined()
+  })
+
+  it('체증식의 저장한 증가율을 처음 값으로 쓴다', () => {
+    // Given
+    const record = { ...savedRecord, repayMethod: 'GRADUATED', growthRate: 8 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.growth).toBe(8)
+  })
+
+  it('체증식이 아니면 증가율은 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, growthRate: 8 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.growth).toBeUndefined()
+  })
+
+  it('범위 밖 증가율은 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, repayMethod: 'GRADUATED', growthRate: 25 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.growth).toBeUndefined()
+  })
+
+  it('중도상환 값이 모두 맞으면 금액을 만원으로 바꿔 쓴다', () => {
+    // Given
+    const record = { ...savedRecord, ...savedPrepay }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.prepay).toEqual({ round: 12, amount: 300, feeRate: 1.2, mode: 'SHORTEN_TERM' })
+  })
+
+  it('중도상환 값이 하나라도 비면 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, ...savedPrepay, prepayMode: null }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.prepay).toBeUndefined()
+  })
+
+  it('중도상환 회차가 대출 기간을 넘으면 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, ...savedPrepay, prepayRound: 37 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.prepay).toBeUndefined()
+  })
+
+  it('모르는 중도상환 방식은 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, ...savedPrepay, prepayMode: 'UNKNOWN' }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.prepay).toBeUndefined()
+  })
+
+  it('금리 변동 값이 맞으면 처음 값으로 쓴다', () => {
+    // Given
+    const record = { ...savedRecord, changeRound: 12, changeRate: 7.5 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.rateChange).toEqual({ round: 12, rate: 7.5 })
+  })
+
+  it('금리 변동 값이 하나라도 비면 무시한다', () => {
+    // Given
+    const record = { ...savedRecord, changeRound: 12 }
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.rateChange).toBeUndefined()
+  })
+
+  it('옵션 칸이 모두 null인 기록은 옵션 없이 처음 값을 만든다', () => {
+    // Given
+    const record = savedRecord
+    // When
+    const result = getInitialCalc(record)
+    // Then
+    expect(result.prepay).toBeUndefined()
+  })
+})
+
+describe('createCalcForm 저장한 기록의 옵션', () => {
+  it('저장한 거치 기간으로 입력칸을 채운다', () => {
+    // Given
+    const initial = getInitialCalc({ ...savedRecord, graceMonths: 6 })
+    // When
+    const form = createCalcForm(initial)
+    // Then
+    expect(form.graceMonths).toBe(6)
+  })
+
+  it('저장한 중도상환이 있으면 체크하고 값을 채운다', () => {
+    // Given
+    const initial = getInitialCalc({ ...savedRecord, ...savedPrepay })
+    // When
+    const form = createCalcForm(initial)
+    // Then
+    expect(form).toMatchObject({
+      isPrepay: true,
+      prepayRound: 12,
+      prepayAmount: 300,
+      prepayFee: 1.2,
+      prepayMode: 'SHORTEN_TERM',
+    })
+  })
+
+  it('저장한 금리 변동이 있으면 체크하고 값을 채운다', () => {
+    // Given
+    const initial = getInitialCalc({ ...savedRecord, changeRound: 12, changeRate: 7.5 })
+    // When
+    const form = createCalcForm(initial)
+    // Then
+    expect(form).toMatchObject({ isRateChange: true, changeRound: 12, changeRate: 7.5 })
+  })
+
+  it('옵션이 없으면 증가율 5%, 중도상환과 금리 변동은 꺼진 처음 모양이다', () => {
+    // Given
+    const initial = getInitialCalc(savedRecord)
+    // When
+    const form = createCalcForm(initial)
+    // Then
+    expect(form).toMatchObject({ growth: 5, isPrepay: false, isRateChange: false })
+  })
+})
+
+describe('toCalcRecord', () => {
+  const schedule = { totalInterest: 123456, firstPayment: 300000 }
+  const record = (form) => toCalcRecord(toScheduleParams(form), schedule)
+
+  it('금액을 원 단위로 바꿔 기본 입력값을 담는다', () => {
+    // Given
+    const form = createCalcForm()
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({
+      loanAmount: 10000000,
+      loanMonths: 36,
+      interestRate: 5,
+      repayMethod: 'EQUAL_PI',
+      graceMonths: 0,
+    })
+  })
+
+  it('계산 결과(총이자, 첫 달 납입액)를 같이 담는다', () => {
+    // Given
+    const form = createCalcForm()
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({ totalInterest: 123456, firstPayment: 300000 })
+  })
+
+  it('만기일시는 거치 기간을 0으로 보낸다', () => {
+    // Given
+    const form = { ...createCalcForm(), method: 'BULLET', graceMonths: 6 }
+    // When
+    const result = record(form)
+    // Then
+    expect(result.graceMonths).toBe(0)
+  })
+
+  it('체증식이 아니면 증가율을 null로 보낸다', () => {
+    // Given
+    const form = { ...createCalcForm(), growth: 8 }
+    // When
+    const result = record(form)
+    // Then
+    expect(result.growthRate).toBeNull()
+  })
+
+  it('체증식이면 증가율을 담는다', () => {
+    // Given
+    const form = { ...createCalcForm(), method: 'GRADUATED', growth: 8 }
+    // When
+    const result = record(form)
+    // Then
+    expect(result.growthRate).toBe(8)
+  })
+
+  it('중도상환을 안 쓰면 중도상환 4칸이 모두 null이다', () => {
+    // Given
+    const form = createCalcForm()
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({ prepayRound: null, prepayAmount: null, prepayFeeRate: null, prepayMode: null })
+  })
+
+  it('중도상환을 쓰면 금액을 원 단위로 바꿔 4칸을 담는다', () => {
+    // Given
+    const form = {
+      ...createCalcForm(),
+      isPrepay: true,
+      prepayRound: 12,
+      prepayAmount: 300,
+      prepayFee: 1.2,
+      prepayMode: 'SHORTEN_TERM',
+    }
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({
+      prepayRound: 12,
+      prepayAmount: 3000000,
+      prepayFeeRate: 1.2,
+      prepayMode: 'SHORTEN_TERM',
+    })
+  })
+
+  it('중도상환 수수료율 칸이 비어 있으면 0으로 보낸다', () => {
+    // Given
+    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 12, prepayAmount: 300, prepayFee: '' }
+    // When
+    const result = record(form)
+    // Then
+    expect(result.prepayFeeRate).toBe(0)
+  })
+
+  it('변동 회차가 0이면 금리 변동 2칸이 모두 null이다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: 7.5 }
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({ changeRound: null, changeRate: null })
+  })
+
+  it('금리 변동을 쓰면 회차와 변동 후 금리를 담는다', () => {
+    // Given
+    const form = { ...createCalcForm(), isRateChange: true, changeRound: 12, changeRate: 7.5 }
+    // When
+    const result = record(form)
+    // Then
+    expect(result).toMatchObject({ changeRound: 12, changeRate: 7.5 })
+  })
+})
+
+describe('저장한 기록을 불러오면 같은 계산 입력이 된다', () => {
+  const schedule = { totalInterest: 123456, firstPayment: 300000 }
+  const roundTrip = (form) => {
+    const params = toScheduleParams(form)
+    const restored = toScheduleParams(createCalcForm(getInitialCalc(toCalcRecord(params, schedule))))
+    return { params, restored }
+  }
+
+  it('옵션을 모두 쓴 체증식 입력을 그대로 되돌린다', () => {
+    // Given
+    const form = {
+      ...createCalcForm(),
+      method: 'GRADUATED',
+      growth: 8,
+      graceMonths: 6,
+      isPrepay: true,
+      prepayRound: 18,
+      prepayAmount: 300,
+      prepayFee: 1.2,
+      prepayMode: 'SHORTEN_TERM',
+      isRateChange: true,
+      changeRound: 12,
+      changeRate: 7.5,
+    }
+    // When
+    const { params, restored } = roundTrip(form)
+    // Then
+    expect(restored).toEqual(params)
+  })
+
+  it('옵션이 없는 처음 입력을 그대로 되돌린다', () => {
+    // Given
+    const form = createCalcForm()
+    // When
+    const { params, restored } = roundTrip(form)
+    // Then
+    expect(restored).toEqual(params)
+  })
+
+  it('만기일시 입력을 그대로 되돌린다', () => {
+    // Given
+    const form = { ...createCalcForm(), method: 'BULLET', amount: 5000, months: 60, rate: 4.35 }
+    // When
+    const { params, restored } = roundTrip(form)
+    // Then
+    expect(restored).toEqual(params)
   })
 })
 

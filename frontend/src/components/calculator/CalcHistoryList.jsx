@@ -11,7 +11,7 @@ import MySection from '../my/MySection'
 // CA-07 계산 기록 목록: 저장한 기록 줄 / [불러오기] / 줄마다 지우기 / 전체 지우기 (API-24)
 // 목록 틀(제목, 지우기 확인 창, 불러오는 중, 실패, 빈 상태)은 MY의 MySection(MY-03)을 다시 씀 (삭제는 확인 창 뒤에, E3, E11)
 // - 비회원: API를 부르지 않고 '로그인하면 저장 가능' 문구만 (확인 중에는 아무것도 안 그림)
-// - [불러오기]: onLoad(item)이 있으면 그 화면이 입력칸을 채움 (계산기). 없으면 계산기(/calc)로 이동하며 값을 넘김 (MY 계산 기록)
+// - [불러오기]: onLoad(item)이 있으면 그 화면이 입력칸을 채움 (계산기). 없으면 계산기(/calc)로 이동하며 기록 한 줄을 넘김 (MY 계산 기록)
 // - refreshKey: 바뀌면 목록을 다시 받음 (계산기에서 [결과 저장] 뒤)
 // TODO(API-24, CHORONG-48 BE): 계산 기록 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const METHOD_LABEL = Object.fromEntries(CALC_METHODS.map((method) => [method.code, method.label]))
@@ -100,20 +100,13 @@ function CalcHistoryList({ onLoad, refreshKey = 0 }) {
     setResult({ status: 'done', items: [] })
   }
 
-  // 불러오기: 계산기 안이면 입력칸 채우기, MY 안이면 계산기로 값을 넘겨 이동 (거치 기간은 넘기는 값에 없어 계산기 안에서만 채움)
+  // 불러오기: 계산기 안이면 입력칸 채우기, MY 안이면 계산기로 기록 한 줄을 그대로 넘겨 이동 (옵션도 함께 복원, 맞지 않는 값은 계산기가 무시)
   const handleLoad = (item) => {
     if (onLoad) {
       onLoad(item)
       return
     }
-    navigate('/calc', {
-      state: {
-        loanAmount: item.loanAmount,
-        loanMonths: item.loanMonths,
-        interestRate: item.interestRate,
-        repayMethod: item.repayMethod,
-      },
-    })
+    navigate('/calc', { state: item })
   }
 
   if (authStatus === 'checking') return null

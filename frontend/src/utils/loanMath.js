@@ -241,6 +241,9 @@ export const CALC_METHODS = [
 // 바로 열었을 때 처음 값 (금액 만원, 기간 개월, 연 이자율 %)
 export const CALC_DEFAULTS = { amount: FALLBACK_AMOUNT_MAN, months: 36, rate: 5, method: 'EQUAL_PI' }
 
+// 중도상환 후 방식 코드 (API-24 prepayMode와 같게): 월 납입액 줄이기, 기간 줄이기
+const PREPAY_MODES = ['REDUCE_PAYMENT', 'SHORTEN_TERM']
+
 // 기간 선택지 전체 (12, 36, 60, 120, 180개월)
 const ALL_TERM_MONTHS = [...new Set([...SHORT_TERM_MONTHS, ...LONG_TERM_MONTHS])].sort((a, b) => a - b)
 
@@ -256,7 +259,8 @@ export function getCalcTermOptions(months) {
 
 // 다른 화면에서 navigate state로 넘긴 값 → 계산기 처음 값 (CA-01)
 // state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 기본값
-// 결과: { amount 만원, months, rate, method, termOptions }
+//   저장한 기록(API-24 한 줄)을 그대로 넘기면 옵션도 복원: graceMonths, growthRate, prepayRound, prepayAmount 원, prepayFeeRate, prepayMode, changeRound, changeRate
+// 결과: { amount 만원, months, rate, method, termOptions } + 옵션이 맞으면 { graceMonths, growth, prepay, rateChange }
 export function getInitialCalc(state) {
   const initial = { ...CALC_DEFAULTS, termOptions: ALL_TERM_MONTHS }
 
@@ -273,34 +277,87 @@ export function getInitialCalc(state) {
 
   if (CALC_METHODS.some((method) => method.code === state?.repayMethod)) initial.method = state.repayMethod
 
-  return initial
+  return Object.assign(initial, getSavedOptions(state, initial))
 }
 
 // 계산기 입력 칸 묶음(form)의 처음 모양. 금액 만원, 중도상환액 만원, 나머지는 개월, 회차, %
 // 칸이 비어 있으면 ''. 거치, 수수료율, 변동 회차의 빈 칸은 0으로 본다.
 // prepayMode: REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기
+// initial에 저장한 기록의 옵션(graceMonths, growth, prepay, rateChange)이 있으면 그 값으로 채움
 export function createCalcForm(initial = getInitialCalc()) {
+  const { prepay, rateChange } = initial
   return {
     method: initial.method,
     amount: initial.amount,
     months: initial.months,
     rate: initial.rate,
-    graceMonths: 0,
-    growth: 5,
-    isPrepay: false,
-    prepayRound: '',
-    prepayAmount: '',
-    prepayFee: 0,
-    prepayMode: 'REDUCE_PAYMENT',
-    isRateChange: false,
-    changeRound: 0,
-    changeRate: '',
+    graceMonths: initial.graceMonths ?? 0,
+    growth: initial.growth ?? 5,
+    isPrepay: Boolean(prepay),
+    prepayRound: prepay?.round ?? '',
+    prepayAmount: prepay?.amount ?? '',
+    prepayFee: prepay?.feeRate ?? 0,
+    prepayMode: prepay?.mode ?? 'REDUCE_PAYMENT',
+    isRateChange: Boolean(rateChange),
+    changeRound: rateChange?.round ?? 0,
+    changeRate: rateChange?.rate ?? '',
   }
 }
 
 const isEmptyValue = (value) => value === '' || value === null || value === undefined
 const orZero = (value) => (isEmptyValue(value) ? 0 : value)
 const isInRange = (value, min, max) => isNumber(value) && value >= min && value <= max
+const isRoundIn = (value, months) => Number.isInteger(value) && value >= 1 && value <= months
+
+// 저장한 기록의 옵션 칸 → 처음 값 (getInitialCalc가 씀). 묶음마다 모두 맞을 때만 담고, 하나라도 틀리면 그 묶음은 무시
+// 거치는 만기일시가 아닐 때 기간 미만, 증가율은 체증식만 (서버 검사와 같은 규칙), 회차는 1 이상 기간 이하
+function getSavedOptions(state, { method, months }) {
+  const options = {}
+
+  const grace = state?.graceMonths
+  if (method !== 'BULLET' && Number.isInteger(grace) && grace > 0 && grace < months) options.graceMonths = grace
+
+  const growth = state?.growthRate
+  if (method === 'GRADUATED' && isInRange(growth, 0, CALC_LIMITS.growthMax)) options.growth = growth
+
+  const amount = isNumber(state?.prepayAmount) ? Math.round(state.prepayAmount / 10000) : null
+  const isPrepayValid =
+    isRoundIn(state?.prepayRound, months) &&
+    isInRange(amount, CALC_LIMITS.amountMin, CALC_LIMITS.amountMax) &&
+    isInRange(state?.prepayFeeRate, 0, CALC_LIMITS.feeMax) &&
+    PREPAY_MODES.includes(state?.prepayMode)
+  if (isPrepayValid) {
+    options.prepay = { round: state.prepayRound, amount, feeRate: state.prepayFeeRate, mode: state.prepayMode }
+  }
+
+  if (isRoundIn(state?.changeRound, months) && isInRange(state?.changeRate, 0, CALC_LIMITS.rateMax)) {
+    options.rateChange = { round: state.changeRound, rate: state.changeRate }
+  }
+
+  return options
+}
+
+// [결과 저장]으로 보낼 값 (API-24): params는 toScheduleParams 결과, schedule은 그 getSchedule 결과
+// 옵션은 안 썼으면 null (서버가 null이면 없는 것으로 봄). 증가율은 체증식만, 거치는 만기일시면 0
+export function toCalcRecord(params, schedule) {
+  const { method, prepay, rateChange } = params
+  return {
+    loanAmount: params.principal,
+    loanMonths: params.months,
+    interestRate: params.rate,
+    repayMethod: method,
+    graceMonths: method === 'BULLET' ? 0 : params.graceMonths,
+    totalInterest: schedule.totalInterest,
+    firstPayment: schedule.firstPayment,
+    growthRate: method === 'GRADUATED' ? params.growth : null,
+    prepayRound: prepay?.round ?? null,
+    prepayAmount: prepay?.amount ?? null,
+    prepayFeeRate: prepay?.feeRate ?? null,
+    prepayMode: prepay ? params.prepayMode : null,
+    changeRound: rateChange?.round ?? null,
+    changeRate: rateChange?.rate ?? null,
+  }
+}
 
 // 중도상환 칸이 계산에 들어가는지: 체크했고 회차, 금액 중 하나라도 적었을 때 (둘 다 비어 있으면 아직 안 정한 것)
 const isPrepayApplied = (form) => form.isPrepay && !(isEmptyValue(form.prepayRound) && isEmptyValue(form.prepayAmount))

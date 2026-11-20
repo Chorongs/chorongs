@@ -14,6 +14,7 @@ import {
   getMethodInterests,
   getPrepayModeResults,
   getSchedule,
+  toCalcRecord,
   toScheduleParams,
 } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
@@ -148,20 +149,12 @@ function LoanCalculator() {
     setApplied((prev) => ({ ...prev, prepayMode }))
   }
 
-  // [결과 저장] (API-24): 입력과 결과 값만 보냄
+  // [결과 저장] (API-24): 입력(옵션 포함)과 결과 값을 보냄. 불러오면 같은 화면이 열리게 옵션도 저장
   const saveResult = async () => {
     if (isSaving || !schedule) return
     setIsSaving(true)
     try {
-      await myApi.postCalc({
-        loanAmount: params.principal,
-        loanMonths: params.months,
-        interestRate: params.rate,
-        repayMethod: params.method,
-        graceMonths: params.method === 'BULLET' ? 0 : params.graceMonths,
-        totalInterest: schedule.totalInterest,
-        firstPayment: schedule.firstPayment,
-      })
+      await myApi.postCalc(toCalcRecord(params, schedule))
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
       setHistoryKey((count) => count + 1)
     } catch (error) {
@@ -190,13 +183,8 @@ function LoanCalculator() {
 
   // 기록 불러오기 (CA-07): 입력칸을 기록 값으로 채우고 (값이 맞으면 결과도 그 값으로 계산) 맨 위로
   const handleLoad = (item) => {
-    const loaded = getInitialCalc({
-      loanAmount: item.loanAmount,
-      loanMonths: item.loanMonths,
-      interestRate: item.interestRate,
-      repayMethod: item.repayMethod,
-    })
-    const loadedForm = { ...createCalcForm(loaded), graceMonths: item.graceMonths ?? 0 }
+    const loaded = getInitialCalc(item)
+    const loadedForm = createCalcForm(loaded)
     setTermOptions(loaded.termOptions)
     setForm(loadedForm)
     setHasTried(false)
