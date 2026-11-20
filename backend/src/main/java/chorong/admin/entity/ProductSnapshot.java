@@ -57,12 +57,5 @@ public class ProductSnapshot {
 	private Long checkedBy;
 
 	@Column(name = "checked_at")
-	private LocalDateTime checkedAt;
-
-	/** 자동 내림 확인 기록 (결과, 확인자, 시각은 같이 채움: DB CHECK ck_snapshot_checked) */
-	public void check(CheckResult checkResult, Long adminId, LocalDateTime now) {
-		this.checkResult = checkResult;
-		this.checkedBy = adminId;
-		this.checkedAt = now;
-	}
+	private LocalDateTime checkedAt;	// 확인 결과, 확인자, 시각은 같이 채움 (DB CHECK ck_snapshot_checked, ProductSnapshotRepository.checkUnchecked)
 }

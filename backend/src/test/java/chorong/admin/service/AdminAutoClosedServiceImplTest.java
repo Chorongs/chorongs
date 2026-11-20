@@ -70,15 +70,30 @@ class AdminAutoClosedServiceImplTest {
 	@Test
 	void 확인하면_확인_결과_기록() {
 		// Given
-		ProductSnapshot snapshot = unchecked(1L);
 		when(snapshotRepository.findUncheckedByProductIds(eq(ActionType.AUTO_CLOSE), anyList()))
-				.thenReturn(List.of(snapshot));
+				.thenReturn(List.of(unchecked(1L)));
+		when(snapshotRepository.checkUnchecked(eq(List.of(1L)), eq(CheckResult.KEEP), eq(9L), any())).thenReturn(1);
 
 		// When
 		service.handleAutoClosed(9L, new AutoClosedHandleRequestDTO(List.of(1L), CheckResult.KEEP));
 
 		// Then
-		assertEquals(CheckResult.KEEP, snapshot.getCheckResult());
+		verify(snapshotRepository).checkUnchecked(eq(List.of(1L)), eq(CheckResult.KEEP), eq(9L), any());
+	}
+
+	@Test
+	void 다른_관리자가_동시에_먼저_처리했으면_409() {
+		// Given: 읽을 때는 확인 전이었지만, 확인 처리 때는 이미 바뀌어 0줄
+		when(snapshotRepository.findUncheckedByProductIds(eq(ActionType.AUTO_CLOSE), anyList()))
+				.thenReturn(List.of(unchecked(1L)));
+		when(snapshotRepository.checkUnchecked(anyList(), eq(CheckResult.REOPEN), eq(9L), any())).thenReturn(0);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> service.handleAutoClosed(9L, new AutoClosedHandleRequestDTO(List.of(1L), CheckResult.REOPEN)));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
 	}
 
 	@Test

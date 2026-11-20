@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.mock.web.MockHttpSession;
 
 import chorong.admin.dto.AdminRemoveRequestDTO;
@@ -99,6 +101,20 @@ class AdminAccountServiceImplTest {
 
 		// Then
 		assertEquals(AdminAccountServiceImpl.MSG_ALREADY_HANDLED, e.getMessage());
+	}
+
+	@Test
+	void 승인은_admin_테이블을_잠근_뒤_상태를_확인() {
+		// Given: 동시에 누른 다른 승인권자는 잠금이 풀린 뒤 바뀐 상태를 읽어야 409를 받음
+		givenAdmin(OTHER_ID, AdminStatus.PENDING, AdminRole.MANAGER);
+
+		// When
+		service.approveAdmin(MY_ID, OTHER_ID, new AdminRoleRequestDTO(AdminRole.MANAGER));
+
+		// Then
+		InOrder order = inOrder(adminRepository);
+		order.verify(adminRepository).lockTable();
+		order.verify(adminRepository).findById(OTHER_ID);
 	}
 
 	@Test

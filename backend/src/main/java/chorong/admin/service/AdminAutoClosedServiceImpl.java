@@ -101,11 +101,14 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 			throw new BusinessException(ErrorCode.CONFLICT);
 		}
 
+		// 확인 기록 먼저: 확인 전인 행만 바뀜 → 다른 관리자가 동시에 먼저 처리했으면 바뀐 줄 수가 모자라 409 (전부 되돌림)
+		List<Long> snapshotIds = snapshots.stream().map(ProductSnapshot::getSnapshotId).toList();
+		if (productSnapshotRepository.checkUnchecked(snapshotIds, request.getAction(), adminId, now) != snapshotIds.size()) {
+			throw new BusinessException(ErrorCode.CONFLICT);
+		}
+
 		if (request.getAction() == CheckResult.REOPEN) {
 			reopenProducts(adminId, productIds, now);
-		}
-		snapshots.forEach(s -> s.check(request.getAction(), adminId, now));
-		if (request.getAction() == CheckResult.REOPEN) {
 			memoryCache.clearProductCaches();
 		}
 	}

@@ -62,6 +62,7 @@ public class AdminAccountServiceImpl implements AdminAccountService {
 	@Override
 	@Transactional
 	public void approveAdmin(Long approverId, Long adminId, AdminRoleRequestDTO request) {
+		adminRepository.lockTable();	// 두 승인권자가 동시에 눌러도 한 명만 통과 (뒤 사람은 아래에서 409, B9)
 		Admin admin = adminRepository.findById(adminId)
 				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 		if (admin.getAdminStatus() != AdminStatus.PENDING) {	// 다른 승인권자가 먼저 승인함 (B9)
@@ -91,6 +92,7 @@ public class AdminAccountServiceImpl implements AdminAccountService {
 	@Override
 	@Transactional
 	public void removeAdmin(Long adminId) {
+		adminRepository.lockTable();	// 승인과 동시에 눌러도 상태를 확인한 뒤 처리 (B9), 마지막 승인권자 확인도 같이
 		Admin admin = adminRepository.findById(adminId)
 				.filter(a -> a.getAdminStatus() != AdminStatus.REMOVED)
 				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
@@ -111,6 +113,7 @@ public class AdminAccountServiceImpl implements AdminAccountService {
 	@Override
 	@Transactional
 	public void withdraw(HttpSession session, AdminRemoveRequestDTO request) {
+		adminRepository.lockTable();	// 마지막 승인권자 확인 + 탈퇴를 한 번에 (B16)
 		Admin admin = findActiveAdmin(AdminUtil.getAdminId(session));
 		if (!Objects.equals(admin.getAdminEmail(), AdminUtil.normalizeEmail(request.getEmail()))) {
 			throw new BusinessException(ErrorCode.INVALID_INPUT);	// 확인용 이메일이 내 이메일과 다름
@@ -119,9 +122,8 @@ public class AdminAccountServiceImpl implements AdminAccountService {
 		session.invalidate();
 	}
 
-	// 탈퇴, 해제 공통: 마지막 정상 승인권자면 409 → REMOVED + 시각, 이메일과 이름 비움, 안 쓴 토큰 무효 (B16)
+	// 탈퇴, 해제 공통 (부르는 쪽이 먼저 admin 테이블 잠금): 마지막 정상 승인권자면 409 → REMOVED + 시각, 이메일과 이름 비움, 안 쓴 토큰 무효 (B16)
 	private void withdrawAdmin(Admin admin) {
-		adminRepository.lockTable();
 		checkNotLastApprover(admin);
 		adminTokenRepository.expireUnusedTokens(admin.getAdminId());
 		admin.withdraw(LocalDateTime.now());
