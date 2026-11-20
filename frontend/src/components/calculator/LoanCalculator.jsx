@@ -178,7 +178,7 @@ function LoanCalculator() {
 
   const handleSave = () => {
     if (isStale) {
-      showToast('입력을 바꿨어요. [계산하기]을 먼저 눌러 주세요')
+      showToast('입력을 바꿨어요. [계산하기]를 먼저 눌러 주세요')
       return
     }
     if (!schedule) {
@@ -330,7 +330,7 @@ function LoanCalculator() {
       </Panel>
 
       <Result ref={resultRef}>
-        {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]을 누르면 결과가 새로 계산돼요.</StaleNotice>}
+        {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {result}
       </Result>
     </Layout>
