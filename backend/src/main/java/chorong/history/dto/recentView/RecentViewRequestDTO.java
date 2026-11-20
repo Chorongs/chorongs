@@ -1,0 +1,14 @@
+package chorong.history.dto.recentView;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RecentViewRequestDTO {
+    @NotNull
+    private Long productId;
+}

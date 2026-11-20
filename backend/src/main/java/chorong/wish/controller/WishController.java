@@ -37,6 +37,10 @@ public class WishController {
     }
 
     // DELETE /api/me/likes/{productId}
-    public void deleteWish() {
+    @DeleteMapping("/{productId}")
+    public ResponseEntity<Void> deleteWish(HttpSession session, @PathVariable Long productId) {
+        wishService.deleteWish(LoginUtil.getMemberId(session), productId);
+
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

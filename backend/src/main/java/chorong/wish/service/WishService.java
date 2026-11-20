@@ -17,6 +17,6 @@ public interface WishService {
     void saveWish(Long memberId, Long productId);
 
     // 찜 취소 (내 찜만)
-    void deleteWish();
+    void deleteWish(Long memberId, Long productId);
 
 }

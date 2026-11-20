@@ -19,10 +19,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 
 @Service
 @RequiredArgsConstructor
@@ -36,7 +34,7 @@ public class WishServiceImpl implements WishService {
     @Transactional(readOnly = true)
     public PageInfo<WishResponseDTO> getWishes(Long memberId, int page, int size) {
         if(page < 1 || size < 1 || size > 50) throw new BusinessException(ErrorCode.INVALID_INPUT);
-        List<Wish>  wishes = wishRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
+        List<Wish> wishes = wishRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
         int from = (page - 1) * size;
         int to = Math.min(from + size, wishes.size());
         if(from > 0 && from >= wishes.size()) throw new BusinessException(ErrorCode.INVALID_INPUT);
@@ -92,7 +90,13 @@ public class WishServiceImpl implements WishService {
     }
 
     @Override
-    public void deleteWish() {
+    @Transactional
+    public void deleteWish(Long memberId, Long productId) {
+        //memberId, productId가 비어있으면 Not Found 발생
+        Optional<Wish> Wish = wishRepository.findByMemberIdAndProductId(memberId, productId);
+        if (Wish.isEmpty()) throw new BusinessException(ErrorCode.NOT_FOUND);
+
+        wishRepository.delete(Wish.get());
 
     }
 
@@ -114,7 +118,7 @@ public class WishServiceImpl implements WishService {
             }
         }
         for (List<Tag> tags : result.values()) {
-            tags.sort((a, b) -> a.getTagId().compareTo(b.getTagId()));                       // 태그 번호 순 (화면 칩 순서)
+            tags.sort(Comparator.comparing(Tag::getTagId));                       // 태그 번호 순 (화면 칩 순서)
         }
         return result;
     }
