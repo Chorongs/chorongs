@@ -13,8 +13,10 @@ import CreditResultCard from './CreditResultCard'
 // CR-02 신용 셀프 진단: 10문항 답 → 예상 점수대 (API-09)
 // submitLabel: 버튼 글 / onContinue(creditBand): 있으면 추천 창용 결과 카드 (RC-13)
 // 답은 이 탭에만 임시 저장 (sessionStorage 'creditAnswers'), 점수와 결과는 브라우저에 저장하지 않는다.
+// 결과 버튼을 눌러 결과를 본 적이 있는지만 'creditChecked'에 남김 (화면을 다시 열 때 결과를 자동으로 보여 줄지 정함)
 // 답, 점수는 console에 출력하지 않는다. (E6)
 const STORAGE_KEY = 'creditAnswers'
+const CHECKED_KEY = 'creditChecked'
 const UNKNOWN_VALUE = 0
 const QUESTION_COUNT = CREDIT_QUESTIONS.length
 const FINANCE_QUESTION_NO = 5
@@ -124,9 +126,10 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
   const showToast = useUiStore((state) => state.showToast)
   const setDiagBand = useRecommendStore((state) => state.setDiagBand)
   const [initialAnswers] = useState(loadAnswers)
+  const [hasChecked] = useState(() => sessionStorage.getItem(CHECKED_KEY) === 'true')
   const [answers, setAnswers] = useState(initialAnswers)
   const [result, setResult] = useState(null)
-  const [isLoading, setIsLoading] = useState(() => isAllRequiredAnswered(initialAnswers))
+  const [isLoading, setIsLoading] = useState(() => hasChecked && isAllRequiredAnswered(initialAnswers))
   const [errorText, setErrorText] = useState('')
   const [missingNos, setMissingNos] = useState([])
   const questionRefs = useRef({})
@@ -137,9 +140,10 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(answers))
   }, [answers])
 
-  // 화면을 다시 열었을 때 필수 문항이 다 답해져 있으면 결과까지 다시 표시
+  // 화면을 다시 열었을 때 결과를 본 적이 있고 필수 문항이 다 답해져 있으면 결과까지 다시 표시
+  // 결과를 본 적이 없으면 점수 없이 답이 채워진 문항 화면
   useEffect(() => {
-    if (!isAllRequiredAnswered(initialAnswers)) return undefined
+    if (!hasChecked || !isAllRequiredAnswered(initialAnswers)) return undefined
     let isStale = false
     postCreditCheck(toRequestAnswers(initialAnswers))
       .then((data) => {
@@ -156,7 +160,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
     return () => {
       isStale = true
     }
-  }, [initialAnswers, setDiagBand])
+  }, [hasChecked, initialAnswers, setDiagBand])
 
   // 결과가 나오면 진단 구간을 스토어에 담음 (추천 3단계 비교용, 구간만)
   const requestCheck = async () => {
@@ -166,6 +170,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
       const data = await postCreditCheck(toRequestAnswers(answers))
       setResult(data)
       setDiagBand(data.creditBand)
+      sessionStorage.setItem(CHECKED_KEY, 'true')
     } catch (error) {
       setErrorText(getErrorText(error))
     } finally {
@@ -177,6 +182,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
   const handleSelect = (no, value) => {
     const { next, cleared } = removeConflicts({ ...answers, [no]: value })
     setAnswers(next)
+    sessionStorage.removeItem(CHECKED_KEY) // 답을 바꿨으니 결과 버튼을 다시 눌러야 결과가 나옴
     if (cleared.length > 0) showToast(`앞 답이 바뀌어 ${cleared.join(', ')}번 답을 비웠어요`)
     setMissingNos((prev) => prev.filter((missingNo) => missingNo !== no))
   }
@@ -196,6 +202,7 @@ function CreditCheck({ submitLabel = '결과 보기', onContinue }) {
 
   // [다시 진단하기]: 답 비우고 문항 화면으로
   const handleRetry = () => {
+    sessionStorage.removeItem(CHECKED_KEY)
     setAnswers({})
     setResult(null)
     setErrorText('')
