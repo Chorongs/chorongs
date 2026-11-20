@@ -27,7 +27,10 @@ public interface AdminAccountService {
 	/** 잠금 풀기: 실패 0, 잠금 시각 비움 (ADMIN-08) */
 	void unlockAdmin(Long adminId);
 
-	/** 승인 대기면 거절 (행 삭제, 메일 없음), 정상이면 해제 (ADMIN-08, 09) */
+	/** 가입 거절: 승인 대기만 (아니면 409) → 행 삭제, 메일 없음 (ADMIN-08) */
+	void rejectAdmin(Long adminId);
+
+	/** 해제: 정상 관리자만 (승인 대기, 탈퇴, 없는 번호 404) → 탈퇴와 같은 처리 (ADMIN-09) */
 	void removeAdmin(Long adminId);
 
 	/** 내 계정 (ADMIN-09) */

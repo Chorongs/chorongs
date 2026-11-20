@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import chorong.admin.dto.CatalogResponseDTO;
 import chorong.admin.dto.HistoryResponseDTO;
 import chorong.admin.dto.PublishResponseDTO;
+import chorong.admin.dto.RollbackPreviewResponseDTO;
 import chorong.admin.dto.RollbackRequestDTO;
 import chorong.admin.entity.ActionType;
 import chorong.admin.entity.Admin;
@@ -52,6 +53,9 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 	private static final long REPORTED_MIN = 5;			// 메뉴 옆 신고 상품 = 미처리 5건 이상
 
 	// 변경 기록 JSON에서 바뀌기 전 상태 꺼내기 ({"product_status":"ON", ...})
+	// FastApiClient와 같은 문구 (마지막 이력으로 되돌리기, FastAPI 409 NOTHING_TO_ROLLBACK)
+	static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
+
 	private static final Pattern PRODUCT_STATUS = Pattern.compile("\"product_status\"\\s*:\\s*\"([A-Z]+)\"");
 
 	private final LoanProductRepository loanProductRepository;
@@ -104,15 +108,36 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 		Long currentVersion = productUpdateHistoryRepository.findTopByOrderByHistoryIdDesc()
 				.map(ProductUpdateHistory::getHistoryId).orElse(null);
 
-		// 처리자 이름 (한 번에 조회), 지금 숨김 + 미처리 신고가 있는 상품 (한 번만 조회)
+		// 처리자 이름 (한 번에 조회) / 되돌리면 바뀌는 수는 미리보기에서 셈
 		Map<Long, String> adminNames = getAdminNames(histories.getContent());
-		List<Long> hiddenReported = loanReportRepository
-				.findProductIdsByProductStatus(ProductStatus.HIDDEN, ReportStatus.RECEIVED);
-
 		List<HistoryResponseDTO> list = histories.getContent().stream()
-				.map(history -> toHistoryResponse(history, adminNames, currentVersion, hiddenReported))
+				.map(history -> {
+					HistoryResponseDTO response = HistoryResponseDTO.from(history, adminNames.get(history.getAdminId()));
+					response.setCanRollback(canRollback(history.getHistoryId(), currentVersion));
+					return response;
+				})
 				.toList();
 		return new PageInfo<>(list, histories.getTotalElements(), page, HISTORY_SIZE);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public RollbackPreviewResponseDTO getRollbackPreview(Long historyId) {
+		if (!productUpdateHistoryRepository.existsById(historyId)) {
+			throw new BusinessException(ErrorCode.NOT_FOUND);
+		}
+		Long currentVersion = productUpdateHistoryRepository.findTopByOrderByHistoryIdDesc()
+				.map(ProductUpdateHistory::getHistoryId).orElse(null);
+		if (!canRollback(historyId, currentVersion)) {	// 지금 마지막 이력: 되돌릴 변경이 없음 (FastAPI와 같은 409)
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_NOTHING_TO_ROLLBACK);
+		}
+		return RollbackPreviewResponseDTO.builder()
+				.historyId(historyId)
+				.baseVersion(currentVersion)
+				.cancelCount(Math.toIntExact(productUpdateHistoryRepository.countByHistoryIdGreaterThan(historyId)))
+				.changedProductCount(Math.toIntExact(productSnapshotRepository.countChangedProductsAfter(historyId)))
+				.unhiddenReportCount(countUnhiddenReports(historyId))
+				.build();
 	}
 
 	@Override
@@ -123,28 +148,16 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 		return new PublishResponseDTO(result.getVersion());
 	}
 
-	// 이력 1줄: 지금 마지막 이력은 되돌릴 변경이 없어 되돌리기 불가 (FastAPI 409 NOTHING_TO_ROLLBACK)
-	private HistoryResponseDTO toHistoryResponse(ProductUpdateHistory history, Map<Long, String> adminNames,
-			Long currentVersion, List<Long> hiddenReported) {
-		HistoryResponseDTO response = HistoryResponseDTO.from(history, adminNames.get(history.getAdminId()));
-		boolean canRollback = currentVersion != null && history.getHistoryId() < currentVersion;
-		response.setCanRollback(canRollback);
-		if (!canRollback) {
-			response.setCancelCount(0);
-			response.setChangedProductCount(0);
-			response.setUnhiddenReportCount(0);
-			return response;
-		}
-		Long historyId = history.getHistoryId();
-		response.setCancelCount(Math.toIntExact(productUpdateHistoryRepository.countByHistoryIdGreaterThan(historyId)));
-		response.setChangedProductCount(Math.toIntExact(productSnapshotRepository.countChangedProductsAfter(historyId)));
-		response.setUnhiddenReportCount(countUnhiddenReports(historyId, hiddenReported));
-		return response;
+	// 되돌리기 가능: 지금 마지막 이력보다 앞선 이력만 (마지막 이력은 되돌릴 변경이 없음, FastAPI 409 NOTHING_TO_ROLLBACK)
+	private static boolean canRollback(Long historyId, Long currentVersion) {
+		return currentVersion != null && historyId < currentVersion;
 	}
 
 	// 이 시점으로 되돌리면 숨김이 풀려 게시(ON)되는 상품의 미처리 신고 건수
-	// 되돌리면 각 상품은 이 이력 뒤 '가장 오래된' 변경 기록의 바뀌기 전 상태가 됨 (ADD는 판매 종료)
-	private int countUnhiddenReports(Long historyId, List<Long> hiddenReported) {
+	// 대상 = 지금 숨김 + 미처리 신고가 있는 상품 / 되돌리면 각 상품은 이 이력 뒤 '가장 오래된' 변경 기록의 바뀌기 전 상태가 됨 (ADD는 판매 종료)
+	private int countUnhiddenReports(Long historyId) {
+		List<Long> hiddenReported = loanReportRepository
+				.findProductIdsByProductStatus(ProductStatus.HIDDEN, ReportStatus.RECEIVED);
 		if (hiddenReported.isEmpty()) {
 			return 0;
 		}

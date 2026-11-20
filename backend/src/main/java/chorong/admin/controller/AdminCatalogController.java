@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import chorong.admin.dto.CatalogResponseDTO;
 import chorong.admin.dto.HistoryResponseDTO;
 import chorong.admin.dto.PublishResponseDTO;
+import chorong.admin.dto.RollbackPreviewResponseDTO;
 import chorong.admin.dto.RollbackRequestDTO;
 import chorong.admin.entity.ActionType;
 import chorong.admin.service.AdminCatalogService;
@@ -46,7 +47,13 @@ public class AdminCatalogController {
 		return ResponseEntity.ok(ApiResponse.success(adminCatalogService.getHistories(actionType, page)));
 	}
 
-	/** ADMIN-05 되돌리기 → 새 버전 */
+	/** ADMIN-05 되돌리기 미리보기: 확인 창 숫자 + 기준 버전 (마지막 이력 409, 없는 번호 404) */
+	@GetMapping("/rollback-preview")
+	public ResponseEntity<ApiResponse<RollbackPreviewResponseDTO>> getRollbackPreview(@RequestParam Long historyId) {
+		return ResponseEntity.ok(ApiResponse.success(adminCatalogService.getRollbackPreview(historyId)));
+	}
+
+	/** ADMIN-05 되돌리기 (기준 버전은 미리보기의 baseVersion) → 새 버전 */
 	@PostMapping("/rollback")
 	public ResponseEntity<ApiResponse<PublishResponseDTO>> rollback(@Valid @RequestBody RollbackRequestDTO requestDTO,
 			HttpServletRequest request) {

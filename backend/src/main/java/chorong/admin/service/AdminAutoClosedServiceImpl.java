@@ -45,6 +45,9 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 	private static final String UNCHECKED = "UNCHECKED";
 	private static final DateTimeFormatter JSON_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+	// 409 문구: 이미 처리함, 동시에 먼저 처리됨, 상품이 이미 판매 종료가 아님 (fe_admin API-48과 같은 글)
+	static final String MSG_ALREADY_DONE = "다른 작업이 먼저 됨";
+
 	private final LoanProductRepository loanProductRepository;
 	private final ProductUpdateHistoryRepository productUpdateHistoryRepository;
 	private final ProductSnapshotRepository productSnapshotRepository;
@@ -98,18 +101,18 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 				.findUncheckedByProductIds(ActionType.AUTO_CLOSE, productIds);
 		Set<Long> unchecked = snapshots.stream().map(ProductSnapshot::getProductId).collect(Collectors.toSet());
 		if (!unchecked.containsAll(productIds)) {
-			throw new BusinessException(ErrorCode.CONFLICT);
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_DONE);
 		}
 
 		// 확인 기록 먼저: 확인 전인 행만 바뀜 → 다른 관리자가 동시에 먼저 처리했으면 바뀐 줄 수가 모자라 409 (전부 되돌림)
 		List<Long> snapshotIds = snapshots.stream().map(ProductSnapshot::getSnapshotId).toList();
 		if (productSnapshotRepository.checkUnchecked(snapshotIds, request.getAction(), adminId, now) != snapshotIds.size()) {
-			throw new BusinessException(ErrorCode.CONFLICT);
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_DONE);
 		}
 
 		if (request.getAction() == CheckResult.REOPEN) {
 			reopenProducts(adminId, productIds, now);
-			memoryCache.clearProductCaches();
+			memoryCache.clearProductCachesAfterCommit();	// 커밋 뒤에 (커밋 전에 비우면 옛 값이 다시 캐시될 수 있음)
 		}
 	}
 
@@ -130,8 +133,8 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 			productSnapshotRepository.save(newSnapshot(history, p, ChangeType.REMOVE, statusJson(p.getProductStatus())));
 			p.close();
 		});
-		// 4. 상품 캐시 비우기
-		memoryCache.clearProductCaches();
+		// 4. 상품 캐시 비우기 (커밋 뒤에)
+		memoryCache.clearProductCachesAfterCommit();
 		return products.size();
 	}
 
@@ -141,7 +144,7 @@ public class AdminAutoClosedServiceImpl implements AdminAutoClosedService {
 		boolean allClosed = products.size() == productIds.size()
 				&& products.stream().allMatch(p -> p.getProductStatus() == ProductStatus.CLOSED);
 		if (!allClosed) {
-			throw new BusinessException(ErrorCode.CONFLICT);
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_DONE);
 		}
 		ProductUpdateHistory history = productUpdateHistoryRepository.save(
 				newHistory(ActionType.SHOW, adminId, products.size(), 0, now));

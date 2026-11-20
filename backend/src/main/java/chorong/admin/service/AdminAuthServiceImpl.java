@@ -27,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 public class AdminAuthServiceImpl implements AdminAuthService {
 
 	private static final long TOKEN_HOURS = 2;		// 로그인 토큰 유효 시간 (B17)
-	private static final long LOGIN_HOURS = 2;		// 로그인 유지 시간, 연장 없음 (B4, AdminInterceptor와 같은 값)
 
 	// 문구 (관리자 상세 기획 4-11)
 	static final String MSG_NOT_REGISTERED = "등록되지 않은 메일이에요. 다시 확인해 주세요";
@@ -35,8 +34,6 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 	static final String MSG_LOCKED = "5번 틀려서 잠겼어요. 30분 뒤 다시 시도하세요";
 	static final String MSG_WRONG_TOKEN = "토큰이 맞지 않아요";
 	static final String MSG_TOKEN_EXPIRED = "토큰을 다시 받아 주세요";
-	static final String MSG_SESSION_EXPIRED = "2시간이 지나 자동으로 로그아웃했어요";
-	static final String MSG_NO_PERMISSION = "관리자 권한이 없어졌어요";
 
 	private final AdminRepository adminRepository;
 	private final AdminTokenRepository adminTokenRepository;
@@ -96,17 +93,17 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 		if (loginAdmin == null) {
 			throw new BusinessException(ErrorCode.LOGIN_REQUIRED);
 		}
-		LocalDateTime expiresAt = loginAdmin.getLoginAt().plusHours(LOGIN_HOURS);
+		LocalDateTime expiresAt = loginAdmin.getLoginAt().plusHours(AdminUtil.LOGIN_HOURS);
 		if (expiresAt.isBefore(LocalDateTime.now())) {
 			session.invalidate();
-			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, MSG_SESSION_EXPIRED);
+			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, AdminUtil.MSG_SESSION_EXPIRED);
 		}
 		Admin admin = adminRepository.findById(loginAdmin.getAdminId())
 				.filter(a -> a.getAdminStatus() == AdminStatus.ACTIVE)
 				.orElse(null);
 		if (admin == null) {	// 해제, 탈퇴됨
 			session.invalidate();
-			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, MSG_NO_PERMISSION);
+			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, AdminUtil.MSG_NO_PERMISSION);
 		}
 		return AdminResponseDTO.from(admin, null, expiresAt);
 	}
@@ -123,7 +120,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 		authService.logout(session);	// 한 세션 한 역할: 회원 로그인 정보 삭제
 		session.setAttribute(SessionConst.LOGIN_ADMIN,
 				new LoginAdminDTO(admin.getAdminId(), admin.getAdminName(), admin.getAdminRole(), now));
-		return AdminResponseDTO.from(admin, null, now.plusHours(LOGIN_HOURS));
+		return AdminResponseDTO.from(admin, null, now.plusHours(AdminUtil.LOGIN_HOURS));
 	}
 
 	// 로그인할 수 있는 관리자: 없음(탈퇴, 해제 포함) 404 / 승인 대기 403 / 잠김 423 / 30분 지난 잠금은 풀어 줌

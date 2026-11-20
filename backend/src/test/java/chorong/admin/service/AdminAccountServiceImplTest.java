@@ -123,10 +123,34 @@ class AdminAccountServiceImplTest {
 		Admin admin = givenAdmin(OTHER_ID, AdminStatus.PENDING, AdminRole.MANAGER);
 
 		// When
-		service.removeAdmin(OTHER_ID);
+		service.rejectAdmin(OTHER_ID);
 
 		// Then
 		verify(adminRepository).delete(admin);
+	}
+
+	@Test
+	void 이미_승인된_신청을_거절하면_409() {
+		// Given: 다른 승인권자가 먼저 승인함
+		givenAdmin(OTHER_ID, AdminStatus.ACTIVE, AdminRole.MANAGER);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> service.rejectAdmin(OTHER_ID));
+
+		// Then
+		assertEquals(AdminAccountServiceImpl.MSG_ALREADY_HANDLED, e.getMessage());
+	}
+
+	@Test
+	void 승인_대기를_해제하면_404() {
+		// Given: 해제는 정상 관리자만 (승인 대기는 거절 주소)
+		givenAdmin(OTHER_ID, AdminStatus.PENDING, AdminRole.MANAGER);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> service.removeAdmin(OTHER_ID));
+
+		// Then
+		assertEquals(ErrorCode.NOT_FOUND, e.getErrorCode());
 	}
 
 	@Test

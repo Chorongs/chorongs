@@ -17,7 +17,14 @@ import lombok.NoArgsConstructor;
 public class ImportStatusResponseDTO {
 	private Long jobId;								// 작업 번호
 	private String jobStatus;						// RUNNING, DONE, FAILED, PUBLISHED, EXPIRED
-	private Long baseVersion;						// 반영 요청에 그대로 보낼 기준 버전
+	/*
+	 * 기준 버전 (baseVersion) = 상품 목록의 버전 번호 = 지금 마지막 반영 이력 번호 (product_update_history.history_id 최댓값)
+	 * 반영, 되돌리기, 자동 내림, 숨기기처럼 상품이 바뀔 때마다 이력이 1건 생겨 번호가 커짐
+	 * 화면이 '내가 보고 결정한 시점의 번호'를 보내면 FastAPI가 지금 번호와 비교 → 다르면 409 VERSION_CONFLICT
+	 * (그 사이 다른 관리자나 자동 작업이 상품을 바꿨으니, 바뀐 상태를 다시 보고 결정하라는 뜻)
+	 * 여기 값 = 비교를 시작한 시점의 버전 (import_job.base_version) → 반영 요청(PublishRequestDTO)에 그대로 보냄
+	 */
+	private Long baseVersion;
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;						// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item, FastApiImportResponseDTO와 같음)
 

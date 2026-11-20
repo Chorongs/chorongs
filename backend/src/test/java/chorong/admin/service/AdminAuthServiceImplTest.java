@@ -226,7 +226,7 @@ class AdminAuthServiceImplTest {
 		BusinessException e = assertThrows(BusinessException.class, () -> service.getSession(session));
 
 		// Then
-		assertEquals(AdminAuthServiceImpl.MSG_NO_PERMISSION, e.getMessage());
+		assertEquals(AdminUtil.MSG_NO_PERMISSION, e.getMessage());
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package chorong.admin.service;
 import chorong.admin.dto.CatalogResponseDTO;
 import chorong.admin.dto.HistoryResponseDTO;
 import chorong.admin.dto.PublishResponseDTO;
+import chorong.admin.dto.RollbackPreviewResponseDTO;
 import chorong.admin.dto.RollbackRequestDTO;
 import chorong.admin.entity.ActionType;
 import chorong.common.dto.PageInfo;
@@ -17,6 +18,9 @@ public interface AdminCatalogService {
 
 	/** 반영 이력 최신순 12건씩, actionType 없으면 전체 (ADMIN-05) */
 	PageInfo<HistoryResponseDTO> getHistories(ActionType actionType, int page);
+
+	/** 되돌리기 미리보기: 취소되는 이력 수, 바뀌는 상품 수, 숨김이 풀리는 상품의 미처리 신고 건수 + 기준 버전 (ADMIN-05) */
+	RollbackPreviewResponseDTO getRollbackPreview(Long historyId);
 
 	/** 되돌리기: FastAPI가 한 트랜잭션으로 처리, 성공하면 상품 캐시 비움 (ADMIN-05) */
 	PublishResponseDTO rollback(Long adminId, RollbackRequestDTO request);

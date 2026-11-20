@@ -63,7 +63,14 @@ public class AdminAccountController {
 		return ResponseEntity.noContent().build();
 	}
 
-	/** ADMIN-08 거절 (승인 대기) / ADMIN-09 해제 (정상) → 204 */
+	/** ADMIN-08 가입 거절 (승인 대기만) → 204 */
+	@PostMapping("/admins/{id}/reject")
+	public ResponseEntity<Void> rejectAdmin(@PathVariable Long id) {
+		adminAccountService.rejectAdmin(id);
+		return ResponseEntity.noContent().build();
+	}
+
+	/** ADMIN-09 해제 (정상 관리자만) → 204 */
 	@DeleteMapping("/admins/{id}")
 	public ResponseEntity<Void> removeAdmin(@PathVariable Long id) {
 		adminAccountService.removeAdmin(id);

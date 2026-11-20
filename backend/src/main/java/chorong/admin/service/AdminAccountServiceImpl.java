@@ -28,8 +28,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AdminAccountServiceImpl implements AdminAccountService {
 
-	private static final long LOGIN_HOURS = 2;	// 로그인 유지 시간 (내 계정의 만료 시각)
-
 	// 문구 (관리자 상세 기획 4-11 문구 16, 18)
 	static final String MSG_LAST_APPROVER = "다른 승인권자를 먼저 지정해 주세요";
 	static final String MSG_ALREADY_HANDLED = "다른 승인권자가 먼저 처리함";
@@ -91,23 +89,28 @@ public class AdminAccountServiceImpl implements AdminAccountService {
 
 	@Override
 	@Transactional
-	public void removeAdmin(Long adminId) {
-		adminRepository.lockTable();	// 승인과 동시에 눌러도 상태를 확인한 뒤 처리 (B9), 마지막 승인권자 확인도 같이
+	public void rejectAdmin(Long adminId) {
+		adminRepository.lockTable();	// 승인과 동시에 눌러도 상태를 확인한 뒤 처리 (B9)
 		Admin admin = adminRepository.findById(adminId)
-				.filter(a -> a.getAdminStatus() != AdminStatus.REMOVED)
-				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-		if (admin.getAdminStatus() == AdminStatus.PENDING) {	// 거절: 행 삭제, 메일 없음
-			adminRepository.delete(admin);
-			return;
+				.orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));	// 이미 거절돼 지워진 신청도 404
+		if (admin.getAdminStatus() != AdminStatus.PENDING) {	// 다른 승인권자가 먼저 승인함
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_HANDLED);
 		}
-		withdrawAdmin(admin);	// 해제: 해제된 사람은 다음 요청에서 401 (AdminInterceptor)
+		adminRepository.delete(admin);
+	}
+
+	@Override
+	@Transactional
+	public void removeAdmin(Long adminId) {
+		adminRepository.lockTable();	// 마지막 승인권자 확인 + 해제를 한 번에 (B16)
+		withdrawAdmin(findActiveAdmin(adminId));	// 해제된 사람은 다음 요청에서 401 (AdminInterceptor)
 	}
 
 	@Override
 	@Transactional(readOnly = true)
 	public AdminResponseDTO getMe(LoginAdminDTO loginAdmin) {
 		Admin admin = findActiveAdmin(loginAdmin.getAdminId());
-		return AdminResponseDTO.from(admin, null, loginAdmin.getLoginAt().plusHours(LOGIN_HOURS));
+		return AdminResponseDTO.from(admin, null, loginAdmin.getLoginAt().plusHours(AdminUtil.LOGIN_HOURS));
 	}
 
 	@Override

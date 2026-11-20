@@ -68,6 +68,19 @@ class AdminAutoClosedServiceImplTest {
 	}
 
 	@Test
+	void 처리할_수_없으면_409_문구는_다른_작업이_먼저_됨() {
+		// Given: 확인 전 기록이 없음 (이미 처리함)
+		when(snapshotRepository.findUncheckedByProductIds(eq(ActionType.AUTO_CLOSE), anyList())).thenReturn(List.of());
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> service.handleAutoClosed(9L, new AutoClosedHandleRequestDTO(List.of(1L), CheckResult.KEEP)));
+
+		// Then
+		assertEquals(AdminAutoClosedServiceImpl.MSG_ALREADY_DONE, e.getMessage());
+	}
+
+	@Test
 	void 확인하면_확인_결과_기록() {
 		// Given
 		when(snapshotRepository.findUncheckedByProductIds(eq(ActionType.AUTO_CLOSE), anyList()))

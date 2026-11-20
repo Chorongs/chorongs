@@ -19,6 +19,13 @@ public class AdminUtil {
 
 	private AdminUtil() {}
 
+	/** 관리자 로그인 유지 시간: 로그인 + 2시간 고정, 활동해도 연장 없음 (B4, AdminInterceptor, 관리자 서비스가 같이 씀) */
+	public static final long LOGIN_HOURS = 2;
+
+	/** 관리자 401 문구 (관리자 상세 기획 4-11 문구 12, 13): 2시간 지남 / 해제, 탈퇴됨 */
+	public static final String MSG_SESSION_EXPIRED = "2시간이 지나 자동으로 로그아웃했어요";
+	public static final String MSG_NO_PERMISSION = "관리자 권한이 없어졌어요";
+
 	/** 로그인 관리자, 없으면 null */
 	public static LoginAdminDTO getLoginAdmin(HttpSession session) {
 		if (session == null) return null;

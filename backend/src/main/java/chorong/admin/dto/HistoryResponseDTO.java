@@ -32,10 +32,7 @@ public class HistoryResponseDTO {
 	private String memo;
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm")
 	private LocalDateTime updatedAt;
-	private Boolean canRollback;			// 이 시점으로 되돌릴 수 있는지 (지금 마지막 이력은 false)
-	private Integer cancelCount;			// 되돌리면 취소되는 이력 수 (상세 기획 문구 15의 n)
-	private Integer changedProductCount;	// 되돌리면 바뀌는 상품 수 (문구 15의 m)
-	private Integer unhiddenReportCount;	// 되돌리면 숨김이 풀리는 상품의 미처리 신고 건수
+	private Boolean canRollback;		// 이 시점으로 되돌릴 수 있는지 (지금 마지막 이력은 false) / 되돌리면 바뀌는 수는 미리보기 API
 
 	/** 이력 행 + 처리자 이름 (되돌리기 값은 서비스가 채움) */
 	public static HistoryResponseDTO from(ProductUpdateHistory history, String adminName) {

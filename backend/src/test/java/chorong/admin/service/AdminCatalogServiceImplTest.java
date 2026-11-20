@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import chorong.admin.dto.HistoryResponseDTO;
+import chorong.admin.dto.RollbackPreviewResponseDTO;
 import chorong.admin.dto.RollbackRequestDTO;
 import chorong.admin.entity.ActionType;
 import chorong.admin.entity.ChangeType;
@@ -85,9 +86,45 @@ class AdminCatalogServiceImplTest {
 	}
 
 	@Test
-	void 되돌리면_숨김이_풀리는_상품의_미처리_신고_건수() {
+	void 미리보기_마지막_이력이면_409() {
+		// Given
+		givenPreview(12L, 12L);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> service.getRollbackPreview(12L));
+
+		// Then
+		assertEquals(AdminCatalogServiceImpl.MSG_NOTHING_TO_ROLLBACK, e.getMessage());
+	}
+
+	@Test
+	void 미리보기_없는_이력이면_404() {
+		// Given
+		when(historyRepository.existsById(99L)).thenReturn(false);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> service.getRollbackPreview(99L));
+
+		// Then
+		assertEquals(ErrorCode.NOT_FOUND, e.getErrorCode());
+	}
+
+	@Test
+	void 미리보기_기준_버전은_지금_마지막_이력_번호() {
+		// Given
+		givenPreview(10L, 12L);
+
+		// When
+		RollbackPreviewResponseDTO preview = service.getRollbackPreview(10L);
+
+		// Then
+		assertEquals(12L, preview.getBaseVersion());
+	}
+
+	@Test
+	void 미리보기_숨김이_풀리는_상품의_미처리_신고_건수() {
 		// Given: 이력 10 뒤에 숨긴 기록 (숨기기 전 ON) → 10으로 되돌리면 게시로 돌아감, 미처리 신고 3건
-		givenHistories(history(10L), 12L);
+		givenPreview(10L, 12L);
 		when(loanReportRepository.findProductIdsByProductStatus(ProductStatus.HIDDEN, ReportStatus.RECEIVED))
 				.thenReturn(List.of(HIDDEN_PRODUCT));
 		ProductSnapshot hide = ProductSnapshot.builder().historyId(11L).productId(HIDDEN_PRODUCT)
@@ -98,10 +135,10 @@ class AdminCatalogServiceImplTest {
 				.thenReturn(3L);
 
 		// When
-		HistoryResponseDTO row = service.getHistories(null, 1).getList().get(0);
+		RollbackPreviewResponseDTO preview = service.getRollbackPreview(10L);
 
 		// Then
-		assertEquals(3, row.getUnhiddenReportCount());
+		assertEquals(3, preview.getUnhiddenReportCount());
 	}
 
 	@Test
@@ -120,6 +157,11 @@ class AdminCatalogServiceImplTest {
 	private ProductUpdateHistory history(Long historyId) {
 		return ProductUpdateHistory.builder().historyId(historyId).actionType(ActionType.PUBLISH)
 				.addedCount(0).changedCount(0).removedCount(0).build();
+	}
+
+	private void givenPreview(Long historyId, Long currentVersion) {
+		when(historyRepository.existsById(historyId)).thenReturn(true);
+		when(historyRepository.findTopByOrderByHistoryIdDesc()).thenReturn(Optional.of(history(currentVersion)));
 	}
 
 	private void givenHistories(ProductUpdateHistory row, Long currentVersion) {

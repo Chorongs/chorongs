@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /*
  * 메모리 캐시 한 곳 (B10): 자주 안 바뀌는 응답을 서버 메모리에 보관
@@ -48,5 +50,23 @@ public class MemoryCache {
 		clear(RANKING);
 		clear(FILTER_CHIP);
 		clear(TERM);
+	}
+
+	/**
+	 * 트랜잭션 안에서 상품을 바꿀 때 (자동 내림, 다시 게시, 숨기기 등): 커밋이 끝난 뒤에 상품 캐시 비우기
+	 * 커밋 전에 비우면 그 틈에 다른 요청이 옛 값을 다시 캐시해 다음 비우기까지 남음 / 되돌려지면(롤백) 안 비움
+	 * 트랜잭션 밖에서 부르면 바로 비움 (FastAPI가 커밋한 반영, 되돌리기는 clearProductCaches를 그대로 씀)
+	 */
+	public void clearProductCachesAfterCommit() {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			clearProductCaches();
+			return;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				clearProductCaches();
+			}
+		});
 	}
 }
