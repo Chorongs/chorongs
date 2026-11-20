@@ -88,7 +88,8 @@ const getBandHint = (creditBand, diagBand) => {
 /*
     RC-06 3단계 신용, 우선순위
     - props: error ({ field, message } 또는 null, 부른 쪽에서 [추천 받기] 검사에 걸린 칸), onOpenDiag ('모르면 셀프 진단' 누름)
-    - 신용 구간은 진단(RC-13)에서 왔으면 store에 이미 들어 있어 미리 선택되어 보임
+    - 신용 구간은 처음에 고르지 않은 상태. 진단(RC-13)에서 왔으면 store에 이미 들어 있어 미리 선택되어 보이고,
+      이 탭의 진단 구간이나 회원이 저장한 진단 구간(API-25)이 있으면 안 골랐을 때만 그 구간을 미리 골라 둠
     - 구간 아래 안내는 이 탭의 진단 구간(diagBand)과 비교
     - 이 탭의 진단 구간이 없으면 회원은 저장한 진단 구간(API-25 myApi.getCreditReport)과 비교. 창 열 때 1번, 회원일 때만 부름 (비회원이 부르면 401 안내 창이 뜸).
       못 불러오면 기본 안내 그대로 (따로 안내 안 함) (CHORONG-43에서 연결)
@@ -116,8 +117,14 @@ function StepCredit({ error, onOpenDiag }) {
     }
   }, [diagBand, isMember])
 
+  // 아직 안 골랐고 진단 구간이나 저장한 진단 구간이 있으면 그 구간을 미리 골라 둠 (이미 고른 구간은 덮어쓰지 않음)
+  const knownBand = diagBand ?? savedBand
+  useEffect(() => {
+    if (!input.creditBand && knownBand) setInput({ creditBand: knownBand })
+  }, [input.creditBand, knownBand, setInput])
+
   const errorOf = (field) => (error?.field === field ? error.message : '')
-  const bandHint = getBandHint(input.creditBand, diagBand ?? savedBand)
+  const bandHint = getBandHint(input.creditBand, knownBand)
 
   return (
     <FormStack>

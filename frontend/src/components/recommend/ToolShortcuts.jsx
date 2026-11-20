@@ -302,9 +302,9 @@ function ToolShortcuts() {
           <BackCard />
           <SampleCard>
             <SampleTop>
-              추천 1위<SampleBadge>일치도 96%</SampleBadge>
+              추천 1위<SampleBadge>추천도 96%</SampleBadge>
             </SampleTop>
-            <SampleName>다함 근로자 생활자금</SampleName>
+            <SampleName>예시 상품</SampleName>
             <SampleNums>
               <SampleNum $isRate>
                 <SampleNumLabel>예상 금리</SampleNumLabel>

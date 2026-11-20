@@ -32,7 +32,7 @@ export const getCalcState = (item, lastInput) => {
   return state
 }
 
-// 일치도(서버는 소수 2자리, 예: 96.5)를 화면에는 정수로 (가안 '일치도 96%')
+// 추천도(서버는 소수 2자리, 예: 96.5)를 화면에는 정수로 (가안 '추천도 96%')
 export const formatMatchRate = (matchRate) => Math.round(matchRate)
 
 // 월 상환 값(원)을 만원 단위로: 100만원 이상은 정수, 그보다 작으면 소수 첫째 자리 (가안 28.9만원)
@@ -40,3 +40,15 @@ export const toManWon = (won) => {
   const man = won / 10000
   return man >= 100 ? Math.round(man) : Math.round(man * 10) / 10
 }
+
+// [결과 저장]이 서버(API-38)로 보낼 값: 용도, 금액, 기간, 직업 + 순위대로 상품 번호
+export const buildSavePayload = (lastInput, items) => ({
+  purpose: lastInput.purpose,
+  need: lastInput.need,
+  months: lastInput.months,
+  job: lastInput.job,
+  productIds: items.map((item) => item.product.productId),
+})
+
+// 저장 내용이 같은지 비교하는 글: 같은 조건에 같은 순위의 결과면 같은 글 (중복 저장 막기용)
+export const getSaveKey = (payload) => JSON.stringify(payload)

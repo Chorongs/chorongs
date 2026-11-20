@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import { formatMatchRate } from '../../utils/recommend'
 
-// 가안(.sh-sec): 제목 줄(제목 + 일치도)은 박스 위, 이유 줄만 연회색 박스 안에
+// 가안(.sh-sec): 제목 줄(제목 + 추천도)은 박스 위, 이유 줄만 연회색 박스 안에
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
@@ -24,7 +24,7 @@ const Title = styled.h3`
   font-weight: 800;
 `
 
-// 제목 옆 작은 글 '조건 일치도 N%' (가안)
+// 제목 옆 작은 글 '조건 추천도 N%' (가안)
 const MatchRate = styled.span`
   color: var(--cocoa);
   font-size: var(--fs-sm);
@@ -63,7 +63,7 @@ function ReasonList({ productId }) {
     <Wrap aria-label="추천 이유">
       <Head>
         <Title>추천 이유</Title>
-        <MatchRate>조건 일치도 {formatMatchRate(item.matchRate)}%</MatchRate>
+        <MatchRate>조건 추천도 {formatMatchRate(item.matchRate)}%</MatchRate>
       </Head>
       <Reasons>
         {item.reasons.map((reason, index) => (

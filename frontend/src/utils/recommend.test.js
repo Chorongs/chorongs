@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatMatchRate, getCalcState, toManWon } from './recommend'
+import { buildSavePayload, formatMatchRate, getCalcState, getSaveKey, toManWon } from './recommend'
 
 // 테스트용 추천 항목: 한도 1,000만원, 최대 60개월, 예상 금리 2.0~3.0
 const makeItem = (productChanges = {}, itemChanges = {}) => ({
@@ -155,7 +155,7 @@ describe('getCalcState 상환 방식', () => {
 })
 
 describe('formatMatchRate', () => {
-  it('소수 일치도를 반올림한 정수로 돌려준다', () => {
+  it('소수 추천도를 반올림한 정수로 돌려준다', () => {
     // Given
     const matchRate = 96.5
     // When
@@ -164,7 +164,7 @@ describe('formatMatchRate', () => {
     expect(result).toBe(97)
   })
 
-  it('정수 일치도는 그대로 돌려준다', () => {
+  it('정수 추천도는 그대로 돌려준다', () => {
     // Given
     const matchRate = 80
     // When
@@ -200,5 +200,43 @@ describe('toManWon', () => {
     const result = toManWon(won)
     // Then
     expect(result).toBe(30)
+  })
+})
+
+describe('buildSavePayload', () => {
+  it('조건 4개와 순위대로 상품 번호를 담는다', () => {
+    // Given
+    const lastInput = { purpose: '생활비', need: 500, months: 36, job: 'OFFICE', income: 3000 }
+    const items = [{ product: { productId: 7 } }, { product: { productId: 3 } }]
+    // When
+    const result = buildSavePayload(lastInput, items)
+    // Then
+    expect(result).toEqual({ purpose: '생활비', need: 500, months: 36, job: 'OFFICE', productIds: [7, 3] })
+  })
+})
+
+describe('getSaveKey', () => {
+  it('저장 내용이 같으면 같은 글을 돌려준다', () => {
+    // Given
+    const lastInput = { purpose: '생활비', need: 500, months: 36, job: 'OFFICE' }
+    const items = [{ product: { productId: 7 } }, { product: { productId: 3 } }]
+    // When
+    const first = getSaveKey(buildSavePayload(lastInput, items))
+    const second = getSaveKey(buildSavePayload({ ...lastInput }, [...items]))
+    // Then
+    expect(first).toBe(second)
+  })
+
+  it('금액이나 순위가 다르면 다른 글을 돌려준다', () => {
+    // Given
+    const lastInput = { purpose: '생활비', need: 500, months: 36, job: 'OFFICE' }
+    const items = [{ product: { productId: 7 } }, { product: { productId: 3 } }]
+    // When
+    const base = getSaveKey(buildSavePayload(lastInput, items))
+    const otherNeed = getSaveKey(buildSavePayload({ ...lastInput, need: 600 }, items))
+    const otherOrder = getSaveKey(buildSavePayload(lastInput, [...items].reverse()))
+    // Then
+    expect(otherNeed).not.toBe(base)
+    expect(otherOrder).not.toBe(base)
   })
 })

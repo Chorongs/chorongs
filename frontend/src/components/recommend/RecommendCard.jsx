@@ -39,7 +39,7 @@ const Wrap = styled(Card)`
   box-shadow: ${({ $isTop }) => ($isTop ? '0 0 0 2px var(--brand)' : 'var(--shadow-1)')};
 `
 
-// 맨 윗줄: 메달 + 순위 + 일치도 (오른쪽 끝에 찜 버튼 자리, 가안). 아래 상품명과 가깝게 붙임
+// 맨 윗줄: 메달 + 순위 + 추천도 (오른쪽 끝에 찜 버튼 자리, 가안). 아래 상품명과 가깝게 붙임
 const Top = styled.div`
   display: flex;
   align-items: center;
@@ -57,7 +57,7 @@ const RankText = styled.b`
   font-weight: 800;
 `
 
-// 일치도: 주황 알약 (가안)
+// 추천도: 주황 알약 (가안)
 const MatchRate = styled.span`
   padding: 3px 10px;
   border-radius: 999px;
@@ -242,7 +242,7 @@ function RecommendCard({ item }) {
       <Top>
         {isTop && <Medal rank={rankNo} size={26} />}
         <RankText>추천 {rankNo}위</RankText>
-        <MatchRate>일치도 {formatMatchRate(matchRate)}%</MatchRate>
+        <MatchRate>추천도 {formatMatchRate(matchRate)}%</MatchRate>
         <LikeSpot>
           <LikeButton productId={product.productId} />
         </LikeSpot>

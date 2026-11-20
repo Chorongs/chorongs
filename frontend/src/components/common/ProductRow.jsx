@@ -12,8 +12,8 @@ import RateText from './RateText'
 // CM-04 상품 한 줄: 금융사 / 상품명 / 태그 2개 (상품 특징 앞 2개) / 금리 / 한도
 // 줄 아무 곳 클릭, Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
-// rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '일치도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
-// 태그: (일치도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (시안 prodRow). 명세서는 '상품 특징 앞 2개'만 있어 소분류는 변경 요청 중
+// rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '추천도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
+// 태그: (추천도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (시안 prodRow). 명세서는 '상품 특징 앞 2개'만 있어 소분류는 변경 요청 중
 // 오른쪽 끝 하트: 찜 버튼 LikeButton (CM-06, CHORONG-43에서 연결. 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation)
 //   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
@@ -237,7 +237,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
         <Name>{product.productName}</Name>
         {(matchRate != null || sector || featureTags.length > 0) && (
           <Tags>
-            {matchRate != null && <Tag $variant="acc">일치도 {matchRate}%</Tag>}
+            {matchRate != null && <Tag $variant="acc">추천도 {matchRate}%</Tag>}
             {sector && <Tag>{sector}</Tag>}
             {featureTags.map((code) => (
               <Tag key={code} $variant={ACCENT_FEATURES.includes(code) ? 'acc' : undefined}>
