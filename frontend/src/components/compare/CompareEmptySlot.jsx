@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import useCompareStore, { getPurposes } from '../../store/useCompareStore'
+import useCompareStore, { getCompareConditionText } from '../../store/useCompareStore'
 import { Button, SlotBadge } from '../../styles/common'
 import Icon from '../ui/Icon'
 
 // CP-04 빈 비교 칸: 상품 없는 칸 (점선 카드, 시안과 같게)
-// [비교 상품 고르기] → 상품 찾기로. 남은 상품이 있으면 그 상품 자금 용도로 필터, 없으면 비교함 비우고 조건 초기화
+// [비교 상품 고르기] → 상품 찾기로. 남은 상품이 있으면 그 상품만 비교함에 두고 바꿀 칸을 기억(startSwap), 없으면 비교함을 비움(clearTray)
+// 상품 찾기에서 용도와 상환 방식이 겹치는 상품만 보이게 거르는 일은 상품 찾기 화면이 한다 (CM-10, getCompareBlock)
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -58,8 +59,7 @@ function CompareEmptySlot({ slot, keepProduct = null }) {
       <Title>텅~ 비어 있어요</Title>
       {keepProduct ? (
         <Hint>
-          {keepProduct.productName} 상품과 자금 용도
-          <br />({getPurposes(keepProduct).join('·')})가 겹치는 상품을 골라 주세요.
+          {keepProduct.productName} 상품과 {getCompareConditionText(keepProduct)}이 겹치는 상품을 골라 주세요.
         </Hint>
       ) : (
         <Hint>

@@ -10,17 +10,18 @@ import LimitText from './LimitText'
 import RateText from './RateText'
 
 // CM-04 상품 한 줄: 금융사 / 상품명 / 태그 2개 (상품 특징 앞 2개) / 금리 / 한도
-// 줄 아무 곳 클릭, Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
+// 줄 아무 곳 클릭, (키보드는 상품명에서) Enter → 상품 상세 창 (from: 추천에서 열면 'recommend')
 // 줄 모양은 시안과 같게: 카드 없이 아래 구분선만, 목록(ProductList) 폭 720 이하에서 2줄 배치 (container query)
-// rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '일치도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
-// 태그: (일치도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (시안 prodRow). 명세서는 '상품 특징 앞 2개'만 있어 소분류는 변경 요청 중
+// rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '추천도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
+// 태그: (추천도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (CM-04)
 // 오른쪽 끝 하트: 찜 버튼 LikeButton (CM-06, CHORONG-43에서 연결. 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation)
 //   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
-// [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
+// [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기, 찜한 대출(MY) 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
 //   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
 //   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
 // TODO(CHORONG-64 조빌립, 상품 찾기 간편 검색): 시안은 태그 자리에 'N/M 일치' 글 + 초록 충족 태그(체크 아이콘)를 보여 줌. 이 줄에 hits 같은 props로 추가 (상세 검색은 그대로)
-// TODO(CM-04, CHORONG-68 조빌립): 줄 전체가 role="button"인데 안에 하트, [+ 비교] 버튼이 또 있어 화면 낭독기에서 버튼 안의 버튼으로 읽힘 (카드도 같음). 줄 전체 클릭은 상품명 버튼 하나로 두고 줄 클릭은 마우스용으로만 두는 방식 검토
+// 줄 전체는 마우스 클릭용이라 role, tabIndex가 없고, 키보드와 화면 낭독기는 '상품명 버튼'으로 연다. (줄을 버튼으로 두면 안의 하트, [+ 비교]가 '버튼 안의 버튼'이 됨)
+//   상품명 버튼은 따로 onClick이 없다: 누르거나 Enter, Space를 누르면 click이 줄까지 퍼져 handleOpen이 한 번 실행됨
 // 랭킹(RK-02, CHORONG-60)은 순위 숫자 칸, 1~3위 메달 카드, '최저 금리' 이름표가 달라 이 줄을 쓰지 않고 components/ranking/RankingItem.jsx로 따로 만듦
 const Row = styled.article`
   display: grid;
@@ -85,6 +86,19 @@ const RankNo = styled.b`
   color: var(--brand-text);
   font-family: var(--f-num);
   font-weight: 900;
+`
+
+// 키보드, 화면 낭독기용 상품명 버튼: 모양은 글자 그대로 (안의 Name이 그린다)
+const NameButton = styled.button.attrs({ type: 'button' })`
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 `
 
 // 상품명이 길면 2줄에서 자름. 줄 위에 마우스를 올리면 밑줄
@@ -213,20 +227,12 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
     addTray(product)
   }
 
-  const handleKeyDown = (event) => {
-    // 줄 안의 버튼에서 누른 Enter는 그 버튼 몫
-    if (event.key === 'Enter' && event.target === event.currentTarget) handleOpen()
-  }
-
   return (
     <Row
-      role="button"
-      tabIndex={0}
       $hasCompare={hasCompare}
       $isInCmp={Boolean(traySlot)}
       $isNo={hasCompare && isNo}
       onClick={handleOpen}
-      onKeyDown={handleKeyDown}
     >
       <Info>
         <Org>
@@ -234,10 +240,12 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
           {product.companyName}
           {traySlot && <CompareBadge>비교 {traySlot}에 담음</CompareBadge>}
         </Org>
-        <Name>{product.productName}</Name>
+        <NameButton>
+          <Name>{product.productName}</Name>
+        </NameButton>
         {(matchRate != null || sector || featureTags.length > 0) && (
           <Tags>
-            {matchRate != null && <Tag $variant="acc">일치도 {matchRate}%</Tag>}
+            {matchRate != null && <Tag $variant="acc">추천도 {matchRate}%</Tag>}
             {sector && <Tag>{sector}</Tag>}
             {featureTags.map((code) => (
               <Tag key={code} $variant={ACCENT_FEATURES.includes(code) ? 'acc' : undefined}>
@@ -270,7 +278,6 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
             $state={traySlot ? 'in' : isNo ? 'no' : undefined}
             aria-pressed={Boolean(traySlot)}
             onClick={handleCompare}
-            onKeyDown={(event) => event.stopPropagation()}
           >
             {traySlot && <Icon name="check" size={15} />}
             {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}

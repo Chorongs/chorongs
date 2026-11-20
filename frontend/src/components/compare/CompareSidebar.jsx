@@ -14,7 +14,7 @@ import Icon from '../ui/Icon'
 // CP-07 비교할 상품 고르기: 비교 화면에서 바로 상품 채우기 (구역마다 3개씩 쪽 넘김 + 건수). 모양은 시안과 같게 접었다 펴는 구역
 // 카드를 누르면 빈 칸에 먼저, 둘 다 차 있으면 B를 바꿈. 이미 있는 상품 → '이미 A에 있어요' 알림
 // 다른 한 상품과 자금 용도나 상환 방식이 안 겹치는 카드는 흐리게 + '용도가(상환 방식이) 달라 비교 불가', 누르면 안 담고 경고 (E15)
-// 추천 상품: useRecommendStore의 result.items를 그대로 보여 줌 (카드에 '일치도 N%' 딱지, 비회원도 가능, 새 API 없음). 추천을 받기 전에는 구역이 안 보임
+// 추천 상품: useRecommendStore의 result.items를 그대로 보여 줌 (카드에 '추천도 N%' 딱지, 비회원도 가능, 새 API 없음). 추천을 받기 전에는 구역이 안 보임
 // 찜, 최근 본: 회원만 (명세서 CP-07, 비회원이면 구역 안 보임): 요청이 401이면 그 구역을 숨긴다.
 // 목록을 못 받으면 그 구역만 실패 문구 (E3). 구역이 모두 비면 사이드바째 숨김
 // 판매 종료, 숨김 상품은 목록에서 뺀다 (관리자가 상태를 바꾸면 안 나옴, 상태 ON만 보임)
@@ -196,7 +196,7 @@ const Flip = styled.span`
 `
 
 // 판매 종료(CLOSED), 숨김(HIDDEN) 상품은 비교할 수 없으니 빼고 게시(ON) 상품만 둔다.
-// 추천 상품 카드의 일치도 딱지
+// 추천 상품 카드의 추천도 딱지
 const Match = styled.span`
   padding: 4px 8px;
   border-radius: var(--r-pill);
@@ -302,7 +302,7 @@ function SectionBox({ title, state, onRetry, pair, otherProduct, onPick }) {
                     <Name>{product.productName}</Name>
                     <Meta>
                       <Rate>{formatRateRange(product.rateMin, product.rateMax)}</Rate>
-                      {product.matchRate != null && <Match>일치도 {product.matchRate}%</Match>}
+                      {product.matchRate != null && <Match>추천도 {product.matchRate}%</Match>}
                     </Meta>
                     {slot && (
                       <On>
@@ -354,7 +354,7 @@ function CompareSidebar({ slotProducts, onPicked }) {
   const [likes, retryLikes] = useSectionData(myApi.getLikes, getLikeItems, isMember, likedIds)
   const [recents, retryRecents] = useSectionData(myApi.getRecentViews, getRecentItems, isMember)
   const recommendItems = useRecommendStore((state) => state.result?.items)
-  // 추천 결과를 구역 모양으로 (게시 상품만, 일치도는 카드 딱지로)
+  // 추천 결과를 구역 모양으로 (게시 상품만, 추천도는 카드 딱지로)
   const recommends = useMemo(() => {
     const items = (recommendItems ?? [])
       .map((item) => ({ ...item.product, matchRate: formatMatchRate(item.matchRate) }))
