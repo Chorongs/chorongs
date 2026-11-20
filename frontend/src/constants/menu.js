@@ -4,6 +4,9 @@
 // match: 이 주소와 그 하위 주소도 현재 메뉴로 표시 (to와 다를 때만 씀)
 // isRecommend: '캐링 추천' 메뉴. 추천받기 전이면 주소 이동 대신 추천 창을 열고, 받은 뒤면 to(/recommend)로 이동
 
+// 추천받은 뒤 '캐링 추천' 메뉴 이름 (상단 메뉴, 모바일 전체 메뉴)
+export const RESULT_MENU_LABEL = '추천 결과'
+
 // 도움말 메뉴 (시안 순서)
 export const HELP_MENU = [
   { label: '자주 묻는 질문', to: '/help/faq', icon: 'help' },

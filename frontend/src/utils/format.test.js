@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { formatDate, formatMoney, formatNumber, formatRate } from './format'
+import {
+  formatDate,
+  formatMoney,
+  formatNumber,
+  formatPrepayFee,
+  formatRange,
+  formatRate,
+  formatRateRange,
+  formatTagValues,
+  getTodayText,
+} from './format'
 
 describe('formatNumber', () => {
   it('천 단위 쉼표를 붙인다', () => {
@@ -132,5 +142,125 @@ describe('formatDate', () => {
     const result = formatDate(value)
     // Then
     expect(result).toBe('-')
+  })
+})
+
+describe('formatPrepayFee', () => {
+  it('0이면 없음', () => {
+    // Given
+    const value = 0
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('없음')
+  })
+
+  it('숫자면 최대 n%', () => {
+    // Given
+    const value = 1.5
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('최대 1.50%')
+  })
+
+  it('값이 없으면 기관 문의', () => {
+    // Given
+    const value = null
+    // When
+    const result = formatPrepayFee(value)
+    // Then
+    expect(result).toBe('기관 문의')
+  })
+})
+
+describe('formatRange', () => {
+  it('둘 다 있으면 a ~ b', () => {
+    // Given
+    const min = 19
+    const max = 34
+    // When
+    const result = formatRange(min, max, '만 ', '세')
+    // Then
+    expect(result).toBe('만 19세 ~ 만 34세')
+  })
+
+  it('최소만 있으면 이상', () => {
+    // Given
+    const min = 600
+    // When
+    const result = formatRange(min, null, '', '점')
+    // Then
+    expect(result).toBe('600점 이상')
+  })
+
+  it('둘 다 없으면 정보 없음', () => {
+    // Given
+    const min = null
+    // When
+    const result = formatRange(min, null)
+    // Then
+    expect(result).toBe('정보 없음')
+  })
+})
+
+describe('formatRateRange', () => {
+  it('최소, 최대 금리가 다르면 범위로 보인다', () => {
+    // Given
+    const rateMin = 3.5
+    const rateMax = 5.2
+    // When
+    const result = formatRateRange(rateMin, rateMax)
+    // Then
+    expect(result).toBe(`${formatRate(3.5)} ~ ${formatRate(5.2)}%`)
+  })
+
+  it('한쪽만 있으면 그 값 하나만 보인다', () => {
+    // Given
+    const rateMin = 4
+    // When
+    const result = formatRateRange(rateMin, null)
+    // Then
+    expect(result).toBe(`${formatRate(4)}%`)
+  })
+
+  it('둘 다 없으면 기관 문의로 보인다', () => {
+    // Given
+    const rateMin = null
+    // When
+    const result = formatRateRange(rateMin, null)
+    // Then
+    expect(result).toBe('금리는 기관 문의')
+  })
+})
+
+describe('formatTagValues', () => {
+  it('같은 종류 태그 값을 쉼표로 잇는다', () => {
+    // Given
+    const product = { tags: [{ tagType: 'REPAY', tagValue: '원리금균등' }, { tagType: 'TARGET', tagValue: '청년' }, { tagType: 'REPAY', tagValue: '만기일시' }] }
+    // When
+    const result = formatTagValues(product, 'REPAY')
+    // Then
+    expect(result).toBe('원리금균등, 만기일시')
+  })
+
+  it('그 종류 태그가 없으면 정보 없음이다', () => {
+    // Given
+    const product = { tags: [] }
+    // When
+    const result = formatTagValues(product, 'REPAY')
+    // Then
+    expect(result).toBe('정보 없음')
+  })
+})
+
+describe('getTodayText', () => {
+  it('한 자리 달, 날짜는 0을 붙여 YYYY-MM-DD로 만든다', () => {
+    // Given
+    const today = new Date(2026, 0, 5)
+    // When
+    const result = getTodayText(today)
+    // Then
+    expect(result).toBe('2026-01-05')
   })
 })

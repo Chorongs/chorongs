@@ -2,7 +2,10 @@ import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import styled from 'styled-components'
 import logoImg from '../../assets/images/logo_main.png'
-import { FULL_MENU } from '../../constants/menu'
+import { LOGIN_TYPE_LABEL } from '../../constants/options'
+import { FULL_MENU, RESULT_MENU_LABEL } from '../../constants/menu'
+import useAuthStore from '../../store/useAuthStore'
+import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { IconButton } from '../../styles/common'
 import Icon from '../ui/Icon'
@@ -11,8 +14,8 @@ import Modal from '../ui/Modal'
 // LY-15 모바일 전체 메뉴: Modal 부품 사용 (Esc → 닫힘). 시안처럼 화면 가득, 위에 로고 + 닫기
 // 링크를 누르면 닫히고, 열려 있는 동안 뒤 화면 스크롤을 잠금
 // 캐링 추천은 LY-05와 같음 (추천받기 전이면 추천 창 열고 메뉴 닫기, 받은 뒤면 /recommend 이동)
-// TODO(ST-03, CHORONG-45): useRecommendStore의 result가 올라오면 hasResult를 result 유무로 바꾼다.
-// TODO(ST-01, CHORONG-43): 맨 위 계정 줄은 useAuthStore가 올라온 뒤 추가한다.
+// hasResult: useRecommendStore의 result 유무 (받은 뒤에는 메뉴 이름이 '추천 결과')
+// 맨 위 계정 줄 (useAuthStore, CHORONG-43에서 연결)
 //   회원: '{닉네임}님' + '{카카오 또는 네이버} 로그인' → /my / 비회원: '카카오, 네이버로 로그인' + '찜과 기록은 회원만 저장돼요' → /login
 const Top = styled.div`
   display: flex;
@@ -25,6 +28,24 @@ const Top = styled.div`
 const LogoImage = styled.img`
   display: block;
   height: 28px;
+`
+
+const Account = styled(NavLink)`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
+  background: var(--mist);
+  b {
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    font-weight: 800;
+  }
+  span {
+    color: var(--cocoa);
+    font-size: var(--fs-sm);
+  }
 `
 
 const Group = styled.section`
@@ -64,7 +85,9 @@ function MobileMenu() {
   const menuOpen = useUiStore((state) => state.menuOpen)
   const closeMenu = useUiStore((state) => state.closeMenu)
   const openRecommend = useUiStore((state) => state.openRecommend)
-  const hasResult = false
+  const status = useAuthStore((state) => state.status)
+  const user = useAuthStore((state) => state.user)
+  const hasResult = useRecommendStore((state) => state.result !== null)
 
   const handleItemClick = (event, item) => {
     closeMenu()
@@ -91,6 +114,17 @@ function MobileMenu() {
           <Icon name="close" />
         </IconButton>
       </Top>
+      {status === 'member' ? (
+        <Account to="/my" onClick={closeMenu}>
+          <b>{user.memberNickname}님</b>
+          <span>{LOGIN_TYPE_LABEL[user.loginType] ?? '소셜'} 로그인</span>
+        </Account>
+      ) : (
+        <Account to="/login" onClick={closeMenu}>
+          <b>카카오, 네이버로 로그인</b>
+          <span>찜과 기록은 회원만 저장돼요</span>
+        </Account>
+      )}
       <nav aria-label="전체 메뉴">
         {FULL_MENU.map((group) => (
           <Group key={group.title}>
@@ -105,7 +139,7 @@ function MobileMenu() {
                 <MenuIcon>
                   <Icon name={item.icon} />
                 </MenuIcon>
-                {item.label}
+                {item.isRecommend && hasResult ? RESULT_MENU_LABEL : item.label}
               </MenuLink>
             ))}
           </Group>

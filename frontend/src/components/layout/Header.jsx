@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import logoImg from '../../assets/images/logo_main.png'
 import { NAV_MENU } from '../../constants/menu'
+import AccountMenu from './AccountMenu'
 import GlobalNav from './GlobalNav'
 import HelperToggle from './HelperToggle'
+import LikeLink from './LikeLink'
 
 // LY-04 상단바: 맨 위 고정 바 (높이 68, 모바일 58)
 // 로고 / 상단 메뉴 / 도우미 버튼 / 찜 바로가기 / 계정 메뉴
 // 상단 메뉴에 마우스를 올리면 하위 메뉴가 펼쳐지고, 바 아래에 흰 배경판이 같이 내려온다. (Esc, 바 밖으로 나가면 닫힘)
-// TODO(LY-07, LY-08, CHORONG-43): 찜 바로가기 LikeLink, 계정 메뉴 AccountMenu가 올라온 뒤 오른쪽 묶음에 연결 (useAuthStore)
+// 오른쪽 묶음: 도우미 버튼 / 찜 바로가기 LikeLink (LY-07) / 계정 메뉴 AccountMenu (LY-08)
 
 // 펼친 배경판 높이 = 가장 긴 하위 메뉴 칸 (위 16 + 아래 20 + 줄 36 x 개수 + 줄 사이 4)
 const MAX_CHILDREN = Math.max(...NAV_MENU.map((item) => item.children?.length ?? 0))
@@ -103,6 +105,8 @@ function Header() {
         <GlobalNav isMegaOpen={isMegaOpen} onMegaChange={setIsMegaOpen} />
         <Right>
           <HelperToggle />
+          <LikeLink />
+          <AccountMenu />
         </Right>
       </Inner>
       <MegaBackground $isOpen={isMegaOpen} aria-hidden="true" />
