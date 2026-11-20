@@ -86,6 +86,7 @@ INSERT_ITEM = text(
 SELECT_JOB = text("SELECT job_id, job_status, base_version, source_result, "
                   "CASE WHEN finished_at < SYSDATE - :hours / 24 THEN 1 ELSE 0 END AS expired "
                   "FROM import_job WHERE job_id = :job_id")
+LATEST_JOB_ID = text("SELECT MAX(job_id) FROM import_job")    # 가장 최근 작업 (화면을 다시 열었을 때 이어서 보기)
 SELECT_ITEMS = text("SELECT item_id, diff_type, product_id, product_name, company_name, source, "
                     "changed_fields, check_reasons, hidden_yn FROM import_item WHERE job_id = :job_id ORDER BY item_id")
 
@@ -355,6 +356,12 @@ def run_import(engine, job_id, sources):
                                           "error": f"{type(e).__name__}: {e}"[:500]})
         except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 불러오기가 FAILED로 바꿈)
             logger.exception("불러오기 작업 %d FAILED 기록 실패", job_id)
+
+
+def read_latest_job(conn):
+    """가장 최근 작업의 진행 상태 (GET /imports/latest). 작업이 하나도 없으면 None. 응답 모양, EXPIRED 처리는 read_job과 같음"""
+    job_id = conn.execute(LATEST_JOB_ID).scalar()
+    return None if job_id is None else read_job(conn, job_id)
 
 
 def read_job(conn, job_id):

@@ -3,6 +3,7 @@
 
     - GET  /health                    : 인증 없음
     - POST /imports                   : 불러오기 시작 → 작업 번호 바로 응답, 수집·정제·비교는 응답 뒤 이어서 (ADMIN-04, EXT-01, 02)
+    - GET  /imports/latest            : 가장 최근 작업의 진행 상태 (화면을 다시 열었을 때 이어서 보기, 없으면 404)
     - GET  /imports/{job_id}          : 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록
     - POST /imports/{job_id}/publish  : 고른 항목 반영 → 새 버전 (ADMIN-04)
     - POST /catalog/rollback          : 되돌리기 → 새 버전 (ADMIN-05)
@@ -19,7 +20,8 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.credit import load_score_table, score_answers
-from app.imports import JobConflict, NotFound, NotPublishable, SOURCE_ORDER, read_job, run_import, start_job
+from app.imports import (JobConflict, NotFound, NotPublishable, SOURCE_ORDER, read_job, read_latest_job, run_import,
+                         start_job)
 from app.load import make_engine
 from app.publish import publish, rollback
 from app.schemas import (ImportStartRequest, ImportStartResponse, ImportStatusResponse, ItemScore, PublishRequest,
@@ -71,6 +73,17 @@ def start_import(body: ImportStartRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(run_import, ENGINE, job_id, sources)
     logger.info("불러오기 작업 %d 시작: %s", job_id, ",".join(sources))
     return ImportStartResponse(job_id=job_id)
+
+
+# /imports/{job_id}보다 위에 둠 (아래에 두면 'latest'를 작업 번호로 읽어 422)
+@app.get("/imports/latest", response_model=ImportStatusResponse, dependencies=[Depends(verify_token)])
+def get_latest_import():
+    """가장 최근 작업의 진행 상태 (로그아웃, 새로 고침 뒤에도 진행 확인이나 반영을 이어서 함). 작업이 없으면 404"""
+    with ENGINE.connect() as conn:
+        job = read_latest_job(conn)
+    if job is None:
+        raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+    return job
 
 
 @app.get("/imports/{job_id}", response_model=ImportStatusResponse, dependencies=[Depends(verify_token)])

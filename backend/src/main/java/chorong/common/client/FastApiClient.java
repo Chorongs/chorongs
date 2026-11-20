@@ -84,6 +84,14 @@ public class FastApiClient {
 				.body(FastApiImportResponseDTO.class));
 	}
 
+	// 가장 최근 작업: 응답은 진행 확인과 같음, 작업이 없으면 404 NOT_FOUND (화면을 다시 열었을 때 이어서 보기, ADMIN-04)
+	public FastApiImportResponseDTO getLatestImport() {
+		return call("최근 작업 확인", () -> restClient.get()
+				.uri("/imports/latest")
+				.retrieve()
+				.body(FastApiImportResponseDTO.class));
+	}
+
 	// 진행 확인: 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록 (ADMIN-04)
 	public FastApiImportResponseDTO getImport(Long jobId) {
 		return call("진행 확인", () -> restClient.get()

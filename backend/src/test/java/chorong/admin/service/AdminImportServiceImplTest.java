@@ -16,8 +16,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import chorong.admin.dto.ImportRequestDTO;
+import chorong.admin.dto.ImportStatusResponseDTO;
 import chorong.admin.dto.PublishRequestDTO;
 import chorong.common.client.FastApiClient;
+import chorong.common.dto.FastApiImportResponseDTO;
 import chorong.common.dto.FastApiVersionResponseDTO;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
@@ -54,6 +56,19 @@ class AdminImportServiceImplTest {
 
 		// Then
 		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 최근_작업은_FastAPI가_준_작업_번호와_상태_그대로() {
+		// Given: 진행 중인 작업 3
+		when(fastApiClient.getLatestImport())
+				.thenReturn(new FastApiImportResponseDTO(JOB_ID, "RUNNING", 12L, null, null));
+
+		// When
+		ImportStatusResponseDTO response = service.getLatestImport();
+
+		// Then
+		assertEquals(List.of(JOB_ID, "RUNNING"), List.of(response.getJobId(), response.getJobStatus()));
 	}
 
 	@Test

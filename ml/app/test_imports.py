@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from app.imports import (changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
-                         source_results, split_list)
+                         read_latest_job, source_results, split_list)
 from app.load import PRODUCT_COLS
 
 RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200", "top_fin_grp_no": "020000"},
@@ -327,12 +327,14 @@ class _Row:
 
 
 class _FakeConn:
-    """SELECT_JOB, SELECT_ITEMS 순서로 호출된다고 보고 정해진 행을 돌려줌"""
+    """호출 순서대로 정해진 행을 돌려줌 (read_job: SELECT_JOB, SELECT_ITEMS / read_latest_job: 그 앞에 LATEST_JOB_ID)"""
 
-    def __init__(self, job, items):
-        self.results = [job, items]
+    def __init__(self, *results):
+        self.results = list(results)
+        self.params = []        # 호출마다 받은 값 (어느 작업 번호로 읽었는지 확인용)
 
     def execute(self, sql, params=None):
+        self.params.append(params)
         result = self.results.pop(0)
         return _FakeResult(result)
 
@@ -342,6 +344,9 @@ class _FakeResult:
         self.rows = rows
 
     def first(self):
+        return self.rows
+
+    def scalar(self):
         return self.rows
 
     def __iter__(self):
@@ -368,3 +373,22 @@ def test_read_job_항목의_쉼표_칸은_목록으로():
     result = read_job(conn, 3)
     # Then
     assert (result["items"][0]["changed_fields"], result["items"][0]["check_reasons"]) == (["rate_max", "tags"], [])
+
+
+def test_read_latest_job_작업이_하나도_없으면_None():
+    # Given
+    conn = _FakeConn(None)
+    # When
+    result = read_latest_job(conn)
+    # Then
+    assert result is None
+
+
+def test_read_latest_job_가장_최근_작업_번호로_읽는다():
+    # Given: 가장 최근 작업 7
+    job = _Row(job_id=7, job_status="RUNNING", base_version=1, source_result=None, expired=0)
+    conn = _FakeConn(7, job, [])
+    # When
+    read_latest_job(conn)
+    # Then
+    assert conn.params[1]["job_id"] == 7

@@ -16,6 +16,9 @@ public interface AdminImportService {
 	/** 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록 */
 	ImportStatusResponseDTO getImport(Long jobId);
 
+	/** 가장 최근 작업 (getImport와 같은 응답, 없으면 404): 화면을 다시 열었을 때 진행 확인, 반영을 이어서 함 */
+	ImportStatusResponseDTO getLatestImport();
+
 	/** 고른 항목만 반영, 성공하면 상품 캐시 비움 */
 	PublishResponseDTO publishImport(Long adminId, Long jobId, PublishRequestDTO request);
 }

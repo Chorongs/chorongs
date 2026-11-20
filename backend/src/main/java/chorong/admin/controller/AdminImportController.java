@@ -37,6 +37,12 @@ public class AdminImportController {
 		return ResponseEntity.ok(ApiResponse.success(adminImportService.startImport(adminId, requestDTO)));
 	}
 
+	/** 가장 최근 작업 (화면을 다시 열었을 때 이어서 보기, 작업이 없으면 404) / '{id}'보다 먼저 맞춰지는 고정 주소 */
+	@GetMapping("/latest")
+	public ResponseEntity<ApiResponse<ImportStatusResponseDTO>> getLatestImport() {
+		return ResponseEntity.ok(ApiResponse.success(adminImportService.getLatestImport()));
+	}
+
 	/** 진행 확인, 비교 결과 */
 	@GetMapping("/{id}")
 	public ResponseEntity<ApiResponse<ImportStatusResponseDTO>> getImport(@PathVariable Long id) {

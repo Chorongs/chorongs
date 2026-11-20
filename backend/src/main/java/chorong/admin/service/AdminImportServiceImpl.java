@@ -42,6 +42,11 @@ public class AdminImportServiceImpl implements AdminImportService {
 	}
 
 	@Override
+	public ImportStatusResponseDTO getLatestImport() {
+		return ImportStatusResponseDTO.from(fastApiClient.getLatestImport());
+	}
+
+	@Override
 	public PublishResponseDTO publishImport(Long adminId, Long jobId, PublishRequestDTO request) {
 		// 기준 버전은 진행 확인 응답의 값 그대로 (DB에서 다시 읽지 않음: 비교 시점과 어긋나면 VERSION_CONFLICT를 못 잡음)
 		List<Long> itemIds = request.getItemIds().stream().distinct().toList();
