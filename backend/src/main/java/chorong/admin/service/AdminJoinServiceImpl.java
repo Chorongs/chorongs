@@ -28,7 +28,7 @@ public class AdminJoinServiceImpl implements AdminJoinService {
 	private static final int MAX_FAIL = 5;			// 5번 틀리면 세션 값 지움
 	private static final long PENDING_DAYS = 14;	// 승인 대기 보관 기간 (BAT-03)
 
-	// 문구 (관리자 상세 기획 4-11 문구 2, 3, 9, 10)
+	// 문구 (관리자 상세 기획 4-11 문구 2, 3 / 토큰 문구 9, 10은 AdminAuthServiceImpl 것을 씀)
 	static final String MSG_ALREADY_ACTIVE = "이미 등록된 메일이에요. 로그인해 주세요";
 	static final String MSG_ALREADY_PENDING = "이미 신청한 메일이에요. 승인되면 메일로 알려 드려요";
 

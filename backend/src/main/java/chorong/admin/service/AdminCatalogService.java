@@ -9,7 +9,7 @@ import chorong.admin.entity.ActionType;
 import chorong.common.dto.PageInfo;
 
 /*
- * 게시 상품 현황, 반영 이력, 되돌리기 (ADMIN-04, 05) / 되돌리기는 FastAPI에 요청
+ * 게시 상품 현황, 반영 이력, 되돌리기 미리보기, 되돌리기 (ADMIN-04, 05) / 되돌리기는 FastAPI에 요청
  */
 public interface AdminCatalogService {
 

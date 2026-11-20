@@ -34,7 +34,8 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
 	// 신청한 지 오래된 승인 대기 (14일 정리, BAT-03)
 	List<Admin> findByAdminStatusAndRequestedAtBefore(AdminStatus adminStatus, LocalDateTime time);
 
-	// admin 테이블 쓰기 잠금 (트랜잭션 끝까지, 읽기는 안 막음): 첫 가입자 판단 + 저장, 마지막 승인권자 확인 + 변경을 한 번에 (B16)
+	// admin 테이블 쓰기 잠금 (트랜잭션 끝까지, 읽기는 안 막음): 첫 가입자 판단 + 저장, 마지막 승인권자 확인 + 변경,
+	// 승인, 거절의 상태 확인 + 처리를 한 번에 (B9, B16)
 	@Modifying
 	@Query(value = "LOCK TABLE admin IN EXCLUSIVE MODE", nativeQuery = true)
 	void lockTable();

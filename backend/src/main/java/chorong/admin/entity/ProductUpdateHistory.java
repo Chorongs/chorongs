@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 
 /*
  * product_update_history 테이블 (반영 이력, history_id = 상품 데이터 버전)
- * Spring이 쓰는 이력: AUTO_CLOSE (BAT-02), SHOW (ADMIN-10 다시 게시) / 나머지는 FastAPI가 씀
+ * Spring이 쓰는 이력: AUTO_CLOSE (BAT-02), SHOW (ADMIN-10 다시 게시), 앞으로 HIDE, SHOW (ADMIN-11, SUE-01) / 나머지는 FastAPI가 씀
  * 이력은 지우거나 고치지 않아 변경 메서드가 없음
  */
 @Entity

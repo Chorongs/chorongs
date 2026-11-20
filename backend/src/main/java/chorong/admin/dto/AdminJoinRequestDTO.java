@@ -32,7 +32,7 @@ public class AdminJoinRequestDTO {
 
 	@NotNull
 	@Pattern(regexp = "\\S.{0,18}\\S")
-	private String name;	// 2~20자
+	private String name;	// 2~20자 (앞뒤 공백 없이, 토큰 요청 때와 같은 규칙)
 
 	@ToString.Exclude
 	@NotNull

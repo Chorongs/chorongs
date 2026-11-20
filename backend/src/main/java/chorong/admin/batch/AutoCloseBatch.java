@@ -10,7 +10,7 @@ import lombok.RequiredArgsConstructor;
 
 /*
  * BAT-02 매일 06:00 자동 내림: 공시 종료일이 지난 게시 상품을 판매 종료로
- * 처리(한 트랜잭션, 캐시 비우기)는 AdminAutoClosedService, 여기는 시각에 부르고 결과만 로그
+ * 처리(한 트랜잭션, 커밋 뒤 캐시 비우기)는 AdminAutoClosedService, 여기는 시각에 부르고 결과만 로그
  * 실패하면 로그를 남기고 다음 날 다시
  */
 @Component

@@ -10,6 +10,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /*
  * 메모리 캐시 한 곳 (B10): 자주 안 바뀌는 응답을 서버 메모리에 보관
  * 각 기능은 put, get만 사용. 상품이 바뀌면(반영, 되돌리기, 자동 내림, 숨기기, 다시 보이기) clearProductCaches()
+ * (Spring 트랜잭션 안에서 상품을 바꾸면 clearProductCachesAfterCommit(): 커밋 뒤에 비움)
  *
  * 사용 예: memoryCache.put(MemoryCache.RANKING, "RATE", list);
  *         List<RankingItemDTO> list = (List<RankingItemDTO>) memoryCache.get(MemoryCache.RANKING, "RATE");

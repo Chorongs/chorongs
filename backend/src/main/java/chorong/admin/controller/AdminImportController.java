@@ -20,7 +20,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /*
- * /api/admin/imports/** : 불러오기 시작, 진행, 비교 결과, 반영 (ADMIN-04)
+ * /api/admin/imports/** : 불러오기 시작, 최근 작업, 진행, 비교 결과, 반영 (ADMIN-04)
  */
 @RestController
 @RequestMapping("/api/admin/imports")

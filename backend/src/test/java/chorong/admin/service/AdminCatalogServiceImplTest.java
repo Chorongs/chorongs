@@ -40,7 +40,7 @@ import chorong.report.entity.ReportStatus;
 import chorong.report.repository.LoanReportRepository;
 
 /*
- * 반영 이력, 되돌리기 (ADMIN-05)
+ * 반영 이력, 되돌리기 미리보기, 되돌리기 (ADMIN-05)
  */
 class AdminCatalogServiceImplTest {
 
@@ -94,7 +94,7 @@ class AdminCatalogServiceImplTest {
 		BusinessException e = assertThrows(BusinessException.class, () -> service.getRollbackPreview(12L));
 
 		// Then
-		assertEquals(AdminCatalogServiceImpl.MSG_NOTHING_TO_ROLLBACK, e.getMessage());
+		assertEquals(FastApiClient.MSG_NOTHING_TO_ROLLBACK, e.getMessage());
 	}
 
 	@Test

@@ -34,7 +34,7 @@ public class HistoryResponseDTO {
 	private LocalDateTime updatedAt;
 	private Boolean canRollback;		// 이 시점으로 되돌릴 수 있는지 (지금 마지막 이력은 false) / 되돌리면 바뀌는 수는 미리보기 API
 
-	/** 이력 행 + 처리자 이름 (되돌리기 값은 서비스가 채움) */
+	/** 이력 행 + 처리자 이름 (canRollback은 서비스가 채움) */
 	public static HistoryResponseDTO from(ProductUpdateHistory history, String adminName) {
 		return HistoryResponseDTO.builder()
 				.historyId(history.getHistoryId())

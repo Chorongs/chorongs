@@ -28,7 +28,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
 	private static final long TOKEN_HOURS = 2;		// 로그인 토큰 유효 시간 (B17)
 
-	// 문구 (관리자 상세 기획 4-11)
+	// 문구 (관리자 상세 기획 4-11, 401 문구 12, 13은 AdminUtil)
 	static final String MSG_NOT_REGISTERED = "등록되지 않은 메일이에요. 다시 확인해 주세요";
 	static final String MSG_PENDING = "승인 대기 중인 메일이에요. 승인되면 메일로 알려 드려요";
 	static final String MSG_LOCKED = "5번 틀려서 잠겼어요. 30분 뒤 다시 시도하세요";
@@ -80,7 +80,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, MSG_WRONG_TOKEN);
 		}
 
-		// 3. 맞으면 토큰 사용 처리, 실패 0, 마지막 로그인 / 4, 5. 세션에 관리자
+		// 3. 맞으면 토큰 사용 처리, 실패 0, 마지막 로그인 / 4, 5. 세션에 관리자 (세션 아이디 새로 발급은 Controller)
 		token.use();
 		admin.succeedLogin(now);
 		return startAdminSession(session, admin, now);

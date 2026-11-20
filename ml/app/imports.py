@@ -8,6 +8,7 @@
       → 이전 작업의 import_item 삭제 → 바뀐 상품을 import_item에 저장 → DONE (출처 모두 실패, 정제 중 오류면 FAILED + 사유)
       (지금 상품을 정제보다 먼저 읽는 이유: 금감원 수집이 빠졌을 때 DB 은행 이름을 정제에 넘기기 위해)
       이 단계에서 loan_product는 바꾸지 않음. 반영은 publish.py
+    - 진행 확인 (main.py GET /imports/{job_id}, GET /imports/latest): read_job, read_latest_job (가장 최근 작업, 화면을 다시 열었을 때)
     - 비교 구분: NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 (판매 종료 상품이 다시 옴) / CHECK 확인 필요 (반영 불가)
     - 비교하는 칸: 상품 내용 칸 (COMPARE_COLS) + 칩 (tags) + 구간 금리 (rates) + 금감원 공시월 (dcls_month)
       base_date (서민은 수집한 날이라 매번 바뀜), raw_json (제출일이 들어 있음)은 비교하지 않고 반영할 때만 새 값으로 씀

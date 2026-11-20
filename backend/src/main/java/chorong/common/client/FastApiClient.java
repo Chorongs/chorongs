@@ -26,7 +26,7 @@ import chorong.common.exception.ErrorCode;
 
 /*
  * FastAPI 서버 호출 (EXT-05): 주소 fastapi.base-url, 요청마다 Authorization: Bearer 토큰
- * 시간 제한: 연결 3초 (FastAPI가 꺼져 있으면 바로 503) / 응답 기다림: 신용 진단, 불러오기 시작, 진행 확인 3초 (B14), 반영, 되돌리기 5분
+ * 시간 제한: 연결 3초 (FastAPI가 꺼져 있으면 바로 503) / 응답 기다림: 신용 진단, 불러오기 시작, 진행 확인, 최근 작업 3초 (B14), 반영, 되돌리기 5분
  * 실패(연결 안 됨, 시간 초과, 응답 형식 틀림)는 503 SERVICE_UNAVAILABLE
  * FastAPI 4xx 변환 (EXT-05): 409 VERSION_CONFLICT → VERSION_CONFLICT, IMPORT_RUNNING, IMPORT_EXPIRED, NOTHING_TO_ROLLBACK → CONFLICT (문구는 ADMIN-04, 05),
  *                           422 NOT_PUBLISHABLE → NOT_PUBLISHABLE, 404 (없는 작업, 이력 번호) → NOT_FOUND, 그 밖의 실패 → SERVICE_UNAVAILABLE
@@ -43,10 +43,10 @@ public class FastApiClient {
 	// FastAPI 오류 본문 {"detail": "코드"}에서 코드 꺼내기 (입력 검사 실패는 detail이 목록이라 안 맞음 → 503)
 	private static final Pattern DETAIL = Pattern.compile("\"detail\"\\s*:\\s*\"([A-Z_]+)\"");
 
-	// 409 CONFLICT 문구 (ADMIN-04)
+	// 409 CONFLICT 문구 (ADMIN-04, 05 / 되돌릴 변경 없음은 되돌리기 미리보기 AdminCatalogServiceImpl도 씀)
 	static final String MSG_IMPORT_RUNNING = "이미 불러오는 중이에요. 끝난 뒤 확인해 주세요";
 	static final String MSG_IMPORT_EXPIRED = "불러온 지 24시간이 지났어요. 다시 불러와 주세요";
-	static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
+	public static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
 
 	private final RestClient restClient;	// 신용 진단 점수, 불러오기 시작, 진행 확인 (응답 3초)
 	private final RestClient writeClient;	// 반영, 되돌리기 (응답 5분)

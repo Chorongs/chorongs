@@ -53,9 +53,6 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 	private static final long REPORTED_MIN = 5;			// 메뉴 옆 신고 상품 = 미처리 5건 이상
 
 	// 변경 기록 JSON에서 바뀌기 전 상태 꺼내기 ({"product_status":"ON", ...})
-	// FastApiClient와 같은 문구 (마지막 이력으로 되돌리기, FastAPI 409 NOTHING_TO_ROLLBACK)
-	static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
-
 	private static final Pattern PRODUCT_STATUS = Pattern.compile("\"product_status\"\\s*:\\s*\"([A-Z]+)\"");
 
 	private final LoanProductRepository loanProductRepository;
@@ -129,7 +126,7 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
 		Long currentVersion = productUpdateHistoryRepository.findTopByOrderByHistoryIdDesc()
 				.map(ProductUpdateHistory::getHistoryId).orElse(null);
 		if (!canRollback(historyId, currentVersion)) {	// 지금 마지막 이력: 되돌릴 변경이 없음 (FastAPI와 같은 409)
-			throw new BusinessException(ErrorCode.CONFLICT, MSG_NOTHING_TO_ROLLBACK);
+			throw new BusinessException(ErrorCode.CONFLICT, FastApiClient.MSG_NOTHING_TO_ROLLBACK);
 		}
 		return RollbackPreviewResponseDTO.builder()
 				.historyId(historyId)

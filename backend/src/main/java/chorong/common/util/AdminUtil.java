@@ -13,7 +13,8 @@ import chorong.common.exception.ErrorCode;
 import jakarta.servlet.http.HttpSession;
 
 /*
- * 세션에서 로그인 관리자 꺼내기 (회원 세션과 따로)
+ * 관리자 공통: 세션에서 로그인 관리자 꺼내기 (회원 세션과 따로), 로그인 2시간과 401 문구,
+ * 토큰 6자리와 해시 (B17), 이메일 비교용 정리
  */
 public class AdminUtil {
 

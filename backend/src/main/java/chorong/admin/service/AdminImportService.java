@@ -6,7 +6,7 @@ import chorong.admin.dto.PublishRequestDTO;
 import chorong.admin.dto.PublishResponseDTO;
 
 /*
- * FastAPI에 불러오기 시작, 진행 확인, 반영 요청 (ADMIN-04) / 비교, 반영은 FastAPI (EXT-01, 02, 05)
+ * FastAPI에 불러오기 시작, 진행 확인, 최근 작업, 반영 요청 (ADMIN-04) / 비교, 반영은 FastAPI (EXT-01, 02, 05)
  */
 public interface AdminImportService {
 

@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /*
- * 불러오기 시작 (작업 번호만), 진행, 비교 결과 (ADMIN-04, API-32, 33)
+ * 불러오기 시작 (작업 번호만), 진행, 비교 결과, 최근 작업 (ADMIN-04, API-32, 33)
  * FastAPI 응답(FastApiImportResponseDTO, JSON은 snake_case)을 화면용 camelCase로 옮김 / 목록은 복사해 담음
  */
 @Data
@@ -22,7 +22,7 @@ public class ImportStatusResponseDTO {
 	 * 반영, 되돌리기, 자동 내림, 숨기기처럼 상품이 바뀔 때마다 이력이 1건 생겨 번호가 커짐
 	 * 화면이 '내가 보고 결정한 시점의 번호'를 보내면 FastAPI가 지금 번호와 비교 → 다르면 409 VERSION_CONFLICT
 	 * (그 사이 다른 관리자나 자동 작업이 상품을 바꿨으니, 바뀐 상태를 다시 보고 결정하라는 뜻)
-	 * 여기 값 = 비교를 시작한 시점의 버전 (import_job.base_version) → 반영 요청(PublishRequestDTO)에 그대로 보냄
+	 * 여기 값 = 비교하려고 지금 상품을 읽은 시점의 버전 (import_job.base_version, FastAPI가 DONE 때 씀) → 반영 요청(PublishRequestDTO)에 그대로 보냄
 	 */
 	private Long baseVersion;
 	private List<SourceResultItem> sourceResults;	// 출처별 결과

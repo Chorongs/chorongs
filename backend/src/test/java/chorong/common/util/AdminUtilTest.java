@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 /*
- * 관리자 토큰 만들기, 해시 (B17)
+ * 관리자 토큰 만들기, 해시 (B17), 이메일 비교용 정리
  */
 class AdminUtilTest {
 

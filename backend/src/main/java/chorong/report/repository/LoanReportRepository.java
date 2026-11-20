@@ -22,12 +22,12 @@ public interface LoanReportRepository extends JpaRepository<LoanReport, Long> {
 	List<Long> findProductIdsWithReports(@Param("reportStatus") ReportStatus reportStatus,
 			@Param("minCount") long minCount);
 
-	// 지금 이 상태이면서 그 신고 상태가 있는 상품 번호 (숨김 + 미처리 신고, ADMIN-05)
+	// 지금 이 상태이면서 그 신고 상태가 있는 상품 번호 (숨김 + 미처리 신고, ADMIN-05 되돌리기 미리보기)
 	@Query("SELECT DISTINCT r.productId FROM LoanReport r, LoanProduct p"
 			+ " WHERE r.productId = p.productId AND p.productStatus = :productStatus AND r.reportStatus = :reportStatus")
 	List<Long> findProductIdsByProductStatus(@Param("productStatus") ProductStatus productStatus,
 			@Param("reportStatus") ReportStatus reportStatus);
 
-	// 고른 상품들의 신고 건수 (되돌리면 숨김이 풀리는 상품의 미처리 신고 건수, ADMIN-05)
+	// 고른 상품들의 신고 건수 (되돌리면 숨김이 풀리는 상품의 미처리 신고 건수, ADMIN-05 되돌리기 미리보기)
 	long countByProductIdInAndReportStatus(Collection<Long> productIds, ReportStatus reportStatus);
 }

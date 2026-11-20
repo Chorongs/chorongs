@@ -18,7 +18,7 @@ import lombok.NoArgsConstructor;
 
 /*
  * admin 테이블 (관리자 계정)
- * 값은 생성자, 변경 메서드로만 바꿈 (@Setter 안 씀) -> 가입, 승인 등 메서드는 그 기능 담당이 추가
+ * 값은 생성자, 변경 메서드로만 바꿈 (@Setter 안 씀): 가입은 빌더 (AdminJoinRequestDTO.toEntity), 잠금, 로그인, 승인, 역할, 탈퇴는 아래 메서드
  */
 @Entity
 @Table(name = "admin")

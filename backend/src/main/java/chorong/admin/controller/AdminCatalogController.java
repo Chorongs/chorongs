@@ -23,7 +23,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /*
- * /api/admin/catalog/** : 게시 상품 현황, 반영 이력, 되돌리기 (ADMIN-04, 05)
+ * /api/admin/catalog/** : 게시 상품 현황, 반영 이력, 되돌리기 미리보기, 되돌리기 (ADMIN-04, 05)
  */
 @RestController
 @RequestMapping("/api/admin/catalog")

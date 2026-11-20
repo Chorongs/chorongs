@@ -14,7 +14,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 
 /*
- * 반복 요청 제한 (B10): 같은 세션(비회원은 IP)이 같은 기능을 1분에 10회 넘게 부르면 429
+ * 반복 요청 제한 (B10): 같은 세션(비회원은 IP)이 같은 기능을 1분에 10회 넘게 부르면 429 (check)
+ * 같은 키(이메일, IP)는 60초에 한 번 (checkOncePerMinute, B17) / 1분 지난 기록은 10분마다 지움 (cleanUp)
  * Controller에서 호출. 사용 예: requestLimiter.check("report", request);
  */
 @Component

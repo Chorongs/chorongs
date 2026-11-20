@@ -31,7 +31,7 @@ public class AdminAuthController {
 	private final AdminAuthService adminAuthService;
 	private final RequestLimiter requestLimiter;
 
-	/** ADMIN-02 토큰 요청: 같은 IP 1분 10회, 같은 이메일 60초에 한 번 (B10, B17) → 204 */
+	/** ADMIN-02 토큰 요청: 같은 세션(비회원은 IP) 1분 10회, 같은 이메일 60초에 한 번 (B10, B17) → 204 */
 	@PostMapping("/token")
 	public ResponseEntity<Void> requestToken(@Valid @RequestBody AdminTokenRequestDTO requestDTO,
 			HttpServletRequest request) {
@@ -41,7 +41,7 @@ public class AdminAuthController {
 		return ResponseEntity.noContent().build();
 	}
 
-	/** ADMIN-03 토큰 로그인: 같은 IP 1분 10회 (B10) */
+	/** ADMIN-03 토큰 로그인: 같은 세션(비회원은 IP) 1분 10회 (B10) */
 	@PostMapping
 	public ResponseEntity<ApiResponse<AdminResponseDTO>> login(@Valid @RequestBody AdminLoginRequestDTO requestDTO,
 			HttpServletRequest request) {
