@@ -32,7 +32,13 @@ export async function getCatalog() {
   return response.data.data
 }
 
-// API-32 최신 상품 불러오기 시작: sources (KINFA, FSS 중 1~2개) → ImportStatusResponseDTO (jobId만 채움)
+// API-55 최신 상품 확인: 출처 첫 쪽만 읽어 DB 적재 시각, 최신 여부 → ImportCheckResponseDTO (checkedAt, sources[], needsRefresh, pendingJob)
+export async function getImportCheck() {
+  const response = await api.get('/api/admin/imports/check')
+  return response.data.data
+}
+
+// API-32 최신 상품 갱신 시작: sources (KINFA, FSS 중 1~2개) → ImportStatusResponseDTO (jobId만 채움). 이걸 눌렀을 때만 외부 API 전체 수집
 export async function postImport(sources) {
   const response = await api.post('/api/admin/imports', { sources })
   return response.data.data

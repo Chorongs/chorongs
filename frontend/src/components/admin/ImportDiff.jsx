@@ -15,7 +15,7 @@ import Modal from '../ui/Modal'
 // 보이는 것: 출처별 결과 한 줄 / 구분 칩 (전체 + 구분별 개수) / 표 (전체 선택, 구분, 상품명·금융사, 바뀐 내용, 출처) / 반영 바 (선택 n건 + 구분별 수) / 확인 창 / 완료 상자
 // '확인 필요'는 사유(checkReasons) 표시 + 선택 불가 / '바뀐 내용'은 바뀐 칸 이름(changedFields, DB 칼럼 이름 그대로) / 숨긴 상품(hiddenYn Y)은 '숨김 중'
 // [사이트에 반영] → 확인 창 → API-34 { itemIds, baseVersion (작업의 baseVersion 그대로) } → 완료 상자 + onPublished() (현황 다시 불러옴. 이력은 그 메뉴를 열 때 새로 불러옴)
-// 422 → '확인 필요 항목 빼고 다시' / 409 VERSION_CONFLICT → 다시 불러온 뒤 반영 / 409 CONFLICT → 서버 문구 (24시간 지남) / 0건이면 버튼 잠금, 연타 방지 (E5)
+// 422 → '확인 필요 항목 빼고 다시' / 409 VERSION_CONFLICT → 다시 갱신한 뒤 반영 / 409 CONFLICT → 서버 문구 (24시간 지남) / 0건이면 버튼 잠금, 연타 방지 (E5)
 const CHECK = 'CHECK'
 
 const CHANGE_TYPE_VARIANT = { NEW: 'good', CHANGE: 'acc', REMOVE: 'default', REOPEN: 'good', CHECK: 'bad' }
@@ -452,8 +452,8 @@ function ImportDiff({ job, onPublished }) {
       const errorCode = err.response?.data?.code
       setIsConfirmOpen(false)
       if (code === 422) setError('확인 필요 항목을 빼고 다시 반영해 주세요')
-      else if (code === 409 && errorCode === 'VERSION_CONFLICT') setError('다른 작업이 먼저 반영됐어요. ①에서 다시 불러온 뒤 반영해 주세요')
-      else if (code === 409) setError(err.response.data?.message ?? '불러온 지 24시간이 지났어요. 다시 불러와 주세요')
+      else if (code === 409 && errorCode === 'VERSION_CONFLICT') setError('다른 작업이 먼저 반영됐어요. ①에서 다시 갱신한 뒤 반영해 주세요')
+      else if (code === 409) setError(err.response.data?.message ?? '갱신한 지 24시간이 지났어요. 다시 갱신해 주세요')
       else if (code !== 401) setError(err.response?.data?.message ?? '반영하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsPublishing(false)
@@ -468,7 +468,7 @@ function ImportDiff({ job, onPublished }) {
   if (!job) {
     body = (
       <Empty>
-        <Icon name="refresh" size={24} />① 최신 상품 불러오기를 누르면 바뀐 상품이 여기에 나와요
+        <Icon name="refresh" size={24} />① [최신 상품 갱신하기]를 누르면 바뀐 상품이 여기에 나와요
       </Empty>
     )
   } else if (published) {
