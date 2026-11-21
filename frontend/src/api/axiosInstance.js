@@ -21,7 +21,6 @@ const PREPARING_APIS = [
   /^\/api\/me$/, // API-28 회원 정보 수정, 탈퇴 (CHORONG-42)
   /^\/api\/me\/summary$/, // API-51 MY 요약 (CHORONG-42)
   /^\/api\/products\/[^/]+\/views$/, // API-05 상품 조회 기록 (실패해도 안내 안 함)
-  /^\/api\/admin\/imports\/check$/, // API-55 최신 상품 확인 (CHORONG-55 Spring, FastAPI 작업 전)
 ]
 
 api.interceptors.request.use((config) => {
