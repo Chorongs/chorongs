@@ -9,6 +9,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
@@ -22,7 +23,9 @@ import jakarta.mail.internet.MimeMessage;
 /*
  * Gmail SMTP 메일 보내기 (EXT-06): 계정, 앱 비밀번호는 환경변수 MAIL_USERNAME, MAIL_PASSWORD (B12)
  * 본문은 HTML 템플릿 1개 (templates/mail/admin-mail.html)에 메일마다 다른 문구, 번호를 넣어 만듦 + 로고는 메일에 붙인 그림 (cid:logo)
- * 보내기 실패 500 + 로그 (받는 사람, 토큰은 로그에 안 남김)
+ * 토큰 메일 2개(가입 인증, 로그인)는 @Async: 호출한 요청은 바로 204로 끝나고 메일은 다른 스레드에서 보냄 (프록시를 거쳐야 하므로 밖에서 부르는 public 메서드에만)
+ *   실패는 로그만 (응답은 이미 나감. 안 오면 화면의 '토큰 다시 받기' 60초 뒤) / 승인 안내는 같은 요청 안에서 보내고 실패하면 500 (ADMIN-08 승인 되돌림)
+ * 로그에 받는 사람, 토큰은 안 남김 (B8)
  */
 @Service
 public class AdminMailServiceImpl implements AdminMailService {
@@ -45,11 +48,12 @@ public class AdminMailServiceImpl implements AdminMailService {
 	}
 
 	@Override
+	@Async
 	public void sendJoinToken(String email, String token) {
 		Context context = newContext(List.of("관리자 가입 신청을 위한", "인증 번호를 보내 드립니다."),
 				"10분 동안 유효합니다.", "본인이 신청하지 않았다면 이 메일은 무시해 주세요.");
 		setCode(context, "인증 번호", token);	// 버튼 없음: 가입 화면에 바로 입력
-		sendMail("[캐링 관리자] 가입 인증 번호", context, email, "가입 인증");
+		sendQuietly("[캐링 관리자] 가입 인증 번호", context, email, "가입 인증");
 	}
 
 	@Override
@@ -62,12 +66,22 @@ public class AdminMailServiceImpl implements AdminMailService {
 	}
 
 	@Override
+	@Async
 	public void sendLoginToken(String email, String token) {
 		Context context = newContext(List.of("관리자 페이지 로그인을 위한", "로그인 토큰을 보내 드립니다."),
 				"2시간 동안 유효하며 한 번만 사용할 수 있습니다.", "본인이 요청하지 않았다면 승인권자에게 알려 주세요.");
 		setCode(context, "로그인 토큰", token);
 		context.setVariable("loginUrl", loginUrl);
-		sendMail("[캐링 관리자] 로그인 토큰", context, email, "로그인 토큰");
+		sendQuietly("[캐링 관리자] 로그인 토큰", context, email, "로그인 토큰");
+	}
+
+	// 응답 뒤에 보내는 메일: 실패해도 던질 곳이 없으므로 로그만 (sendMail이 이미 남김)
+	private void sendQuietly(String subject, Context context, String to, String what) {
+		try {
+			sendMail(subject, context, to, what);
+		} catch (BusinessException e) {
+			// 응답은 이미 나감. 화면은 60초 뒤 '토큰 다시 받기'
+		}
 	}
 
 	// 템플릿 칸 값 (메일마다 다른 문구): 첫 문장 줄들, 굵은 안내, 노란 안내 (null이면 칸이 숨겨짐) / 제목은 sendMail이 넣음

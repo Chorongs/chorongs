@@ -1,5 +1,6 @@
 package chorong.admin.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -93,15 +94,24 @@ class AdminMailServiceImplTest {
 	}
 
 	@Test
-	void 보내기에_실패하면_500() {
+	void 승인_안내_메일_보내기에_실패하면_500() {
 		// Given
 		doThrow(new MailSendException("실패")).when(sender).send(any(MimeMessage.class));
 
 		// When
-		BusinessException e = assertThrows(BusinessException.class, () -> service.sendLoginToken(EMAIL, "135790"));
+		BusinessException e = assertThrows(BusinessException.class, () -> service.sendApproved(EMAIL, AdminRole.MANAGER));
 
 		// Then
 		assertEquals(ErrorCode.SERVER_ERROR, e.getErrorCode());
+	}
+
+	@Test
+	void 로그인_토큰_메일은_응답_뒤에_보내므로_실패해도_예외_없음() {
+		// Given
+		doThrow(new MailSendException("실패")).when(sender).send(any(MimeMessage.class));
+
+		// When, Then
+		assertDoesNotThrow(() -> service.sendLoginToken(EMAIL, "135790"));
 	}
 
 	// 보낸 메일 (머리글을 채워야 부분마다 종류를 알 수 있음)
