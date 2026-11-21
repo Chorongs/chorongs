@@ -1,33 +1,38 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
-import { PREPARING_TEXT } from '../../api/axiosInstance'
 import { IMPORT_SOURCE_OPTIONS } from '../../constants/options'
-import { Button, InlineError, Tag } from '../../styles/common'
+import { Button, InlineError } from '../../styles/common'
 import { formatDateTime, formatNumber } from '../../utils/format'
 import Icon from '../ui/Icon'
 
-// AD-04 최신 상품 확인, 갱신 (① 최신인지 확인하고, 필요하면 갱신): 현황 4칸 (API-31) / [최신 상품 불러오기] + 확인 결과 카드 / 출처 카드 2개 / [최신 상품 갱신하기] + 진행 문구
-// 열 때 최근 작업 확인 (API-33 latest, 외부 API 안 부름): 현황에 '마지막 갱신 finishedAt', RUNNING이면 진행 확인을 이어서, DONE이면 결과를 ②에 넘김, 404나 다른 상태(FAILED, PUBLISHED, EXPIRED)면 평소 화면
-// [최신 상품 불러오기] → API-55 (출처마다 첫 쪽만, 몇 초. 적재·비교 안 함) → 출처별 적재 시각, DB·출처 기준값, 최신 여부 + 문구 24 '지금 상품이 최신이에요' / 25 '새 공시·상품이 있어요…' + 반영 전 작업 안내
-// [최신 상품 갱신하기] → API-32 (jobId, 이걸 눌렀을 때만 외부 API 전체 수집, 2분 안팎) → 1초마다 진행 확인 (API-33, 최대 횟수 안에서) → DONE이면 onDone(작업) → ②(ImportDiff)가 선택, 스크롤
-// 출처 0개 → 갱신 버튼 잠금 / 409 → '이미 갱신하는 중' / FAILED → 실패 문구 + 버튼 다시 열림 / EXPIRED → 24시간 지남 안내 / 화면 떠나면 진행 확인 멈춤 (useEffect 정리)
-// 확인 503 → '출처를 확인하지 못했어요…' / 출처 한 곳 실패 → 그 출처만 error 문구 / 서버에 아직 없으면(PREPARING_APIS) '아직 준비 중인 서비스예요'
+// AD-04 최신 상품 불러오기, 갱신 (① 적재된 결과를 불러오고, 필요하면 갱신): 현황 4칸 (API-31) / [최신 상품 불러오기] + 안내 / 출처 카드 2개 / [최신 상품 갱신하기] + 진행 문구
+// [최신 상품 불러오기] → API-33 latest (반영 대기 테이블을 DB에서 읽음, 외부 API 안 부름, 몇 초): DONE이면 onDone(작업) → ②(ImportDiff)가 목록, 선택, 스크롤
+//   404 → 문구 24 '아직 적재한 결과가 없어요…' / EXPIRED → 24시간 지남 안내 / PUBLISHED → 이미 반영한 결과 안내 / RUNNING → 진행 확인을 이어서 / FAILED → 실패 문구
+// [최신 상품 갱신하기] → API-32 (jobId, 이걸 눌렀을 때만 외부 API 전체 수집·적재, 2분 안팎, 서버 뒤에서) → 1초마다 진행 확인 (API-33, 최대 횟수 안에서)
+//   → DONE이면 문구 25 '갱신이 끝났어요. 바뀐 상품 n건이 반영을 기다려요. [최신 상품 불러오기]를 눌러…' (목록은 불러오기를 눌러야 보임. 갱신을 시작하면 ②의 옛 목록은 비움)
+// 열 때 최근 작업 확인 (API-33 latest): 현황에 '마지막 갱신 finishedAt', RUNNING이면 진행 확인을 이어서, DONE이면 문구 25 안내만, 404나 다른 상태면 평소 화면
+// 출처 0개 → 갱신 버튼 잠금 / 409 → '이미 갱신하는 중' / FAILED → 실패 문구 + 버튼 다시 열림 / 화면 떠나면 진행 확인 멈춤 (useEffect 정리)
 // 이 단계는 사이트 안 바뀜. 매일 자동 수집 없음 (갱신 버튼으로만)
 // 현황은 AdminPage가 불러와 props로 (catalog, catalogStatus, onReloadCatalog). 메뉴 개수와 같은 응답 (CatalogResponseDTO)
 const POLL_MS = 1000
 const MAX_POLL = 900 // 15분 (금감원 공시 API를 쪽마다 받아 2분 안팎 걸림. 외부 API가 느린 날을 생각해 넉넉히)
 const FAILED_TEXT = '갱신에 실패했어요. 다시 갱신해 주세요'
 const EXPIRED_TEXT = '갱신한 지 24시간이 지났어요. 다시 갱신해 주세요'
-const CHECK_FAILED_TEXT = '출처를 확인하지 못했어요. 잠시 뒤 다시 눌러 주세요'
+const NO_JOB_TEXT = '아직 적재한 결과가 없어요. [최신 상품 갱신하기]를 눌러 주세요'
+const LOAD_FAILED_TEXT = '적재된 결과를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요'
+const LOAD_HINT = 'DB에 적재된 결과만 읽어요. 몇 초면 끝나요'
+
+// 문구 25: 갱신이 끝나 반영을 기다리는 결과 안내 (열 때, 갱신 끝)
+function pendingText(job) {
+  return `갱신이 끝났어요. 바뀐 상품 ${formatNumber(job.items?.length ?? 0)}건이 반영을 기다려요 (${formatDateTime(job.finishedAt)} 갱신). [최신 상품 불러오기]를 눌러 확인한 뒤 반영해 주세요`
+}
 
 // 출처 카드 설명 (시안)
 const SOURCE_DESC = {
-  KINFA: { desc: '대출상품한눈에 · 공공데이터포털', kind: '정책·서민금융', mark: '상품 수' },
-  FSS: { desc: '금융상품통합비교공시 오픈 API', kind: '은행·인터넷은행·2금융권', mark: '공시월' },
+  KINFA: { desc: '대출상품한눈에 · 공공데이터포털', kind: '정책·서민금융' },
+  FSS: { desc: '금융상품통합비교공시 오픈 API', kind: '은행·인터넷은행·2금융권' },
 }
-
-const SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
 
 const Wrap = styled.div`
   display: flex;
@@ -129,56 +134,12 @@ const Hint = styled.p`
   line-height: 1.55;
 `
 
-// 확인 결과 카드: 출처별 한 줄 (이름, 적재 시각, DB·출처 기준값, 최신 딱지)
-const CheckCard = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px 18px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
-`
-
-const CheckRow = styled.div`
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) auto;
-  gap: 8px 16px;
-  align-items: center;
-  b {
-    font-size: var(--fs-base);
-    font-weight: 800;
-  }
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr) auto;
-    > span:nth-child(2) {
-      grid-column: 1 / -1;
-    }
-  }
-`
-
-const CheckDetail = styled.span`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-  small {
-    color: var(--cocoa);
-  }
-`
-
-const CheckError = styled.span`
-  color: var(--bad);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-`
-
-// 확인 결과 안내 (문구 24, 25): 최신이면 초록, 새 것이 있으면 연주황
-const Verdict = styled.p`
+// 반영 대기 안내 (문구 25): 연주황 상자
+const Notice = styled.p`
   padding: 12px 16px;
   border-radius: var(--r-sm);
-  background: ${({ $isLatest }) => ($isLatest ? 'var(--good-soft)' : 'var(--brand-soft)')};
-  color: ${({ $isLatest }) => ($isLatest ? 'var(--good)' : 'var(--ink-2)')};
+  background: var(--brand-soft);
+  color: var(--ink-2);
   font-size: var(--fs-md);
   font-weight: 600;
   line-height: 1.6;
@@ -262,14 +223,15 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
   const [error, setError] = useState('')
   // 마지막 갱신 시각 (최근 작업의 finishedAt, 현황에 표시)
   const [lastRefreshedAt, setLastRefreshedAt] = useState(null)
-  // 최신 확인 (API-55): 결과 (null이면 아직 안 누름), 누르는 중, 오류 문구
-  const [check, setCheck] = useState(null)
-  const [isChecking, setIsChecking] = useState(false)
-  const [checkError, setCheckError] = useState('')
+  // [최신 상품 불러오기]: 읽는 중, 버튼 옆 안내, 오류 문구 / 반영 대기 안내 (문구 25, 열 때와 갱신 끝)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadHint, setLoadHint] = useState(LOAD_HINT)
+  const [loadError, setLoadError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const isRunning = jobStatus === 'running'
 
-  // 열 때 최근 작업 (API-33 latest, 외부 API 안 부름): 마지막 갱신 시각, 진행 중이면 이어서 확인, 비교가 끝났으면 ②에 바로 보여 줌
+  // 열 때 최근 작업 (API-33 latest, DB만): 마지막 갱신 시각, 진행 중이면 이어서 확인, 반영 전 결과가 있으면 안내만 (목록은 [최신 상품 불러오기]로)
   useEffect(() => {
     let isCancelled = false
     adminApi
@@ -281,8 +243,7 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
           setJobId(job.jobId)
           setJobStatus('running')
         } else if (job.jobStatus === 'DONE') {
-          setJobStatus('done')
-          onDone(job)
+          setNotice(pendingText(job))
         }
       })
       .catch(() => {
@@ -291,7 +252,7 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
     return () => {
       isCancelled = true
     }
-  }, [onDone])
+  }, [])
 
   // 진행 확인 (API-33): 1초마다, 최대 MAX_POLL번. 앞 요청이 안 끝났으면 그 번은 건너뜀
   useEffect(() => {
@@ -316,7 +277,7 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
         if (job?.finishedAt) setLastRefreshedAt(job.finishedAt)
         if (job?.jobStatus === 'DONE') {
           setJobStatus('done')
-          onDone(job)
+          setNotice(pendingText(job))
         } else if (job?.jobStatus === 'EXPIRED') {
           setJobStatus('failed')
           setError(EXPIRED_TEXT)
@@ -335,21 +296,38 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
       }
     }, POLL_MS)
     return () => clearInterval(timer)
-  }, [isRunning, jobId, onDone])
+  }, [isRunning, jobId])
 
-  // [최신 상품 불러오기]: 출처 첫 쪽만 확인 (몇 초), 적재 안 함
-  const handleCheck = async () => {
-    setCheckError('')
-    setIsChecking(true)
+  // [최신 상품 불러오기]: 반영 대기 테이블의 최근 작업을 DB에서 읽어 ②에 보여 줌 (외부 API 안 부름). 상태별 안내는 머리말
+  const handleLoad = async () => {
+    setLoadError('')
+    setNotice('')
+    setIsLoading(true)
     try {
-      const data = await adminApi.getImportCheck()
-      setCheck(data ?? null)
+      const job = await adminApi.getLatestImport()
+      if (job?.finishedAt) setLastRefreshedAt(job.finishedAt)
+      if (job?.jobStatus === 'DONE') {
+        onDone(job)
+        setLoadHint(`${formatDateTime(job.finishedAt)} 갱신 · 바뀐 상품 ${formatNumber(job.items?.length ?? 0)}건을 아래 ②에 보여 줘요`)
+      } else if (job?.jobStatus === 'RUNNING') {
+        setJobId(job.jobId)
+        setJobStatus('running')
+        setLoadHint('갱신이 진행 중이에요. 끝나면 다시 눌러 주세요')
+      } else {
+        onDone(null)
+        setLoadHint(LOAD_HINT)
+        if (job?.jobStatus === 'EXPIRED') setLoadError(EXPIRED_TEXT)
+        else if (job?.jobStatus === 'PUBLISHED') {
+          setLoadError(`마지막 결과는 이미 반영했어요 (${formatDateTime(job.finishedAt)} 갱신). 새로 받아오려면 [최신 상품 갱신하기]를 눌러 주세요`)
+        } else setLoadError(FAILED_TEXT)
+      }
     } catch (err) {
-      setCheck(null)
-      if (err.isPreparing) setCheckError(PREPARING_TEXT)
-      else if (err.response?.status !== 401) setCheckError(err.response?.data?.message ?? CHECK_FAILED_TEXT)
+      onDone(null)
+      setLoadHint(LOAD_HINT)
+      if (err.response?.status === 404) setLoadError(NO_JOB_TEXT)
+      else if (err.response?.status !== 401) setLoadError(err.response?.data?.message ?? LOAD_FAILED_TEXT)
     } finally {
-      setIsChecking(false)
+      setIsLoading(false)
     }
   }
 
@@ -357,9 +335,10 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
     setSources((prev) => (checked ? [...prev, value] : prev.filter((item) => item !== value)))
   }
 
-  // [최신 상품 갱신하기]: 이걸 눌렀을 때만 외부 API 전체 수집
+  // [최신 상품 갱신하기]: 이걸 눌렀을 때만 외부 API 전체 수집·적재. 시작하면 옛 결과는 서버에서 지워지므로 ②도 비움
   const handleRefresh = async () => {
     setError('')
+    setNotice('')
     setSeconds(0)
     setJobStatus('running')
     try {
@@ -370,6 +349,8 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
         return
       }
       setJobId(data.jobId)
+      onDone(null)
+      setLoadHint(LOAD_HINT)
     } catch (err) {
       setJobStatus('failed')
       if (err.response?.status === 409) setError(err.response.data?.message ?? '이미 갱신하는 중이에요. 끝난 뒤 확인해 주세요')
@@ -425,64 +406,9 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
     )
   }
 
-  // 확인 결과 (API-55): 출처별 줄 + 안내 (문구 24, 25) + 반영 전 작업 안내
-  let checkResult = null
-  if (check) {
-    const sourceRows = check.sources ?? []
-    const isAllLatest = !check.needsRefresh && sourceRows.every((row) => !row.error)
-    checkResult = (
-      <CheckCard aria-label="최신 확인 결과">
-        {sourceRows.map((row) => (
-          <CheckRow key={row.source}>
-            <b>{SOURCE_LABEL[row.source] ?? row.source}</b>
-            {row.error ? (
-              <CheckError>확인하지 못했어요 ({row.error})</CheckError>
-            ) : (
-              <CheckDetail>
-                <span>
-                  <small>DB 적재 </small>
-                  {formatDateTime(row.loadedAt)}
-                </span>
-                <span>
-                  <small>DB {SOURCE_DESC[row.source]?.mark ?? '기준'} </small>
-                  {row.dbMark ?? '-'}
-                </span>
-                <span>
-                  <small>출처 {SOURCE_DESC[row.source]?.mark ?? '기준'} </small>
-                  {row.sourceMark ?? '-'}
-                </span>
-                {row.source === 'KINFA' && (row.newCount > 0 || row.missingCount > 0) && (
-                  <span>
-                    <small>새로 온 </small>
-                    {row.newCount ?? 0}개 <small>빠진 </small>
-                    {row.missingCount ?? 0}개
-                  </span>
-                )}
-              </CheckDetail>
-            )}
-            <span>
-              {row.error ? (
-                <Tag $variant="bad">확인 실패</Tag>
-              ) : row.isLatest ? (
-                <Tag $variant="good">최신</Tag>
-              ) : (
-                <Tag $variant="warn">새 것 있음</Tag>
-              )}
-            </span>
-          </CheckRow>
-        ))}
-        <Verdict $isLatest={isAllLatest} role="status">
-          {isAllLatest ? '지금 상품이 최신이에요' : '새 공시나 상품이 있어요. [최신 상품 갱신하기]를 눌러 주세요'}
-          {check.pendingJob && ` 갱신한 결과 ${formatNumber(check.pendingJob.itemCount)}건이 반영을 기다려요 (${formatDateTime(check.pendingJob.finishedAt)} 갱신, 아래 ②)`}
-        </Verdict>
-        <Hint>확인 시각 {formatDateTime(check.checkedAt)} · 출처마다 첫 쪽만 읽어 비교했어요. 적재는 하지 않아요.</Hint>
-      </CheckCard>
-    )
-  }
-
   let progressText
   if (isRunning) progressText = `출처에서 다시 받아와 비교하는 중이에요… (${seconds}초, 2분 안팎 걸려요)`
-  else if (jobStatus === 'done') progressText = '갱신이 끝났어요. 아래 ②에서 바뀐 상품을 확인해 주세요'
+  else if (jobStatus === 'done') progressText = '갱신이 끝났어요. [최신 상품 불러오기]를 눌러 확인해 주세요'
   else if (sources.length === 0) progressText = '출처를 하나 이상 골라 주세요'
   else progressText = '출처에서 다시 받아와요. 2분 안팎 걸려요'
 
@@ -493,22 +419,23 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
         <SecHead>
           <No aria-hidden="true">1</No>
           <div>
-            <h2 id="import-panel-title">최신인지 확인하고, 필요하면 갱신</h2>
+            <h2 id="import-panel-title">적재된 결과를 불러오고, 필요하면 갱신</h2>
             <p>
-              [최신 상품 불러오기]는 DB에 적재한 게 언제인지와 출처에 새 공시·상품이 있는지만 확인해요. 새 것이 있으면 [최신 상품 갱신하기]로 받아와요.
-              이 단계에서는 사이트가 바뀌지 않아요.
+              [최신 상품 불러오기]는 갱신해 둔 결과(반영 대기 테이블)를 DB에서 읽어 아래 ②에 보여 줘요. 외부 API는 부르지 않아요.
+              <br />
+              새로 받아오려면 [최신 상품 갱신하기]를 눌러요. 이 단계에서는 사이트가 바뀌지 않아요.
             </p>
           </div>
         </SecHead>
         <ActionRow>
-          <Button onClick={handleCheck} disabled={isChecking || isRunning}>
+          <Button onClick={handleLoad} disabled={isLoading || isRunning}>
             <Icon name="search" />
             최신 상품 불러오기
           </Button>
-          <Hint role="status">{isChecking ? '출처를 확인하는 중이에요…' : '출처 첫 쪽만 읽어요. 몇 초면 끝나요'}</Hint>
+          <Hint role="status">{isLoading ? '적재된 결과를 읽는 중이에요…' : loadHint}</Hint>
         </ActionRow>
-        {checkResult}
-        <InlineError>{checkError}</InlineError>
+        {notice && <Notice role="status">{notice}</Notice>}
+        <InlineError>{loadError}</InlineError>
         <Sources>
           {IMPORT_SOURCE_OPTIONS.map((option) => {
             const isOn = sources.includes(option.value)
