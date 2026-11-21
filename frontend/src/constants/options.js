@@ -207,22 +207,30 @@ export const IMPORT_SOURCE_OPTIONS = [
   { value: 'FSS', label: '금융감독원' },
 ]
 
-// 바뀐 상품 구분 (API-33). TODO(CHORONG-57 BE): 코드 값은 ImportStatusResponseDTO를 보고 맞춘다 (화면 글은 명세서 AD-05)
+// 바뀐 상품 구분 (API-33 items[].diffType, FastAPI 값 그대로)
 export const IMPORT_CHANGE_TYPE_LABEL = {
   NEW: '신규',
-  CHANGED: '변경',
-  CLOSED: '판매 중단',
-  REOPENED: '다시 게시',
-  REVIEW: '확인 필요',
+  CHANGE: '변경',
+  REMOVE: '판매 중단',
+  REOPEN: '다시 게시',
+  CHECK: '확인 필요',
 }
 
-// 반영 이력 종류 (API-35 actionType). TODO(CHORONG-57 BE): 코드 값은 HistoryResponseDTO를 보고 맞춘다 (화면 글은 명세서 AD-06)
+// 확인 필요 사유 (API-33 items[].checkReasons)
+export const CHECK_REASON_LABEL = {
+  NO_NAME: '상품명이나 기관 정보가 비어 있어요',
+  RATE_REVERSED: '최저 금리가 최고 금리보다 높아요',
+  RATE_OVER_20: '최고 금리가 연 20%를 넘어요',
+  NEW_PHRASE: '칩에 넣지 못한 새 문구가 있어요',
+}
+
+// 반영 이력 종류 (API-35 actionType)
 export const HISTORY_ACTION_TYPE_LABEL = {
   INIT: '초기 적재',
   PUBLISH: '반영',
   AUTO_CLOSE: '자동 내림',
   HIDE: '숨기기',
-  UNHIDE: '다시 보이기',
+  SHOW: '다시 보이기',
   ROLLBACK: '되돌리기',
 }
 

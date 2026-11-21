@@ -5,9 +5,8 @@ import useAuthStore from './useAuthStore'
 // ST-06 관리자 인증 (저장 안 함: 로그인은 서버 세션 쿠키, E14. 토큰 원문은 스토어에도 두지 않음)
 // admin: AdminResponseDTO 그대로 (adminId, adminName, adminEmail, adminRole APPROVER 승인권자 / MANAGER 관리자)
 // status: checking 확인 중 / guest 인증 안 됨 / tokenSent 토큰 메일 보냄 (로그인 화면) / authed 인증됨
-// expiresAt: 만료 시각 (로그인 + 2시간 고정, 서버가 준 값 그대로)
+// expiresAt: 만료 시각 'yyyy-MM-dd HH:mm' (로그인 + 2시간 고정, 서버가 준 값 그대로)
 // 역할은 메뉴 숨김용, 권한 확인은 서버 (AdminInterceptor)
-// TODO(CHORONG-57 BE): AdminResponseDTO 필드 이름(adminName, adminRole, expiresAt 등)은 DTO 파일이 올라오면 맞춘다
 const useAdminStore = create((set) => ({
   admin: null,
   status: 'checking',

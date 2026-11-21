@@ -43,9 +43,8 @@ api.interceptors.response.use(
 
       if (url.startsWith('/api/admin/')) {
         // 관리자 (AD-02, ST-06): 화면 상태 guest로 → RequireAdmin이 /admin/login으로 보냄 + 서버 문구 안내 (알림)
-        //   ('2시간이 지나 자동으로 로그아웃했어요' / '관리자 권한이 없어졌어요'. 문구가 없으면 기본 글)
+        //   (서버 문구: '2시간이 지나 자동으로 로그아웃했어요' / '관리자 권한이 없어졌어요' / 세션 없음 '로그인이 필요합니다.')
         // 로그인, 가입 흐름(/api/admin/auth*, /api/admin/join*)의 401은 아직 로그인 전이거나 토큰이 틀린 것이므로 부르는 쪽이 처리
-        // TODO(CHORONG-57 BE): 지금 서버 401 문구는 '로그인이 필요합니다.' 하나 (ErrorCode.LOGIN_REQUIRED). 명세서 두 문구로 나뉘면 그대로 보임
         const isAuthFlow = /^\/api\/admin\/(auth|join)(\/|$)/.test(url)
         if (!isAuthFlow) {
           useAdminStore.setState({ admin: null, status: 'guest', expiresAt: null })

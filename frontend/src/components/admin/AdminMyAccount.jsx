@@ -5,55 +5,95 @@ import * as adminApi from '../../api/adminApi'
 import { ADMIN_ROLE_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, InlineError } from '../../styles/common'
-import { formatDateTime } from '../../utils/format'
+import { Button, InlineError } from '../../styles/common'
+import { formatDateTime, formatTime } from '../../utils/format'
 import Modal from '../ui/Modal'
-import SectionHeader from '../common/SectionHeader'
 
-// AD-10 내 계정: 이름, 이메일, 역할, 승인 일시, 마지막 로그인 (API-47 GET) / [관리자 탈퇴]
+// AD-10 내 계정: 이름, 이메일, 역할, 로그인 끝나는 시각, 승인 일시 · 승인한 사람, 마지막 로그인 (API-47 GET) / [관리자 탈퇴]
 // [관리자 탈퇴] → 확인 창 (되돌릴 수 없음, 내 이메일 다시 입력. 다르면 버튼 잠금) → API-47 DELETE → 스토어 guest → /admin/login
 // 마지막 승인권자 → 서버 문구 ('다른 승인권자를 먼저 지정해 주세요') / 연타 방지 (E5) / 관리자는 언제든 탈퇴 가능
-// TODO(CHORONG-57 BE): AdminResponseDTO 필드 이름(adminName, adminEmail, adminRole, approvedAt, lastLoginAt)은 DTO 파일이 올라오면 맞춘다
+// AdminResponseDTO: adminName, adminEmail, adminRole, approvedBy, approvedByName, approvedAt, lastLoginAt
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
   gap: 20px;
 `
 
-const Info = styled.dl`
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr);
-  gap: 12px 16px;
-  font-size: var(--fs-md);
-  dt {
-    color: var(--cocoa);
-    font-weight: 600;
+const SecHead = styled.div`
+  h2 {
+    font-size: var(--fs-h4);
+    font-weight: 800;
   }
-  dd {
-    font-weight: 700;
-    overflow-wrap: anywhere;
+  p {
+    margin-top: 4px;
+    color: var(--cocoa);
+    font-size: var(--fs-md);
   }
 `
 
-const Bottom = styled.div`
+// 내 정보 (시안 adm-me): 연한 바탕 안 이름-값 두 칸
+const Info = styled.dl`
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 12px 28px;
+  padding: 20px;
+  border-radius: var(--r-md);
+  background: var(--mist);
+  font-size: var(--fs-md);
+  dt {
+    color: var(--cocoa);
+    font-weight: 700;
+  }
+  dd {
+    color: var(--ink);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  dd b {
+    font-family: var(--f-num);
+    font-weight: 700;
+  }
+`
+
+// 탈퇴 구역 (시안 adm-out): 위 구분선, 설명 왼쪽 + 버튼 오른쪽
+const Out = styled.div`
   display: flex;
-  justify-content: flex-end;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  b {
+    font-size: var(--fs-base);
+    font-weight: 800;
+  }
+  p {
+    margin-top: 4px;
+    color: var(--cocoa);
+    font-size: var(--fs-sm);
+  }
+  @media (max-width: 899px) {
+    flex-direction: column;
+  }
 `
 
 // 관리자 목록 안 빈 상태, 안내: 테두리 없는 작은 글씨
 const Status = styled.p`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 36px 0;
+  padding: 36px 20px;
+  border-bottom: 1px solid var(--line);
   color: var(--cocoa);
   font-size: var(--fs-md);
   text-align: center;
 `
 
 const DialogTitle = styled.h2`
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   font-size: var(--fs-h3);
   font-weight: 800;
 `
@@ -67,20 +107,33 @@ const DialogBody = styled.div`
   font-size: var(--fs-md);
 `
 
+const Mine = styled.p`
+  padding: 16px 18px;
+  border-radius: var(--r-sm);
+  background: var(--brand-soft);
+  line-height: 1.6;
+`
+
 const Field = styled.label`
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   font-size: var(--fs-md);
-  font-weight: 600;
+  font-weight: 700;
   input {
     height: 52px;
-    padding: 0 16px;
+    padding: 0 14px;
     border: 1px solid var(--line-2);
     border-radius: var(--r-sm);
     background: var(--paper);
     color: var(--ink);
     font-size: var(--fs-lg);
+    font-weight: 600;
+    &:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px var(--brand-soft);
+      outline: none;
+    }
     @media (max-width: 899px) {
       height: 48px;
     }
@@ -93,8 +146,16 @@ const DialogActions = styled.div`
   gap: 8px;
 `
 
+// 승인한 사람: 이름 / 번호만 있으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자
+function approvedByText(me) {
+  if (me.approvedByName) return me.approvedByName
+  if (me.approvedBy !== null && me.approvedBy !== undefined) return '탈퇴한 관리자'
+  return '첫 관리자 자동 승인'
+}
+
 function AdminMyAccount() {
   const navigate = useNavigate()
+  const expiresAt = useAdminStore((state) => state.expiresAt)
   const showToast = useUiStore((state) => state.showToast)
   const [result, setResult] = useState({ status: 'loading', me: null })
   const [attempt, setAttempt] = useState(0)
@@ -130,7 +191,8 @@ function AdminMyAccount() {
   }
 
   const me = result.me
-  const isEmailMatched = me?.adminEmail !== undefined && emailInput.trim() === me.adminEmail
+  // 이메일은 대소문자 상관없이 같으면 통과 (서버도 소문자로 맞춤)
+  const isEmailMatched = Boolean(me?.adminEmail) && emailInput.trim().toLowerCase() === me.adminEmail.toLowerCase()
 
   const handleRemove = async () => {
     setError('')
@@ -138,7 +200,7 @@ function AdminMyAccount() {
     try {
       await adminApi.deleteAdminMe(emailInput.trim())
       useAdminStore.setState({ admin: null, status: 'guest', expiresAt: null })
-      showToast('관리자 탈퇴를 마쳤어요')
+      showToast('관리자에서 탈퇴했어요. 이메일과 이름을 지웠어요')
       navigate('/admin/login', { replace: true })
     } catch (err) {
       if (err.response?.status !== 401) setError(err.response?.data?.message ?? '탈퇴하지 못했어요. 다시 시도해 주세요')
@@ -161,7 +223,7 @@ function AdminMyAccount() {
     )
   } else {
     body = (
-      <Card>
+      <>
         <Info>
           <dt>이름</dt>
           <dd>{me.adminName ?? '-'}</dd>
@@ -169,35 +231,49 @@ function AdminMyAccount() {
           <dd>{me.adminEmail ?? '-'}</dd>
           <dt>역할</dt>
           <dd>{ADMIN_ROLE_LABEL[me.adminRole] ?? me.adminRole ?? '-'}</dd>
-          <dt>승인 일시</dt>
-          <dd>{formatDateTime(me.approvedAt)}</dd>
+          <dt>로그인</dt>
+          <dd>
+            <b>{formatTime(expiresAt)}</b>까지 (2시간 고정, 활동해도 늘어나지 않아요)
+          </dd>
+          <dt>승인</dt>
+          <dd>{me.approvedAt ? `${formatDateTime(me.approvedAt)} · ${approvedByText(me)}` : '-'}</dd>
           <dt>마지막 로그인</dt>
           <dd>{formatDateTime(me.lastLoginAt)}</dd>
         </Info>
-      </Card>
+        <Out>
+          <div>
+            <b>관리자 탈퇴</b>
+            <p>탈퇴하면 이메일과 이름을 지우고 바로 로그아웃해요. 남긴 기록은 ‘탈퇴한 관리자’로 보여요. 같은 이메일로 다시 쓰려면 새로 가입 신청해야 해요.</p>
+          </div>
+          <Button $size="sm" $variant="outline" onClick={openConfirm}>
+            관리자 탈퇴
+          </Button>
+        </Out>
+      </>
     )
   }
 
   return (
-    <Wrap>
-      <SectionHeader title="내 계정" description="내 관리자 정보예요." />
+    <Wrap aria-labelledby="admin-me-title">
+      <SecHead>
+        <h2 id="admin-me-title">내 계정</h2>
+        <p>내 관리자 정보와 로그인 시간을 확인해요.</p>
+      </SecHead>
       {body}
-      {me && (
-        <Bottom>
-          <Button $variant="ghost" onClick={openConfirm}>
-            관리자 탈퇴
-          </Button>
-        </Bottom>
-      )}
 
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="관리자 탈퇴" width={460}>
-        <DialogTitle>관리자 탈퇴</DialogTitle>
+      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="관리자 탈퇴" width={460} showClose={false}>
+        <DialogTitle>관리자에서 탈퇴할까요?</DialogTitle>
         <DialogBody>
-          <p>탈퇴하면 되돌릴 수 없어요. 다시 관리자가 되려면 가입 신청과 승인을 다시 받아야 해요.</p>
-          <p>마지막 승인권자는 탈퇴할 수 없어요. 다른 승인권자를 먼저 지정해 주세요.</p>
+          <Mine>되돌릴 수 없어요. 확인을 위해 내 이메일을 다시 입력해 주세요.</Mine>
           <Field>
-            확인을 위해 내 이메일을 다시 입력해 주세요
-            <input type="email" value={emailInput} autoComplete="off" onChange={(event) => setEmailInput(event.target.value)} />
+            내 이메일
+            <input
+              type="email"
+              value={emailInput}
+              autoComplete="off"
+              placeholder={me?.adminEmail ?? ''}
+              onChange={(event) => setEmailInput(event.target.value)}
+            />
           </Field>
           <InlineError>{error}</InlineError>
         </DialogBody>
