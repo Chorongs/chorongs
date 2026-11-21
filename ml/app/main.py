@@ -9,7 +9,7 @@
     - POST /catalog/rollback          : 되돌리기 → 새 버전 (ADMIN-05)
     - POST /credit/score              : 진단 문항 답 → 점수, 문항별 점수 (CREDIT-01). 답과 점수는 로그 금지 (B8)
     /health 말고는 모두 Bearer 토큰 (B14)
-    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT / NOTHING_TO_ROLLBACK, 422 detail: NOT_PUBLISHABLE,
+    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT / NOTHING_TO_ROLLBACK / NOT_INITIALIZED (첫 적재 전), 422 detail: NOT_PUBLISHABLE,
     404 detail: JOB_NOT_FOUND / HISTORY_NOT_FOUND (Spring FastApiClient가 ErrorCode로 바꿈)
 
     실행: ml 폴더에서  fastapi dev app/main.py
@@ -64,7 +64,7 @@ def health():
 @app.post("/imports", response_model=ImportStartResponse, dependencies=[Depends(verify_token)])
 def start_import(body: ImportStartRequest, background_tasks: BackgroundTasks):
     """
-        작업 1행(RUNNING)을 만들고 번호를 바로 돌려줌. 진행 중 작업이 있으면 409 IMPORT_RUNNING
+        작업 1행(RUNNING)을 만들고 번호를 바로 돌려줌. 진행 중 작업이 있으면 409 IMPORT_RUNNING, 첫 적재 전이면 409 NOT_INITIALIZED
         수집, 정제, 비교(run_import)는 응답을 보낸 뒤 같은 서버에서 이어서 함 (BackgroundTasks)
     """
     sources = [s for s in SOURCE_ORDER if s in body.sources]    # 같은 출처 중복 제거 + 'KINFA,FSS' 순서

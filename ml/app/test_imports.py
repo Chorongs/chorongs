@@ -3,8 +3,8 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.imports import (changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
-                         read_latest_job, source_results, split_list)
+from app.imports import (JobConflict, changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
+                         read_latest_job, source_results, split_list, start_job)
 from app.load import PRODUCT_COLS
 
 RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200", "top_fin_grp_no": "020000"},
@@ -404,3 +404,31 @@ def test_read_job_시작_시각과_끝난_시각을_담는다():
     result = read_job(conn, 3)
     # Then
     assert (result["created_at"], result["finished_at"]) == (created, finished)
+
+
+# ---------- start_job (가짜 conn: LOCK, FAIL_STALE, COUNT_RUNNING, LAST_VERSION 순서) ----------
+
+def test_start_job_첫_적재_전이면_NOT_INITIALIZED():
+    # Given: 진행 중 0개, 이력 없음
+    conn = _FakeConn(None, None, 0, None)
+    # When
+    try:
+        start_job(conn, ["KINFA"], 1)
+        detail = None
+    except JobConflict as e:
+        detail = e.detail
+    # Then
+    assert detail == "NOT_INITIALIZED"
+
+
+def test_start_job_진행_중_작업이_있으면_IMPORT_RUNNING():
+    # Given
+    conn = _FakeConn(None, None, 1)
+    # When
+    try:
+        start_job(conn, ["KINFA"], 1)
+        detail = None
+    except JobConflict as e:
+        detail = e.detail
+    # Then
+    assert detail == "IMPORT_RUNNING"

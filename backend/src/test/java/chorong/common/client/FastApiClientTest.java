@@ -56,6 +56,17 @@ class FastApiClientTest {
 	}
 
 	@Test
+	void 첫_적재_전이면_CONFLICT와_첫_적재_문구() {
+		// Given
+		RestClientResponseException e = fastApiError(409, "{\"detail\":\"NOT_INITIALIZED\"}");
+		// When
+		BusinessException result = FastApiClient.toBusinessException(e);
+		// Then
+		assertEquals(ErrorCode.CONFLICT + FastApiClient.MSG_NOT_INITIALIZED,
+				result.getErrorCode() + result.getMessage());
+	}
+
+	@Test
 	void 확인_필요가_섞이면_NOT_PUBLISHABLE() {
 		// Given
 		RestClientResponseException e = fastApiError(422, "{\"detail\":\"NOT_PUBLISHABLE\"}");

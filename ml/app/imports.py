@@ -4,6 +4,7 @@
     - 시작 (main.py POST /imports): import_job 1행 (RUNNING) → 작업 번호 바로 응답
       base_version(기준 버전)은 시작 때 일단 넣고, 비교하려고 지금 상품을 읽는 시점의 마지막 이력 번호로 DONE 때 다시 씀 (ADMIN-04 '비교할 때의')
       동시에 1개 (B9): import_job 표를 잠그고 RUNNING이 있으면 IMPORT_RUNNING. 시작한 지 30분 넘은 RUNNING은 FAILED로 바꾸고 진행
+      첫 적재(INIT 이력) 전에는 NOT_INITIALIZED: 빈 상품 표와 비교한 결과는 기준 버전이 없어 반영할 수 없으므로 (먼저 load.py)
     - 응답 뒤 (BackgroundTasks → run_import): 수집 → 지금 상품 읽기 → 정제 (첫 적재와 같은 clean_products) → 비교
       → 이전 작업의 import_item 삭제 → 바뀐 상품을 import_item에 저장 → DONE (출처 모두 실패, 정제 중 오류면 FAILED + 사유)
       (지금 상품을 정제보다 먼저 읽는 이유: 금감원 수집이 빠졌을 때 DB 은행 이름을 정제에 넘기기 위해)
@@ -43,7 +44,7 @@ KEEP_HOURS = 24         # DONE 뒤 이 시간이 지나면 EXPIRED (반영 불�
 class JobConflict(Exception):
     """
         409. detail: IMPORT_RUNNING 진행 중 / IMPORT_EXPIRED 24시간 지남 또는 DONE 아님 / VERSION_CONFLICT 기준 버전 다름
-        / NOTHING_TO_ROLLBACK 되돌릴 변경 기록 없음
+        / NOTHING_TO_ROLLBACK 되돌릴 변경 기록 없음 / NOT_INITIALIZED 첫 적재 전 (이력 없음)
     """
 
     def __init__(self, detail):
@@ -307,15 +308,20 @@ def read_products(conn):
 
 
 def start_job(conn, sources, admin_id):
-    """작업 1행 만들고 번호 돌려줌 (conn은 트랜잭션 안). 진행 중 작업이 있으면 JobConflict(IMPORT_RUNNING)"""
+    """
+        작업 1행 만들고 번호 돌려줌 (conn은 트랜잭션 안)
+        진행 중 작업이 있으면 JobConflict(IMPORT_RUNNING), 첫 적재(INIT 이력) 전이면 JobConflict(NOT_INITIALIZED)
+    """
     conn.execute(LOCK_JOBS)     # 동시에 두 작업이 시작되지 않게 (커밋하면 풀림)
     conn.execute(FAIL_STALE_JOBS, {"msg": f"{STALE_MINUTES}분 넘게 끝나지 않아 실패 처리", "minutes": STALE_MINUTES})
     if conn.execute(COUNT_RUNNING).scalar():
         raise JobConflict("IMPORT_RUNNING")
 
-    conn.execute(INSERT_JOB, {"sources": ",".join(sources),
-                              "base_version": conn.execute(LAST_VERSION).scalar(),
-                              "admin_id": admin_id})
+    base_version = conn.execute(LAST_VERSION).scalar()
+    if base_version is None:    # 이력이 없음 = 첫 적재 전. 빈 표와 비교한 결과는 반영할 수 없으니 시작하지 않음
+        raise JobConflict("NOT_INITIALIZED")
+
+    conn.execute(INSERT_JOB, {"sources": ",".join(sources), "base_version": base_version, "admin_id": admin_id})
     return conn.execute(NEW_JOB_ID).scalar()
 
 
