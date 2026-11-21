@@ -7,6 +7,9 @@ import useAuthStore from './useAuthStore'
 // status: checking 확인 중 / guest 인증 안 됨 / tokenSent 토큰 메일 보냄 (로그인 화면) / authed 인증됨
 // expiresAt: 만료 시각 'yyyy-MM-dd HH:mm' (로그인 + 2시간 고정, 서버가 준 값 그대로)
 // 역할은 메뉴 숨김용, 권한 확인은 서버 (AdminInterceptor)
+// 앱 시작 때 main.jsx가 check()를 1회 불러 회원 쪽 화면도 관리자 로그인 중인지 앎 → 회원 로그인 진입을 막고 아래 문구로 알림 (SCR-16 비고)
+export const ADMIN_LOGGED_IN_TEXT = '관리자로 로그인 중이라 회원 로그인은 할 수 없어요. 관리자에서 로그아웃한 뒤 이용해 주세요'
+
 const useAdminStore = create((set) => ({
   admin: null,
   status: 'checking',

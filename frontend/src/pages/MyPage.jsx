@@ -9,7 +9,9 @@ import MyOverview from '../components/my/MyOverview'
 import RecentList from '../components/my/RecentList'
 import SavedRecList from '../components/my/SavedRecList'
 import SearchHistoryList from '../components/my/SearchHistoryList'
+import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
+import useUiStore from '../store/useUiStore'
 import { Button, EmptyBox } from '../styles/common'
 
 // MY-01 MY 화면 (/my, /my/:section, 회원 전용): 왼쪽 메뉴 9개 / 오른쪽 고른 항목 하나 (useParams)
@@ -100,7 +102,14 @@ function MyPage() {
         <EmptyBox>
           로그인하면 찜과 기록을 MY에서 볼 수 있어요
           {/* 로그인 뒤 보던 /my 주소로 돌아오게 지금 주소를 로그인 화면에 넘김 (기획서 3-7, 7-1 9번) */}
-          <Button $size="sm" onClick={() => navigate('/login', { state: { returnPath: section ? `/my/${section}` : '/my' } })}>
+          <Button
+            $size="sm"
+            onClick={() =>
+              useAdminStore.getState().status === 'authed' // 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
+                ? useUiStore.getState().showToast(ADMIN_LOGGED_IN_TEXT)
+                : navigate('/login', { state: { returnPath: section ? `/my/${section}` : '/my' } })
+            }
+          >
             로그인
           </Button>
         </EmptyBox>

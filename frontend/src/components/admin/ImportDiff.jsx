@@ -16,6 +16,9 @@ import Modal from '../ui/Modal'
 // '확인 필요'는 사유(checkReasons) 표시 + 선택 불가 / '바뀐 내용'은 바뀐 칸 이름(changedFields, DB 칼럼 이름 그대로) / 숨긴 상품(hiddenYn Y)은 '숨김 중'
 // [사이트에 반영] → 확인 창 → API-34 { itemIds, baseVersion (작업의 baseVersion 그대로) } → 완료 상자 + onPublished() (현황 다시 불러옴. 이력은 그 메뉴를 열 때 새로 불러옴)
 // 422 → '확인 필요 항목 빼고 다시' / 409 VERSION_CONFLICT → 다시 갱신하고 불러온 뒤 반영 / 409 CONFLICT → 서버 문구 (24시간 지남) / 0건이면 버튼 잠금, 연타 방지 (E5)
+// 기준 버전(baseVersion)이 없는 작업(상품 첫 적재 INIT 전에 갱신한 결과)은 ①이 걸러 넘기지 않음. 혹시 받아도 목록 대신 안내만 (서버에 보내면 400)
+const NO_BASE_VERSION_TEXT =
+  '기준 버전이 없는 결과라 반영할 수 없어요 (상품 첫 적재 전에 갱신한 결과). 첫 적재를 한 뒤 ①에서 [최신 상품 갱신하기]로 다시 비교하고 불러와 주세요'
 const CHECK = 'CHECK'
 
 const CHANGE_TYPE_VARIANT = { NEW: 'good', CHANGE: 'acc', REMOVE: 'default', REOPEN: 'good', CHECK: 'bad' }
@@ -426,6 +429,7 @@ function ImportDiff({ job, onPublished }) {
   const visibleValidIds = visibleItems.filter((item) => item.diffType !== CHECK).map((item) => item.itemId)
   const isAllVisibleSelected = visibleValidIds.length > 0 && visibleValidIds.every((id) => selectedIds.includes(id))
   const selectedItems = items.filter((item) => selectedIds.includes(item.itemId))
+  const hasBaseVersion = job?.baseVersion !== null && job?.baseVersion !== undefined
 
   const handleToggle = (itemId, checked) => {
     setSelectedIds((prev) => (checked ? [...prev, itemId] : prev.filter((id) => id !== itemId)))
@@ -471,6 +475,8 @@ function ImportDiff({ job, onPublished }) {
         <Icon name="refresh" size={24} />① [최신 상품 불러오기]를 누르면 적재된 바뀐 상품이 여기에 나와요
       </Empty>
     )
+  } else if (!hasBaseVersion) {
+    body = <Empty>{NO_BASE_VERSION_TEXT}</Empty>
   } else if (published) {
     body = (
       <Done role="status">

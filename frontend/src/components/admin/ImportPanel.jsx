@@ -9,6 +9,7 @@ import Icon from '../ui/Icon'
 // AD-04 최신 상품 불러오기, 갱신 (① 적재된 결과를 불러오고, 필요하면 갱신): 현황 4칸 (API-31) / [최신 상품 불러오기] + 안내 / 출처 카드 2개 / [최신 상품 갱신하기] + 진행 문구
 // [최신 상품 불러오기] → API-33 latest (반영 대기 테이블을 DB에서 읽음, 외부 API 안 부름, 몇 초): DONE이면 onDone(작업) → ②(ImportDiff)가 목록, 선택, 스크롤
 //   404 → 문구 24 '아직 적재한 결과가 없어요…' / EXPIRED → 24시간 지남 안내 / PUBLISHED → 이미 반영한 결과 안내 / RUNNING → 진행 확인을 이어서 / FAILED → 실패 문구
+//   DONE인데 baseVersion이 없음(상품 첫 적재 INIT 전에 갱신한 결과, 반영하면 400) → ②에 안 넘기고 다시 갱신 안내
 // [최신 상품 갱신하기] → API-32 (jobId, 이걸 눌렀을 때만 외부 API 전체 수집·적재, 2분 안팎, 서버 뒤에서) → 1초마다 진행 확인 (API-33, 최대 횟수 안에서)
 //   → DONE이면 문구 25 '갱신이 끝났어요. 바뀐 상품 n건이 반영을 기다려요. [최신 상품 불러오기]를 눌러…' (목록은 불러오기를 눌러야 보임. 갱신을 시작하면 ②의 옛 목록은 비움)
 // 열 때 최근 작업 확인 (API-33 latest): 현황에 '마지막 갱신 finishedAt', RUNNING이면 진행 확인을 이어서, DONE이면 문구 25 안내만, 404나 다른 상태면 평소 화면
@@ -21,6 +22,8 @@ const FAILED_TEXT = '갱신에 실패했어요. 다시 갱신해 주세요'
 const EXPIRED_TEXT = '갱신한 지 24시간이 지났어요. 다시 갱신해 주세요'
 const NO_JOB_TEXT = '아직 적재한 결과가 없어요. [최신 상품 갱신하기]를 눌러 주세요'
 const LOAD_FAILED_TEXT = '적재된 결과를 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요'
+const NO_BASE_VERSION_TEXT =
+  '기준 버전이 없는 결과라 반영할 수 없어요 (상품 첫 적재 전에 갱신한 결과). 첫 적재가 됐으니 [최신 상품 갱신하기]로 다시 비교해 주세요'
 const LOAD_HINT = 'DB에 적재된 결과만 읽어요. 몇 초면 끝나요'
 
 // 문구 25: 갱신이 끝나 반영을 기다리는 결과 안내 (열 때, 갱신 끝)
@@ -306,7 +309,11 @@ function ImportPanel({ catalog, catalogStatus, onReloadCatalog, onDone }) {
     try {
       const job = await adminApi.getLatestImport()
       if (job?.finishedAt) setLastRefreshedAt(job.finishedAt)
-      if (job?.jobStatus === 'DONE') {
+      if (job?.jobStatus === 'DONE' && (job.baseVersion === null || job.baseVersion === undefined)) {
+        onDone(null)
+        setLoadHint(LOAD_HINT)
+        setLoadError(NO_BASE_VERSION_TEXT)
+      } else if (job?.jobStatus === 'DONE') {
         onDone(job)
         setLoadHint(`${formatDateTime(job.finishedAt)} 갱신 · 바뀐 상품 ${formatNumber(job.items?.length ?? 0)}건을 아래 ②에 보여 줘요`)
       } else if (job?.jobStatus === 'RUNNING') {
