@@ -20,7 +20,7 @@ class ImportStatusResponseDTOTest {
 		List<String> changedFields = new ArrayList<>(List.of("rate_min"));
 		FastApiImportResponseDTO.Item item = new FastApiImportResponseDTO.Item(
 				1L, "CHANGE", 10L, "상품", "기관", "FSS", changedFields, null, "N");
-		FastApiImportResponseDTO fast = new FastApiImportResponseDTO(3L, "DONE", 7L, List.of(), List.of(item));
+		FastApiImportResponseDTO fast = new FastApiImportResponseDTO(3L, "DONE", 7L, null, null, List.of(), List.of(item));
 		ImportStatusResponseDTO response = ImportStatusResponseDTO.from(fast);
 
 		// When

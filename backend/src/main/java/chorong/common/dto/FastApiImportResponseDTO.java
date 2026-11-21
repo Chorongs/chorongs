@@ -1,5 +1,6 @@
 package chorong.common.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -25,6 +26,10 @@ public class FastApiImportResponseDTO {
 	private String jobStatus;					// RUNNING 진행 중, DONE 비교 끝, FAILED 실패, PUBLISHED 반영함, EXPIRED 24시간 지남
 	@JsonProperty("base_version")
 	private Long baseVersion;					// 비교할 때의 마지막 반영 이력 번호 (반영 요청에 그대로 보냄)
+	@JsonProperty("created_at")
+	private LocalDateTime createdAt;			// 작업 시작 시각
+	@JsonProperty("finished_at")
+	private LocalDateTime finishedAt;			// DONE, FAILED가 된 시각 = DB 적재 시각 (RUNNING이면 null)
 	@JsonProperty("source_results")
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;					// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item으로 함)

@@ -3,8 +3,9 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.imports import (changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
-                         read_latest_job, source_results, split_list)
+from app.imports import (SourceUnavailable, build_check, changed_fields, check_latest, compare, db_bank_names, item_row,
+                         kinfa_diff, match_products, norm, read_check_state, read_job, read_latest_job, source_results,
+                         split_list)
 from app.load import PRODUCT_COLS
 
 RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200", "top_fin_grp_no": "020000"},
@@ -355,7 +356,7 @@ class _FakeResult:
 
 def test_read_job_DONE_뒤_24시간_지났으면_EXPIRED로_보여_준다():
     # Given
-    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result='[{"source":"FSS"}]', expired=1)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result='[{"source":"FSS"}]', expired=1, created_at=None, finished_at=None)
     conn = _FakeConn(job, [])
     # When
     result = read_job(conn, 3)
@@ -365,7 +366,7 @@ def test_read_job_DONE_뒤_24시간_지났으면_EXPIRED로_보여_준다():
 
 def test_read_job_항목의_쉼표_칸은_목록으로():
     # Given
-    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0, created_at=None, finished_at=None)
     item = _Row(item_id=1, diff_type="CHANGE", product_id=5, product_name="가대출", company_name="가은행",
                 source="FSS", changed_fields="rate_max,tags", check_reasons=None, hidden_yn="N")
     conn = _FakeConn(job, [item])
@@ -386,9 +387,137 @@ def test_read_latest_job_작업이_하나도_없으면_None():
 
 def test_read_latest_job_가장_최근_작업_번호로_읽는다():
     # Given: 가장 최근 작업 7
-    job = _Row(job_id=7, job_status="RUNNING", base_version=1, source_result=None, expired=0)
+    job = _Row(job_id=7, job_status="RUNNING", base_version=1, source_result=None, expired=0, created_at=None, finished_at=None)
     conn = _FakeConn(7, job, [])
     # When
     read_latest_job(conn)
     # Then
     assert conn.params[1]["job_id"] == 7
+
+
+# ---------- 최신 확인 (kinfa_diff, build_check, read_check_state, check_latest) ----------
+
+def _state(**changes):
+    """read_check_state 결과 모양. 바꿀 칸만 넘김"""
+    state = {"loaded_at": {"KINFA": datetime(2026, 11, 20, 9, 0), "FSS": datetime(2026, 11, 20, 9, 0)},
+             "kinfa_rows": [("101", "ON"), ("102", "HIDDEN")], "db_month": "202611", "pending_job": None}
+    state.update(changes)
+    return state
+
+
+def test_kinfa_diff_출처와_DB가_같으면_새로_온_수와_빠진_수가_0():
+    # Given
+    seqs, rows = ["101", "102"], [("101", "ON"), ("102", "ON")]
+    # When
+    result = kinfa_diff(seqs, rows)
+    # Then
+    assert result == (2, 0, 0)
+
+
+def test_kinfa_diff_판매_종료_상품은_DB_수와_빠진_수에_넣지_않는다():
+    # Given: 103은 CLOSED라 출처에 없어도 빠진 것이 아님, 104는 출처에 새로 옴
+    seqs, rows = ["101", "104"], [("101", "ON"), ("102", "ON"), ("103", "CLOSED")]
+    # When
+    result = kinfa_diff(seqs, rows)
+    # Then
+    assert result == (2, 1, 1)
+
+
+def test_build_check_모두_최신이면_needs_refresh_False():
+    # Given
+    peeked = {"KINFA": ["101", "102"], "FSS": "202611"}
+    # When
+    result = build_check(_state(), peeked, {}, datetime(2026, 11, 21, 14, 0))
+    # Then
+    assert (result["needs_refresh"], [s["is_latest"] for s in result["sources"]]) == (False, [True, True])
+
+
+def test_build_check_금감원_공시월이_다르면_그_출처만_최신_아님():
+    # Given
+    peeked = {"KINFA": ["101", "102"], "FSS": "202612"}
+    # When
+    result = build_check(_state(), peeked, {}, datetime(2026, 11, 21, 14, 0))
+    # Then
+    fss = result["sources"][1]
+    assert (result["needs_refresh"], fss["is_latest"], fss["db_mark"], fss["source_mark"]) == \
+        (True, False, "202611", "202612")
+
+
+def test_build_check_서민_기준값은_상품_수와_새로_온_수_빠진_수():
+    # Given: 102 빠짐, 105 새로 옴
+    peeked = {"KINFA": ["101", "105"], "FSS": "202611"}
+    # When
+    kinfa = build_check(_state(), peeked, {}, datetime(2026, 11, 21, 14, 0))["sources"][0]
+    # Then
+    assert (kinfa["db_mark"], kinfa["source_mark"], kinfa["new_count"], kinfa["missing_count"], kinfa["is_latest"]) == \
+        ("2", "2", 1, 1, False)
+
+
+def test_build_check_실패한_출처는_error만_채우고_최신_판단에_넣지_않는다():
+    # Given: 서민 실패, 금감원 최신
+    peeked, errors = {"FSS": "202611"}, {"KINFA": "ConnectTimeout"}
+    # When
+    result = build_check(_state(), peeked, errors, datetime(2026, 11, 21, 14, 0))
+    # Then
+    kinfa = result["sources"][0]
+    assert (kinfa["error"], kinfa["is_latest"], kinfa["source_mark"], result["needs_refresh"]) == \
+        ("ConnectTimeout", None, None, False)
+
+
+def test_build_check_반영_전_작업과_적재_시각을_그대로_담는다():
+    # Given
+    pending = {"job_id": 7, "finished_at": datetime(2026, 11, 21, 13, 0), "item_count": 12}
+    state = _state(pending_job=pending)
+    # When
+    result = build_check(state, {"KINFA": [], "FSS": None}, {}, datetime(2026, 11, 21, 14, 0))
+    # Then
+    assert (result["pending_job"], result["sources"][0]["loaded_at"]) == (pending, datetime(2026, 11, 20, 9, 0))
+
+
+def test_read_check_state_갱신한_적_없는_출처는_첫_적재_시각을_쓴다():
+    # Given: INIT 11-10, KINFA 갱신 11-20, FSS 갱신 없음, 서민 행 1개, 공시월 202611, 반영 전 작업 없음
+    init_at, kinfa_at = datetime(2026, 11, 10, 9, 0), datetime(2026, 11, 20, 9, 0)
+    conn = _FakeConn(init_at, kinfa_at, None, [_Row(source_code="101", product_status="ON")], "202611", None)
+    # When
+    state = read_check_state(conn)
+    # Then
+    assert (state["loaded_at"], state["kinfa_rows"], state["db_month"], state["pending_job"]) == \
+        ({"KINFA": kinfa_at, "FSS": init_at}, [("101", "ON")], "202611", None)
+
+
+def test_read_check_state_반영_전_작업이_있으면_항목_수까지_읽는다():
+    # Given: 작업 7 DONE, 항목 12개
+    finished = datetime(2026, 11, 21, 13, 0)
+    conn = _FakeConn(None, None, None, [], None, _Row(job_id=7, finished_at=finished), 12)
+    # When
+    state = read_check_state(conn)
+    # Then
+    assert state["pending_job"] == {"job_id": 7, "finished_at": finished, "item_count": 12}
+
+
+def _fail(session):
+    raise RuntimeError("응답 코드 99")
+
+
+def test_check_latest_출처_모두_실패면_SourceUnavailable():
+    # Given
+    peekers = {"KINFA": _fail, "FSS": _fail}
+    # When, Then
+    try:
+        check_latest(None, peekers)
+        raised = False
+    except SourceUnavailable:
+        raised = True
+    assert raised
+
+
+def test_read_job_시작_시각과_끝난_시각을_담는다():
+    # Given
+    created, finished = datetime(2026, 11, 21, 13, 0), datetime(2026, 11, 21, 13, 2)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0,
+               created_at=created, finished_at=finished)
+    conn = _FakeConn(job, [])
+    # When
+    result = read_job(conn, 3)
+    # Then
+    assert (result["created_at"], result["finished_at"]) == (created, finished)

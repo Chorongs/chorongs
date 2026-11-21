@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import chorong.common.dto.FastApiImportCheckResponseDTO;
 import chorong.common.dto.FastApiImportResponseDTO;
 import chorong.common.dto.FastApiScoreRequestDTO;
 import chorong.common.dto.FastApiScoreResponseDTO;
@@ -26,11 +27,12 @@ import chorong.common.exception.ErrorCode;
 
 /*
  * FastAPI 서버 호출 (EXT-05): 주소 fastapi.base-url, 요청마다 Authorization: Bearer 토큰
- * 시간 제한: 연결 3초 (FastAPI가 꺼져 있으면 바로 503) / 응답 기다림: 신용 진단, 불러오기 시작, 진행 확인, 최근 작업 3초 (B14), 반영, 되돌리기 5분
+ * 시간 제한: 연결 3초 (FastAPI가 꺼져 있으면 바로 503) / 응답 기다림: 신용 진단, 갱신 시작, 진행 확인, 최근 작업 3초 (B14),
+ *           최신 확인 15초 (외부 API 첫 쪽 5번), 반영, 되돌리기 5분
  * 실패(연결 안 됨, 시간 초과, 응답 형식 틀림)는 503 SERVICE_UNAVAILABLE
  * FastAPI 4xx 변환 (EXT-05): 409 VERSION_CONFLICT → VERSION_CONFLICT, IMPORT_RUNNING, IMPORT_EXPIRED, NOTHING_TO_ROLLBACK → CONFLICT (문구는 ADMIN-04, 05),
  *                           422 NOT_PUBLISHABLE → NOT_PUBLISHABLE, 404 (없는 작업, 이력 번호) → NOT_FOUND, 그 밖의 실패 → SERVICE_UNAVAILABLE
- * 불러오기 시작, 반영, 되돌리기 요청 본문은 DTO 없이 Map.of (EXT-05 비고)
+ * 갱신 시작, 반영, 되돌리기 요청 본문은 DTO 없이 Map.of (EXT-05 비고) / 최신 확인(GET /imports/check)은 외부 API 첫 쪽만 조회하고 DB에 쓰지 않음
  */
 @Component
 public class FastApiClient {
@@ -39,17 +41,19 @@ public class FastApiClient {
 
 	private static final Duration TIMEOUT = Duration.ofSeconds(3);
 	private static final Duration WRITE_TIMEOUT = Duration.ofMinutes(5);	// 반영, 되돌리기 (상품 1,600여 개를 한 트랜잭션으로 씀)
+	private static final Duration CHECK_TIMEOUT = Duration.ofSeconds(15);	// 최신 확인 (출처마다 외부 API 첫 쪽 1번: 서민 1 + 금감원 4)
 
 	// FastAPI 오류 본문 {"detail": "코드"}에서 코드 꺼내기 (입력 검사 실패는 detail이 목록이라 안 맞음 → 503)
 	private static final Pattern DETAIL = Pattern.compile("\"detail\"\\s*:\\s*\"([A-Z_]+)\"");
 
 	// 409 CONFLICT 문구 (ADMIN-04, 05 / 되돌릴 변경 없음은 되돌리기 미리보기 AdminCatalogServiceImpl도 씀)
-	static final String MSG_IMPORT_RUNNING = "이미 불러오는 중이에요. 끝난 뒤 확인해 주세요";
-	static final String MSG_IMPORT_EXPIRED = "불러온 지 24시간이 지났어요. 다시 불러와 주세요";
+	static final String MSG_IMPORT_RUNNING = "이미 갱신하는 중이에요. 끝난 뒤 확인해 주세요";
+	static final String MSG_IMPORT_EXPIRED = "갱신한 지 24시간이 지났어요. 다시 갱신해 주세요";
 	public static final String MSG_NOTHING_TO_ROLLBACK = "되돌릴 변경이 없어요";
 
-	private final RestClient restClient;	// 신용 진단 점수, 불러오기 시작, 진행 확인 (응답 3초)
+	private final RestClient restClient;	// 신용 진단 점수, 갱신 시작, 진행 확인 (응답 3초)
 	private final RestClient writeClient;	// 반영, 되돌리기 (응답 5분)
+	private final RestClient checkClient;	// 최신 확인 (응답 15초)
 
 	public FastApiClient(@Value("${fastapi.base-url}") String baseUrl,
 						 @Value("${fastapi.token}") String token) {
@@ -61,6 +65,7 @@ public class FastApiClient {
 
 		this.restClient = buildClient(baseUrl, token, httpClient, TIMEOUT);
 		this.writeClient = buildClient(baseUrl, token, httpClient, WRITE_TIMEOUT);
+		this.checkClient = buildClient(baseUrl, token, httpClient, CHECK_TIMEOUT);
 	}
 
 	private static RestClient buildClient(String baseUrl, String token, HttpClient httpClient, Duration readTimeout) {
@@ -74,10 +79,19 @@ public class FastApiClient {
 				.build();
 	}
 
-	// 불러오기 시작: 출처(KINFA, FSS)와 관리자 번호를 보내면 작업 번호(jobId)만 든 응답을 바로 돌려줌 (ADMIN-04, EXT-01, 02)
+	// 최신 상품 확인: 출처마다 외부 API 첫 쪽만 읽어 DB 적재 시각, 최신 여부를 돌려줌 (ADMIN-04 최신 상품 확인, API-55). 적재 안 함
+	// 한 출처만 실패하면 그 출처 error만 채워서 200, 출처 모두 실패하거나 FastAPI가 꺼져 있으면 503
+	public FastApiImportCheckResponseDTO checkImport() {
+		return call("최신 확인", () -> checkClient.get()
+				.uri("/imports/check")
+				.retrieve()
+				.body(FastApiImportCheckResponseDTO.class));
+	}
+
+	// 갱신 시작: 출처(KINFA, FSS)와 관리자 번호를 보내면 작업 번호(jobId)만 든 응답을 바로 돌려줌 (ADMIN-04, EXT-01, 02)
 	// 수집, 정제, 비교는 FastAPI가 응답 뒤 이어서 함 → 진행은 getImport로 확인 / 진행 중 작업이 있으면 409 CONFLICT
 	public FastApiImportResponseDTO startImport(List<String> sources, Long adminId) {
-		return call("불러오기 시작", () -> restClient.post()
+		return call("갱신 시작", () -> restClient.post()
 				.uri("/imports")
 				.body(Map.of("sources", sources, "admin_id", adminId))
 				.retrieve()

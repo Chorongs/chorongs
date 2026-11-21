@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import chorong.admin.dto.ImportCheckResponseDTO;
 import chorong.admin.dto.ImportRequestDTO;
 import chorong.admin.dto.ImportStatusResponseDTO;
 import chorong.admin.dto.PublishRequestDTO;
@@ -26,6 +27,11 @@ public class AdminImportServiceImpl implements AdminImportService {
 
 	private final FastApiClient fastApiClient;
 	private final MemoryCache memoryCache;
+
+	@Override
+	public ImportCheckResponseDTO checkImport() {
+		return ImportCheckResponseDTO.from(fastApiClient.checkImport());
+	}
 
 	@Override
 	public ImportStatusResponseDTO startImport(Long adminId, ImportRequestDTO request) {

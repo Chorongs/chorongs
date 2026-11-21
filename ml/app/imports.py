@@ -9,6 +9,8 @@
       (지금 상품을 정제보다 먼저 읽는 이유: 금감원 수집이 빠졌을 때 DB 은행 이름을 정제에 넘기기 위해)
       이 단계에서 loan_product는 바꾸지 않음. 반영은 publish.py
     - 진행 확인 (main.py GET /imports/{job_id}, GET /imports/latest): read_job, read_latest_job (가장 최근 작업, 화면을 다시 열었을 때)
+    - 최신 확인 (main.py GET /imports/check): check_latest. 출처마다 첫 쪽만 받아(collect.peek_*) DB와 비교, 적재·저장 안 함
+      서민은 seq 목록 vs loan_product source_code (새로 온 수, 빠진 수), 금감원은 공시월 최댓값 vs product_rate_month
     - 비교 구분: NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 (판매 종료 상품이 다시 옴) / CHECK 확인 필요 (반영 불가)
     - 비교하는 칸: 상품 내용 칸 (COMPARE_COLS) + 칩 (tags) + 구간 금리 (rates) + 금감원 공시월 (dcls_month)
       base_date (서민은 수집한 날이라 매번 바뀜), raw_json (제출일이 들어 있음)은 비교하지 않고 반영할 때만 새 값으로 씀
@@ -26,12 +28,13 @@ import requests
 from sqlalchemy import CLOB, bindparam, text
 
 from app.clean import WORDS, clean_products
-from app.collect import collect_fss, collect_kinfa
+from app.collect import collect_fss, collect_kinfa, peek_fss, peek_kinfa
 from app.load import PRODUCT_COLS, dcls_month, product_key
 
 logger = logging.getLogger(__name__)
 
 COLLECTORS = {"KINFA": collect_kinfa, "FSS": collect_fss}
+PEEKERS = {"KINFA": peek_kinfa, "FSS": peek_fss}       # 최신 확인: 출처마다 첫 쪽만
 SOURCE_ORDER = ("KINFA", "FSS")             # import_job.sources, product_update_history.source 값 순서 ('KINFA,FSS')
 COMPARE_COLS = [c for c in PRODUCT_COLS if c not in ("base_date", "raw_json")]
 STALE_MINUTES = 30      # 이 시간 넘게 RUNNING이면 멈춘 작업으로 보고 FAILED
@@ -59,6 +62,10 @@ class NotFound(Exception):
     """404: 없는 작업 번호, 없는 이력 번호"""
 
 
+class SourceUnavailable(Exception):
+    """503: 최신 확인에서 출처 모두 실패 (한 출처만 실패하면 그 출처의 error만 채우고 응답)"""
+
+
 # ---------- SQL ----------
 
 LOCK_JOBS = text("LOCK TABLE import_job IN EXCLUSIVE MODE")
@@ -84,7 +91,7 @@ INSERT_ITEM = text(
 ).bindparams(bindparam("after_data", type_=CLOB))
 
 # 24시간 판단은 DB 시각(SYSDATE) 기준 (FastAPI PC와 DB 서버의 시간이 다를 수 있음)
-SELECT_JOB = text("SELECT job_id, job_status, base_version, source_result, "
+SELECT_JOB = text("SELECT job_id, job_status, base_version, source_result, created_at, finished_at, "
                   "CASE WHEN finished_at < SYSDATE - :hours / 24 THEN 1 ELSE 0 END AS expired "
                   "FROM import_job WHERE job_id = :job_id")
 LATEST_JOB_ID = text("SELECT MAX(job_id) FROM import_job")    # 가장 최근 작업 (화면을 다시 열었을 때 이어서 보기)
@@ -95,6 +102,16 @@ SELECT_PRODUCTS = text(f"SELECT product_id, product_status, {', '.join(PRODUCT_C
 SELECT_PRODUCT_TAGS = text("SELECT pt.product_id, t.tag_type, t.tag_value "
                            "FROM product_tag pt JOIN tag t ON t.tag_id = pt.tag_id")
 SELECT_RATES = text("SELECT product_id, rate_kind, rate_key, rate_min, rate_max, rate_source FROM product_rate")
+
+# 최신 확인 (GET /imports/check): 출처별 적재 시각 = 그 출처를 포함한 마지막 DONE, PUBLISHED 작업의 finished_at (sources는 'KINFA', 'FSS', 'KINFA,FSS')
+LOADED_AT = text("SELECT MAX(finished_at) FROM import_job WHERE job_status IN ('DONE', 'PUBLISHED') "
+                 "AND INSTR(',' || sources || ',', ',' || :source || ',') > 0")
+INIT_AT = text("SELECT MAX(updated_at) FROM product_update_history WHERE action_type = 'INIT'")   # 갱신한 적 없으면 첫 적재 시각
+KINFA_CODES = text("SELECT source_code, product_status FROM loan_product WHERE source = 'KINFA'")
+DB_MONTH = text("SELECT MAX(dcls_month) FROM product_rate_month")
+PENDING_JOB = text("SELECT job_id, finished_at FROM import_job WHERE job_status = 'DONE' "
+                   "AND finished_at >= SYSDATE - :hours / 24 ORDER BY job_id DESC FETCH FIRST 1 ROWS ONLY")
+COUNT_ITEMS = text("SELECT COUNT(*) FROM import_item WHERE job_id = :job_id")
 
 
 # ---------- 값 비교 (DB 없이 쓰는 함수) ----------
@@ -378,4 +395,86 @@ def read_job(conn, job_id):
               "hidden_yn": row.hidden_yn}
              for row in conn.execute(SELECT_ITEMS, {"job_id": job_id})]
     return {"job_id": job.job_id, "job_status": status, "base_version": job.base_version,
+            "created_at": job.created_at, "finished_at": job.finished_at,
             "source_results": json.loads(job.source_result) if job.source_result else [], "items": items}
+
+
+# ---------- 최신 상품 확인 (GET /imports/check, ADMIN-04) ----------
+
+def kinfa_diff(seqs, kinfa_rows):
+    """
+        서민 최신 여부: 출처 첫 쪽 seq 목록 vs DB (source_code, product_status) → (DB 상품 수, 새로 온 수, 빠진 수)
+        판매 종료(CLOSED)는 이미 출처에서 빠진 상품이라 DB 쪽에서 뺌 (안 빼면 늘 '빠진 수'가 남아 최신이 될 수 없음)
+    """
+    source = set(seqs)
+    db_open = {code for code, status in kinfa_rows if status != "CLOSED"}
+    return len(db_open), len(source - db_open), len(db_open - source)
+
+
+def build_check(state, peeked, errors, checked_at):
+    """
+        최신 확인 응답 (DB 없이 쓰는 함수)
+        - state: read_check_state 결과 / peeked: {출처: 첫 쪽 값} / errors: {실패한 출처: 사유}
+        - 실패한 출처는 error만 채우고 is_latest None → needs_refresh는 성공한 출처만으로 판단
+    """
+    sources = []
+    for source in SOURCE_ORDER:
+        row = {"source": source, "loaded_at": state["loaded_at"].get(source), "is_latest": None, "db_mark": None,
+               "source_mark": None, "new_count": None, "missing_count": None, "error": errors.get(source)}
+        if source == "KINFA":
+            db_count, new_count, missing_count = kinfa_diff(peeked.get(source, []), state["kinfa_rows"])
+            row["db_mark"] = str(db_count)
+            if source in peeked:
+                row.update(source_mark=str(len(set(peeked[source]))), new_count=new_count, missing_count=missing_count,
+                           is_latest=new_count == 0 and missing_count == 0)
+        else:
+            row["db_mark"] = state["db_month"]
+            if source in peeked:
+                row["source_mark"] = peeked[source]
+                row["is_latest"] = peeked[source] is not None and peeked[source] == state["db_month"]
+        sources.append(row)
+    return {"checked_at": checked_at, "sources": sources,
+            "needs_refresh": any(row["is_latest"] is False for row in sources),
+            "pending_job": state["pending_job"]}
+
+
+def peek_sources(peekers):
+    """출처마다 첫 쪽만 받기. 한 출처가 실패해도 나머지는 계속 (B13) → ({출처: 받은 값}, {실패한 출처: 사유})"""
+    peeked, errors = {}, {}
+    with requests.Session() as session:
+        for source, peek in peekers.items():
+            try:
+                peeked[source] = peek(session)
+            except requests.RequestException as e:
+                errors[source] = type(e).__name__      # 예외 메시지에 키가 든 주소가 있어서 이름만
+            except (RuntimeError, ValueError, KeyError, ET.ParseError) as e:
+                errors[source] = str(e)
+            if source in errors:
+                logger.warning("%s 최신 확인 실패: %s", source, errors[source])
+    return peeked, errors
+
+
+def read_check_state(conn):
+    """최신 확인에 쓰는 DB 값: 출처별 적재 시각, 서민 source_code와 상태, 금감원 공시월 최댓값, 반영 전 작업"""
+    init_at = conn.execute(INIT_AT).scalar()
+    loaded_at = {source: conn.execute(LOADED_AT, {"source": source}).scalar() or init_at for source in SOURCE_ORDER}
+    kinfa_rows = [(row.source_code, row.product_status) for row in conn.execute(KINFA_CODES)]
+    db_month = conn.execute(DB_MONTH).scalar()
+
+    pending = conn.execute(PENDING_JOB, {"hours": KEEP_HOURS}).first()
+    pending_job = None
+    if pending is not None:
+        pending_job = {"job_id": pending.job_id, "finished_at": pending.finished_at,
+                       "item_count": conn.execute(COUNT_ITEMS, {"job_id": pending.job_id}).scalar()}
+    return {"loaded_at": loaded_at, "kinfa_rows": kinfa_rows, "db_month": db_month, "pending_job": pending_job}
+
+
+def check_latest(engine, peekers=PEEKERS):
+    """최신 상품 확인: 출처 첫 쪽 + DB 값 비교 (적재, 저장 안 함). 출처 모두 실패면 SourceUnavailable (503)"""
+    peeked, errors = peek_sources(peekers)
+    if not peeked:
+        raise SourceUnavailable("출처 모두 실패: " + ", ".join(f"{s} {e}" for s, e in errors.items()))
+
+    with engine.connect() as conn:
+        state = read_check_state(conn)
+    return build_check(state, peeked, errors, datetime.now())

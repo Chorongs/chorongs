@@ -4,6 +4,7 @@
     - 서민금융진흥원 대출상품한눈에 (XML)        → kinfa_loan_products.csv
     - 금융감독원 금융상품통합비교공시 대출 4종 (JSON) → finlife_{종류}_base.csv, finlife_{종류}_option.csv
     - 받은 값을 그대로 저장한다 (정제하지 않음)
+    - 최신 확인(peek_kinfa, peek_fss)은 출처마다 첫 쪽만 받아 돌려주고 저장하지 않는다 (ADMIN-04 최신 상품 확인)
 
     실행: ml 폴더에서  python -m app.collect
 """
@@ -43,6 +44,7 @@ FSS_SERVICES = {
 # 권역 코드: 은행, 여신전문, 저축은행, 보험, 금융투자 (신협 032000은 개인사업자대출 API에만 있음)
 FSS_GROUPS = ["020000", "030200", "030300", "050000", "060000"]
 FSS_BIZ_GROUPS = FSS_GROUPS + ["032000"]
+FSS_PEEK_GROUP = "020000"   # 최신 확인에 읽는 권역 (은행). 공시월은 권역마다 같아서 하나만 봄
 
 
 def _get(session, url, params):
@@ -141,6 +143,38 @@ def collect_fss(session):
         tables[f"finlife_{kind}_option"] = option_rows
 
     return tables
+
+
+# ---------- 최신 확인: 첫 쪽만 (ADMIN-04 최신 상품 확인, API-55) ----------
+
+def peek_kinfa(session):
+    """서민금융진흥원 첫 쪽(500건)의 seq 목록. 지금 318건이라 한 번에 다 옴 (저장 안 함)"""
+    resp = _get(session, KINFA_URL, {"serviceKey": KINFA_API_KEY, "pageNo": 1, "numOfRows": KINFA_PAGE_SIZE})
+    root = ET.fromstring(resp.content)
+
+    code = root.findtext("./header/resultCode")
+    if code != "00":
+        raise RuntimeError(f"서민금융진흥원 응답 코드 {code}")
+
+    return [item.findtext("seq") for item in root.findall("./body/items/item")]
+
+
+def peek_fss(session):
+    """금융감독원 4종의 권역 020000 첫 쪽에서 공시월(dcls_month) 최댓값 (저장 안 함). 상품이 없으면 None"""
+    months = []
+
+    for service in FSS_SERVICES.values():
+        resp = _get(session, FSS_URL.format(service=service),
+                    {"auth": FSS_API_KEY, "topFinGrpNo": FSS_PEEK_GROUP, "pageNo": 1})
+        result = resp.json()["result"]
+
+        if result["err_cd"] != "000":
+            raise RuntimeError(f"금융감독원 {service} 응답 코드 {result['err_cd']}")
+
+        months += [row["dcls_month"] for row in result.get("baseList") or [] if row.get("dcls_month")]
+        time.sleep(DELAY)
+
+    return max(months) if months else None
 
 
 def save_csv(rows, name):

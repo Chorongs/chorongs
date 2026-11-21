@@ -34,7 +34,7 @@ class FastApiClientTest {
 	}
 
 	@Test
-	void 진행_중_작업이_있으면_CONFLICT와_불러오는_중_문구() {
+	void 진행_중_작업이_있으면_CONFLICT와_갱신하는_중_문구() {
 		// Given
 		RestClientResponseException e = fastApiError(409, "{\"detail\":\"IMPORT_RUNNING\"}");
 		// When

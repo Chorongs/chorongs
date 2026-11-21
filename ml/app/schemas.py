@@ -1,4 +1,5 @@
 """요청/응답 스키마 (EXT-05, Spring common/dto의 FastApi*DTO와 칸 이름을 맞춤)"""
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -42,8 +43,38 @@ class ImportStatusResponse(BaseModel):
     job_id: int
     job_status: Literal["RUNNING", "DONE", "FAILED", "PUBLISHED", "EXPIRED"]
     base_version: int | None    # 비교할 때의 마지막 반영 이력 번호 (반영 요청에 그대로 보냄)
+    created_at: datetime | None = None      # 작업 시작 시각
+    finished_at: datetime | None = None     # DONE, FAILED가 된 시각 (DB 적재 시각, 화면 '마지막 갱신'. RUNNING이면 None)
     source_results: list[SourceResult]
     items: list[ImportItem]
+
+
+# ---------- 최신 상품 확인 (ADMIN-04, API-55, Spring FastApiImportCheckResponseDTO) ----------
+
+class SourceCheck(BaseModel):
+    """출처 1곳의 최신 여부. 실패한 출처는 error만 채우고 출처 기준 칸은 None"""
+    source: str
+    loaded_at: datetime | None      # DB 적재 시각: 그 출처를 포함한 마지막 DONE, PUBLISHED 작업의 finished_at (없으면 첫 적재 INIT 시각)
+    is_latest: bool | None          # 출처 첫 쪽 기준값이 DB와 같은지 (실패면 None)
+    db_mark: str | None             # DB 기준: 금감원 최신 공시월 / 서민 상품 수 (판매 종료 제외)
+    source_mark: str | None         # 출처 첫 쪽 기준: 금감원 공시월 / 서민 상품 수
+    new_count: int | None           # 서민만: 출처에 새로 온 seq 수
+    missing_count: int | None       # 서민만: DB에 있는데 출처에 없는 seq 수
+    error: str | None               # 실패 사유 (성공이면 None)
+
+
+class PendingJob(BaseModel):
+    """갱신이 끝나고 반영 전인 작업 (DONE, 24시간 안)"""
+    job_id: int
+    finished_at: datetime | None
+    item_count: int                 # 반영 대기 항목 수
+
+
+class ImportCheckResponse(BaseModel):
+    checked_at: datetime
+    sources: list[SourceCheck]
+    needs_refresh: bool             # 하나라도 is_latest False
+    pending_job: PendingJob | None
 
 
 # ---------- 반영, 되돌리기 (ADMIN-04, 05, Spring FastApiVersionResponseDTO) ----------

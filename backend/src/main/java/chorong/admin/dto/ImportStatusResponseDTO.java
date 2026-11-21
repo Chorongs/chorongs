@@ -1,6 +1,9 @@
 package chorong.admin.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 
 import chorong.common.dto.FastApiImportResponseDTO;
 import lombok.AllArgsConstructor;
@@ -8,7 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /*
- * 불러오기 시작 (작업 번호만), 진행, 비교 결과, 최근 작업 (ADMIN-04, API-32, 33)
+ * 갱신 시작 (작업 번호만), 진행, 비교 결과, 최근 작업 (ADMIN-04, API-32, 33)
  * FastAPI 응답(FastApiImportResponseDTO, JSON은 snake_case)을 화면용 camelCase로 옮김 / 목록은 복사해 담음
  */
 @Data
@@ -25,6 +28,10 @@ public class ImportStatusResponseDTO {
 	 * 여기 값 = 비교하려고 지금 상품을 읽은 시점의 버전 (import_job.base_version, FastAPI가 DONE 때 씀) → 반영 요청(PublishRequestDTO)에 그대로 보냄
 	 */
 	private Long baseVersion;
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm")
+	private LocalDateTime createdAt;				// 작업 시작 시각
+	@JsonFormat(pattern = "yyyy-MM-dd HH:mm")
+	private LocalDateTime finishedAt;				// DONE, FAILED가 된 시각 = DB 적재 시각 (화면 현황 '마지막 갱신', RUNNING이면 null)
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;						// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item, FastApiImportResponseDTO와 같음)
 
@@ -63,7 +70,7 @@ public class ImportStatusResponseDTO {
 						copyOrEmpty(i.getCheckReasons()), i.getHiddenYn()))
 				.toList();
 		return new ImportStatusResponseDTO(fast.getJobId(), fast.getJobStatus(), fast.getBaseVersion(),
-				sourceResults, items);
+				fast.getCreatedAt(), fast.getFinishedAt(), sourceResults, items);
 	}
 
 	// 받은 목록을 복사해 담음 (원본이 바뀌어도 그대로), 없으면 빈 목록

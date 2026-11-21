@@ -3,6 +3,7 @@
 
     - GET  /health                    : 인증 없음
     - POST /imports                   : 불러오기 시작 → 작업 번호 바로 응답, 수집·정제·비교는 응답 뒤 이어서 (ADMIN-04, EXT-01, 02)
+    - GET  /imports/check             : 최신 상품 확인. 출처마다 첫 쪽만 읽어 DB 적재 시각, 최신 여부 (적재 안 함. 출처 모두 실패면 503)
     - GET  /imports/latest            : 가장 최근 작업의 진행 상태 (화면을 다시 열었을 때 이어서 보기, 없으면 404)
     - GET  /imports/{job_id}          : 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록
     - POST /imports/{job_id}/publish  : 고른 항목 반영 → 새 버전 (ADMIN-04)
@@ -20,12 +21,12 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.credit import load_score_table, score_answers
-from app.imports import (JobConflict, NotFound, NotPublishable, SOURCE_ORDER, read_job, read_latest_job, run_import,
-                         start_job)
+from app.imports import (JobConflict, NotFound, NotPublishable, SOURCE_ORDER, SourceUnavailable, check_latest, read_job,
+                         read_latest_job, run_import, start_job)
 from app.load import make_engine
 from app.publish import publish, rollback
-from app.schemas import (ImportStartRequest, ImportStartResponse, ImportStatusResponse, ItemScore, PublishRequest,
-                         RollbackRequest, ScoreRequest, ScoreResponse, VersionResponse)
+from app.schemas import (ImportCheckResponse, ImportStartRequest, ImportStartResponse, ImportStatusResponse, ItemScore,
+                         PublishRequest, RollbackRequest, ScoreRequest, ScoreResponse, VersionResponse)
 from app.security import verify_token
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -54,6 +55,11 @@ def not_found(request: Request, exc: NotFound):
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
+@app.exception_handler(SourceUnavailable)
+def source_unavailable(request: Request, exc: SourceUnavailable):
+    return JSONResponse(status_code=503, content={"detail": "SOURCE_UNAVAILABLE"})
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -75,7 +81,16 @@ def start_import(body: ImportStartRequest, background_tasks: BackgroundTasks):
     return ImportStartResponse(job_id=job_id)
 
 
-# /imports/{job_id}보다 위에 둠 (아래에 두면 'latest'를 작업 번호로 읽어 422)
+# 고정 주소 2개(check, latest)는 /imports/{job_id}보다 위에 둠 (아래에 두면 글자를 작업 번호로 읽어 422)
+@app.get("/imports/check", response_model=ImportCheckResponse, dependencies=[Depends(verify_token)])
+def check_import():
+    """
+        최신 상품 확인 (ADMIN-04, API-55): 출처마다 첫 쪽만 읽어 DB 적재 시각과 최신 여부를 바로 돌려줌 (몇 초)
+        적재, 비교 저장은 하지 않음 (그건 POST /imports). 한 출처 실패는 그 출처 error만, 출처 모두 실패면 503
+    """
+    return check_latest(ENGINE)
+
+
 @app.get("/imports/latest", response_model=ImportStatusResponse, dependencies=[Depends(verify_token)])
 def get_latest_import():
     """가장 최근 작업의 진행 상태 (로그아웃, 새로 고침 뒤에도 진행 확인이나 반영을 이어서 함). 작업이 없으면 404"""
