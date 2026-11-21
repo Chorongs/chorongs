@@ -38,7 +38,7 @@ export async function postImport(sources) {
   return response.data.data
 }
 
-// API-33 불러오기 진행, 비교 결과 → ImportStatusResponseDTO (jobId, jobStatus, baseVersion, sourceResults, items)
+// API-33 갱신 진행, 비교 결과 → ImportStatusResponseDTO (jobId, jobStatus, baseVersion, createdAt, finishedAt, sourceResults, items)
 export async function getImport(jobId) {
   const response = await api.get(`/api/admin/imports/${jobId}`)
   return response.data.data

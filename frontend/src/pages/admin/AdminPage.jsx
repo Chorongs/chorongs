@@ -243,7 +243,7 @@ function AdminPage() {
   // 현황 (API-31): status loading / error / done. attempt가 바뀌면 다시 불러옴
   const [catalog, setCatalog] = useState({ status: 'loading', data: null })
   const [catalogAttempt, setCatalogAttempt] = useState(0)
-  // ① 불러오기가 끝난 작업 (API-33 결과, jobStatus DONE) → ②에 넘김. 항목을 옮기면 비워지고 다시 열 때 최근 작업(latest)으로 되살림
+  // ① [최신 상품 불러오기]로 DB에서 읽은 작업 (API-33 latest, jobStatus DONE) → ②에 넘김. 갱신을 시작하면 비움, 다시 열 때는 안내만 (목록은 버튼으로)
   const [importJob, setImportJob] = useState(null)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
