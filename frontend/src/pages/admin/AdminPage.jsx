@@ -55,7 +55,7 @@ const Head = styled.div`
   margin-bottom: 28px;
 `
 
-// 관리자 배지: 검은 바탕 작은 딱지 (시안 adm-badge)
+// 관리자 배지: 검은 바탕 작은 딱지
 const Badge = styled.span`
   display: inline-flex;
   align-items: center;
@@ -81,7 +81,7 @@ const Desc = styled.p`
   font-size: var(--fs-lg);
 `
 
-// 누가 로그인했는지 (시안 adm-who): 동그란 아바타 + 이름, 역할 딱지 + 이메일 · 끝나는 시각
+// 누가 로그인했는지: 동그란 아바타 + 이름, 역할 딱지 + 이메일 · 끝나는 시각
 const Who = styled.div`
   display: flex;
   align-items: center;
@@ -197,7 +197,7 @@ const MenuLink = styled(NavLink)`
   }
 `
 
-// 메뉴 옆 개수: 빨간 알약 (시안 adm-nav .cnt)
+// 메뉴 옆 개수: 빨간 알약
 const Count = styled.span`
   display: inline-grid;
   place-items: center;

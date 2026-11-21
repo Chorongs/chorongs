@@ -6,7 +6,7 @@ import { ADMIN_ROLE_LABEL, ADMIN_STATUS_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError, Tag } from '../../styles/common'
-import { formatDateTime } from '../../utils/format'
+import { approvedByText, formatDateTime } from '../../utils/format'
 import ChipGroup from '../ui/ChipGroup'
 import Modal from '../ui/Modal'
 import SelectField from '../ui/SelectField'
@@ -20,7 +20,7 @@ import SelectField from '../ui/SelectField'
 // AdminResponseDTO: adminId, adminName, adminEmail, adminRole, adminStatus, lockedUntil, approvedBy, approvedByName, requestedAt, approvedAt, lastLoginAt
 const ROLE_OPTIONS = Object.entries(ADMIN_ROLE_LABEL).map(([value, label]) => ({ value, label }))
 
-// 역할 설명 (시안)
+// 역할 설명
 const ROLE_DESC = {
   MANAGER: '상품 관리 (불러오기 · 반영 · 자동 내림 확인 · 되돌리기 · 신고 처리)',
   APPROVER: '상품 관리 + 가입 승인 · 역할 바꾸기 · 잠금 풀기 · 해제',
@@ -59,7 +59,7 @@ const SecHead = styled.div`
   }
 `
 
-// 줄 (시안 adm-row acct): 이름·이메일 | 딱지 | 보조 글 | 버튼
+// 줄: 이름·이메일 | 딱지 | 보조 글 | 버튼
 const List = styled.div`
   border-top: 2px solid var(--ink);
 `
@@ -177,12 +177,6 @@ const DialogActions = styled.div`
 `
 
 // 승인한 사람: 이름 / 승인한 번호는 있는데 이름이 없으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자
-function approvedByText(item) {
-  if (item.approvedByName) return item.approvedByName
-  if (item.approvedBy !== null && item.approvedBy !== undefined) return '탈퇴한 관리자'
-  return '첫 관리자 자동 승인'
-}
-
 function AdminAccounts({ onChanged }) {
   const me = useAdminStore((state) => state.admin)
   const showToast = useUiStore((state) => state.showToast)

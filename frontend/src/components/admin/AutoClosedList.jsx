@@ -41,7 +41,7 @@ const SecHead = styled.div`
   }
 `
 
-// 선택 바 (시안 ask-bar): 전체 선택 + n개 선택 + 버튼
+// 선택 바: 전체 선택 + n개 선택 + 버튼
 const Bar = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -85,7 +85,7 @@ const BarActions = styled.div`
   }
 `
 
-// 줄 (시안 adm-row ac): 체크 | 상품 | 종료일 | 내린 날 | 상태
+// 줄: 체크 | 상품 | 종료일 | 내린 날 | 상태
 const List = styled.div`
   border-top: 2px solid var(--ink);
 `

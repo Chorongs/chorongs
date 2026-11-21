@@ -206,6 +206,8 @@ export const IMPORT_SOURCE_OPTIONS = [
   { value: 'KINFA', label: '서민금융진흥원' },
   { value: 'FSS', label: '금융감독원' },
 ]
+// 출처 코드 → 이름 (관리자 바뀐 상품 표, 반영 이력)
+export const IMPORT_SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
 
 // 바뀐 상품 구분 (API-33 items[].diffType, FastAPI 값 그대로)
 export const IMPORT_CHANGE_TYPE_LABEL = {

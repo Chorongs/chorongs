@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  approvedByText,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -304,5 +305,34 @@ describe('formatDateTime', () => {
     const result = formatDateTime(value)
     // Then
     expect(result).toBe('2026.11.19')
+  })
+})
+
+describe('approvedByText', () => {
+  it('승인한 사람 이름이 있으면 그 이름', () => {
+    // Given
+    const admin = { approvedBy: 3, approvedByName: '김승인' }
+    // When
+    const text = approvedByText(admin)
+    // Then
+    expect(text).toBe('김승인')
+  })
+
+  it('번호만 남고 이름이 없으면 탈퇴한 관리자', () => {
+    // Given
+    const admin = { approvedBy: 3, approvedByName: null }
+    // When
+    const text = approvedByText(admin)
+    // Then
+    expect(text).toBe('탈퇴한 관리자')
+  })
+
+  it('승인한 사람이 없으면 첫 관리자 자동 승인', () => {
+    // Given
+    const admin = { approvedBy: null, approvedByName: null }
+    // When
+    const text = approvedByText(admin)
+    // Then
+    expect(text).toBe('첫 관리자 자동 승인')
   })
 })

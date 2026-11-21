@@ -6,7 +6,7 @@ import { ADMIN_ROLE_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
-import { formatDateTime, formatTime } from '../../utils/format'
+import { approvedByText, formatDateTime, formatTime } from '../../utils/format'
 import Modal from '../ui/Modal'
 
 // AD-10 내 계정: 이름, 이메일, 역할, 로그인 끝나는 시각, 승인 일시 · 승인한 사람, 마지막 로그인 (API-47 GET) / [관리자 탈퇴]
@@ -31,7 +31,7 @@ const SecHead = styled.div`
   }
 `
 
-// 내 정보 (시안 adm-me): 연한 바탕 안 이름-값 두 칸
+// 내 정보: 연한 바탕 안 이름-값 두 칸
 const Info = styled.dl`
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -55,7 +55,7 @@ const Info = styled.dl`
   }
 `
 
-// 탈퇴 구역 (시안 adm-out): 위 구분선, 설명 왼쪽 + 버튼 오른쪽
+// 탈퇴 구역: 위 구분선, 설명 왼쪽 + 버튼 오른쪽
 const Out = styled.div`
   display: flex;
   align-items: flex-start;
@@ -147,12 +147,6 @@ const DialogActions = styled.div`
 `
 
 // 승인한 사람: 이름 / 번호만 있으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자
-function approvedByText(me) {
-  if (me.approvedByName) return me.approvedByName
-  if (me.approvedBy !== null && me.approvedBy !== undefined) return '탈퇴한 관리자'
-  return '첫 관리자 자동 승인'
-}
-
 function AdminMyAccount() {
   const navigate = useNavigate()
   const expiresAt = useAdminStore((state) => state.expiresAt)

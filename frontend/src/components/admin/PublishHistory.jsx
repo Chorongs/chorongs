@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
-import { HISTORY_ACTION_TYPE_LABEL, IMPORT_SOURCE_OPTIONS } from '../../constants/options'
+import { HISTORY_ACTION_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError, Tag } from '../../styles/common'
 import { formatDateTime } from '../../utils/format'
@@ -15,8 +15,6 @@ import Modal from '../ui/Modal'
 // 미리보기, 되돌리기 409 CONFLICT → 서버 문구 ('되돌릴 변경이 없어요', 지금 마지막 이력) / 409 VERSION_CONFLICT → '다른 작업이 먼저 됨' + 다시 불러오기 / 404 → 다시 불러오기
 // HistoryResponseDTO: historyId (= 버전), adminId (null 자동), adminName (null 탈퇴한 관리자), actionType, targetHistoryId, source, addedCount, changedCount, removedCount, memo, updatedAt, canRollback
 const ACTION_VARIANT = { INIT: 'default', PUBLISH: 'acc', AUTO_CLOSE: 'warn', HIDE: 'bad', SHOW: 'good', ROLLBACK: 'default' }
-
-const SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
 
 const CHIP_OPTIONS = [{ value: 'ALL', label: '전체' }, ...Object.entries(HISTORY_ACTION_TYPE_LABEL).map(([value, label]) => ({ value, label }))]
 
@@ -39,7 +37,7 @@ const SecHead = styled.div`
   }
 `
 
-// 이력 줄 (시안 adm-hist): v번호 | 시각 | 종류 + 무엇 + 메모 | 누가 | 이 시점으로
+// 이력 줄: v번호 | 시각 | 종류 + 무엇 + 메모 | 누가 | 이 시점으로
 const List = styled.ol`
   border-top: 2px solid var(--ink);
 `
@@ -193,7 +191,7 @@ function whatText(item) {
     case 'INIT':
       return `상품 ${added}개`
     case 'PUBLISH':
-      return `신규 ${added} · 변경 ${changed} · 판매 중단 ${removed}${item.source ? ` · ${SOURCE_LABEL[item.source] ?? item.source}` : ''}`
+      return `신규 ${added} · 변경 ${changed} · 판매 중단 ${removed}${item.source ? ` · ${IMPORT_SOURCE_LABEL[item.source] ?? item.source}` : ''}`
     case 'AUTO_CLOSE':
       return `상품 ${removed}개 판매 종료 (공시 종료일 지남)`
     case 'HIDE':

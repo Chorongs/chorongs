@@ -31,7 +31,7 @@ function pendingText(job) {
   return `갱신이 끝났어요. 바뀐 상품 ${formatNumber(job.items?.length ?? 0)}건이 반영을 기다려요 (${formatDateTime(job.finishedAt)} 갱신). [최신 상품 불러오기]를 눌러 확인한 뒤 반영해 주세요`
 }
 
-// 출처 카드 설명 (시안)
+// 출처 카드 설명
 const SOURCE_DESC = {
   KINFA: { desc: '대출상품한눈에 · 공공데이터포털', kind: '정책·서민금융' },
   FSS: { desc: '금융상품통합비교공시 오픈 API', kind: '은행·인터넷은행·2금융권' },
@@ -43,7 +43,7 @@ const Wrap = styled.div`
   gap: 40px;
 `
 
-// 현황 4칸 (시안 adm-stats): 테두리 상자, 작은 이름 + 큰 숫자 + 보조 글
+// 현황 4칸: 테두리 상자, 작은 이름 + 큰 숫자 + 보조 글
 const Tiles = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -93,7 +93,7 @@ const Section = styled.section`
   gap: 20px;
 `
 
-// 구역 제목줄 (시안 adm-sec-h): 번호 동그라미 + 제목(fs-h4) + 설명
+// 구역 제목줄: 번호 동그라미 + 제목(fs-h4) + 설명
 const SecHead = styled.div`
   display: flex;
   align-items: flex-start;
@@ -157,7 +157,7 @@ const Sources = styled.div`
   }
 `
 
-// 출처 카드 (시안 adm-src): 체크 + 이름 + 설명 + 작은 글. 고르면 테두리 진하게
+// 출처 카드: 체크 + 이름 + 설명 + 작은 글. 고르면 테두리 진하게
 const SourceCard = styled.label`
   display: flex;
   align-items: flex-start;

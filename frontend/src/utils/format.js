@@ -100,3 +100,10 @@ export function formatDateTime(value) {
   if (date === EMPTY) return EMPTY
   return time === EMPTY ? date : `${date} ${time}`
 }
+
+// 관리자를 승인한 사람 글 (AdminResponseDTO approvedBy, approvedByName): 이름 / 번호만 남았으면 '탈퇴한 관리자' / 둘 다 없으면 첫 관리자
+export function approvedByText(admin) {
+  if (admin.approvedByName) return admin.approvedByName
+  if (admin.approvedBy !== null && admin.approvedBy !== undefined) return '탈퇴한 관리자'
+  return '첫 관리자 자동 승인'
+}

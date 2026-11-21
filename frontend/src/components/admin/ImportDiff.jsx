@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
-import { CHECK_REASON_LABEL, IMPORT_CHANGE_TYPE_LABEL, IMPORT_SOURCE_OPTIONS } from '../../constants/options'
+import { CHECK_REASON_LABEL, IMPORT_CHANGE_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError, Tag } from '../../styles/common'
 import ChipGroup from '../ui/ChipGroup'
@@ -25,8 +25,6 @@ const CHANGE_TYPE_VARIANT = { NEW: 'good', CHANGE: 'acc', REMOVE: 'default', REO
 
 // 반영 바, 확인 창의 구분별 수 순서
 const COUNT_TYPES = ['NEW', 'CHANGE', 'REOPEN', 'REMOVE']
-
-const SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
 
 const Wrap = styled.section`
   display: flex;
@@ -80,7 +78,7 @@ const SourceFail = styled.p`
   font-weight: 600;
 `
 
-// 표 (시안 adm-list, adm-row): 위 2px 검은 선, 줄마다 1px 구분선. 900px 미만은 체크 | 상품 | 구분 → 아래로 바뀐 내용, 출처
+// 표: 위 2px 검은 선, 줄마다 1px 구분선. 900px 미만은 체크 | 상품 | 구분 → 아래로 바뀐 내용, 출처
 const List = styled.div`
   border-top: 2px solid var(--ink);
 `
@@ -222,7 +220,7 @@ const Source = styled.span`
   }
 `
 
-// 반영 바 (시안 adm-bar): 아래에 붙는 검은 바 + 주 버튼
+// 반영 바: 아래에 붙는 검은 바 + 주 버튼
 const Bar = styled.div`
   position: sticky;
   bottom: 16px;
@@ -256,7 +254,7 @@ const Bar = styled.div`
   }
 `
 
-// 완료 상자 (시안 adm-done)
+// 완료 상자
 const Done = styled.div`
   display: flex;
   align-items: flex-start;
@@ -286,7 +284,7 @@ const DoneLinks = styled.div`
   margin-top: 12px;
 `
 
-// 빈 상태 (시안 empty): 점선 상자 + 아이콘
+// 빈 상태: 점선 상자 + 아이콘
 const Empty = styled.div`
   display: flex;
   flex-direction: column;
@@ -306,7 +304,7 @@ const DialogTitle = styled.h2`
   font-weight: 800;
 `
 
-// 확인 창 숫자 4칸 (시안 sheet-nums n4)
+// 확인 창 숫자 4칸
 const Nums = styled.div`
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -503,7 +501,7 @@ function ImportDiff({ job, onPublished }) {
     body = (
       <>
         <Meta>
-          {okResults.map((result) => `${SOURCE_LABEL[result.source] ?? result.source} ${result.count ?? 0}개`).join(' · ')}를 비교했어요
+          {okResults.map((result) => `${IMPORT_SOURCE_LABEL[result.source] ?? result.source} ${result.count ?? 0}개`).join(' · ')}를 비교했어요
         </Meta>
         <Empty>
           <Icon name="check" size={24} />
@@ -515,12 +513,12 @@ function ImportDiff({ job, onPublished }) {
     body = (
       <>
         <Meta>
-          {okResults.map((result) => `${SOURCE_LABEL[result.source] ?? result.source} ${result.count ?? 0}개`).join(' · ')}를 비교했어요. 바뀐 상품{' '}
+          {okResults.map((result) => `${IMPORT_SOURCE_LABEL[result.source] ?? result.source} ${result.count ?? 0}개`).join(' · ')}를 비교했어요. 바뀐 상품{' '}
           <b>{items.length}개</b>
         </Meta>
         {failResults.map((result) => (
           <SourceFail key={result.source}>
-            {SOURCE_LABEL[result.source] ?? result.source}: 불러오지 못했어요{result.error ? ` (${result.error})` : ''}
+            {IMPORT_SOURCE_LABEL[result.source] ?? result.source}: 불러오지 못했어요{result.error ? ` (${result.error})` : ''}
           </SourceFail>
         ))}
         <ChipGroup options={chipOptions} value={filter} onChange={setFilter} size="sm" label="구분별로 보기" />
@@ -563,7 +561,7 @@ function ImportDiff({ job, onPublished }) {
                   <small>{item.companyName || '(기관 없음)'}</small>
                 </Name>
                 <ChangeLines item={item} />
-                <Source role="cell">{SOURCE_LABEL[item.source] ?? item.source}</Source>
+                <Source role="cell">{IMPORT_SOURCE_LABEL[item.source] ?? item.source}</Source>
               </Row>
             )
           })}

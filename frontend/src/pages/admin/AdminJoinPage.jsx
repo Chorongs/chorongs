@@ -8,7 +8,7 @@ import { Button, InlineError } from '../../styles/common'
 import { isBlank, isValidAdminName } from '../../utils/validate'
 
 // AD-12 관리자 가입 (/admin/join, SCR-24): 이메일, 이름 (2~20자) → [인증 토큰 받기] (API-45 ①) → 인증 토큰 6자리 → [가입 신청] (API-45 ②)
-// 토큰 칸은 204일 때만 열림, 그때 이메일·이름 칸은 잠기고 버튼 하나가 [가입 신청]으로 바뀜 (시안) / '이메일 · 이름 고치기' → 처음 단계로
+// 토큰 칸은 204일 때만 열림, 그때 이메일·이름 칸은 잠기고 버튼 하나가 [가입 신청]으로 바뀜 / '이메일 · 이름 고치기' → 처음 단계로
 // 60초 잠금은 204, 429 응답 뒤에만 (409, 400 등 메일을 안 보낸 응답은 잠그지 않음)
 // 가입 신청 결과 adminStatus: ACTIVE (관리자 0명, 첫 관리자가 승인권자로 바로 로그인됨) → 세션 다시 읽고 /admin / PENDING → 완료 안내
 // 409 → 서버 문구 ('이미 등록된 메일이에요. 로그인해 주세요' / '이미 신청한 메일이에요. 승인되면 메일로 알려 드려요'), 토큰 칸 안 열림
@@ -139,7 +139,7 @@ const LinkButton = styled.button`
   }
 `
 
-// 신청 완료 상자 (시안 adm-done): 초록 바탕 + 체크 + 다음 할 일 버튼
+// 신청 완료 상자: 초록 바탕 + 체크 + 다음 할 일 버튼
 const Done = styled.div`
   display: flex;
   align-items: flex-start;
