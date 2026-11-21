@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import chorong.admin.dto.ImportCheckResponseDTO;
 import chorong.admin.dto.ImportRequestDTO;
 import chorong.admin.dto.ImportStatusResponseDTO;
 import chorong.admin.dto.PublishRequestDTO;
@@ -21,7 +20,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /*
- * /api/admin/imports/** : 최신 확인, 갱신 시작, 최근 작업, 진행, 비교 결과, 반영 (ADMIN-04)
+ * /api/admin/imports/** : 갱신 시작, 최근 작업 ([최신 상품 불러오기]), 진행, 비교 결과, 반영 (ADMIN-04)
  */
 @RestController
 @RequestMapping("/api/admin/imports")
@@ -29,12 +28,6 @@ import lombok.RequiredArgsConstructor;
 public class AdminImportController {
 
 	private final AdminImportService adminImportService;
-
-	/** 최신 상품 확인: 출처 첫 쪽만 읽어 DB 적재 시각, 최신 여부 (적재 안 함) / '{id}'보다 먼저 맞춰지는 고정 주소 */
-	@GetMapping("/check")
-	public ResponseEntity<ApiResponse<ImportCheckResponseDTO>> checkImport() {
-		return ResponseEntity.ok(ApiResponse.success(adminImportService.checkImport()));
-	}
 
 	/** 갱신 시작 → 작업 번호 (jobId만 채움) */
 	@PostMapping

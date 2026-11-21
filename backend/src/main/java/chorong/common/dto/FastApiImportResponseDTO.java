@@ -29,7 +29,7 @@ public class FastApiImportResponseDTO {
 	@JsonProperty("created_at")
 	private LocalDateTime createdAt;			// 작업 시작 시각
 	@JsonProperty("finished_at")
-	private LocalDateTime finishedAt;			// DONE, FAILED가 된 시각 = DB 적재 시각 (RUNNING이면 null)
+	private LocalDateTime finishedAt;			// DONE, FAILED가 된 시각 = 반영 대기 테이블 적재 시각 (RUNNING이면 null)
 	@JsonProperty("source_results")
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;					// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item으로 함)

@@ -15,12 +15,10 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import chorong.admin.dto.ImportCheckResponseDTO;
 import chorong.admin.dto.ImportRequestDTO;
 import chorong.admin.dto.ImportStatusResponseDTO;
 import chorong.admin.dto.PublishRequestDTO;
 import chorong.common.client.FastApiClient;
-import chorong.common.dto.FastApiImportCheckResponseDTO;
 import chorong.common.dto.FastApiImportResponseDTO;
 import chorong.common.dto.FastApiVersionResponseDTO;
 import chorong.common.exception.BusinessException;
@@ -29,7 +27,7 @@ import chorong.common.util.MemoryCache;
 import chorong.product.entity.Source;
 
 /*
- * 최신 확인, 갱신 시작, 최근 작업, 반영 (ADMIN-04) / FastAPI 대신 가짜 FastApiClient
+ * 불러오기 시작, 최근 작업, 반영 (ADMIN-04) / FastAPI 대신 가짜 FastApiClient
  */
 class AdminImportServiceImplTest {
 
@@ -58,24 +56,6 @@ class AdminImportServiceImplTest {
 
 		// Then
 		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
-	}
-
-	@Test
-	void 최신_확인은_FastAPI가_준_최신_여부와_출처_결과_그대로() {
-		// Given: 서민은 최신, 금감원은 새 공시월
-		FastApiImportCheckResponseDTO.SourceCheck kinfa = new FastApiImportCheckResponseDTO.SourceCheck(
-				"KINFA", null, true, "318", "318", 0, 0, null);
-		FastApiImportCheckResponseDTO.SourceCheck fss = new FastApiImportCheckResponseDTO.SourceCheck(
-				"FSS", null, false, "202611", "202612", null, null, null);
-		when(fastApiClient.checkImport())
-				.thenReturn(new FastApiImportCheckResponseDTO(null, List.of(kinfa, fss), true, null));
-
-		// When
-		ImportCheckResponseDTO response = service.checkImport();
-
-		// Then
-		assertEquals(List.of(true, 2, false),
-				List.of(response.getNeedsRefresh(), response.getSources().size(), response.getSources().get(1).getIsLatest()));
 	}
 
 	@Test

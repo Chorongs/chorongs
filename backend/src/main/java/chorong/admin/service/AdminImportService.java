@@ -1,20 +1,16 @@
 package chorong.admin.service;
 
-import chorong.admin.dto.ImportCheckResponseDTO;
 import chorong.admin.dto.ImportRequestDTO;
 import chorong.admin.dto.ImportStatusResponseDTO;
 import chorong.admin.dto.PublishRequestDTO;
 import chorong.admin.dto.PublishResponseDTO;
 
 /*
- * FastAPI에 최신 확인, 갱신 시작, 진행 확인, 최근 작업, 반영 요청 (ADMIN-04) / 비교, 반영은 FastAPI (EXT-01, 02, 05)
+ * FastAPI에 갱신 시작, 진행 확인, 최근 작업, 반영 요청 (ADMIN-04) / 비교, 반영은 FastAPI (EXT-01, 02, 05)
  */
 public interface AdminImportService {
 
-	/** 최신 상품 확인: 출처 첫 쪽만 읽어 DB 적재 시각, 최신 여부 (적재 안 함). 출처 모두 실패, FastAPI 꺼짐은 503 */
-	ImportCheckResponseDTO checkImport();
-
-	/** 갱신 시작: 작업 번호만 바로 받음, 진행 중 작업이 있으면 409 */
+	/** 갱신 시작 ([최신 상품 갱신하기], 외부 API 수집은 이때만): 작업 번호만 바로 받음, 진행 중 작업이 있으면 409 */
 	ImportStatusResponseDTO startImport(Long adminId, ImportRequestDTO request);
 
 	/** 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록 */

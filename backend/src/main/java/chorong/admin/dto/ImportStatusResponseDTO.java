@@ -31,7 +31,7 @@ public class ImportStatusResponseDTO {
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm")
 	private LocalDateTime createdAt;				// 작업 시작 시각
 	@JsonFormat(pattern = "yyyy-MM-dd HH:mm")
-	private LocalDateTime finishedAt;				// DONE, FAILED가 된 시각 = DB 적재 시각 (화면 현황 '마지막 갱신', RUNNING이면 null)
+	private LocalDateTime finishedAt;				// DONE, FAILED가 된 시각 = 반영 대기 테이블 적재 시각 (화면 '마지막 갱신', RUNNING이면 null)
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;						// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item, FastApiImportResponseDTO와 같음)
 
