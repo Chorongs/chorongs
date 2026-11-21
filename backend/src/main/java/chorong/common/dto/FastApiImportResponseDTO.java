@@ -10,7 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /*
- * FastAPI 불러오기 응답 (EXT-05, ADMIN-04)
+ * FastAPI 갱신 작업 응답 (EXT-05, ADMIN-04)
  * POST /imports 응답은 jobId만 채워짐 / GET /imports/{job_id} 응답은 전부 채워짐
  * FastAPI JSON은 snake_case라 칸마다 @JsonProperty로 맞춤
  * 반영할 상품 값(after_data)은 FastAPI DB(import_item)에만 있고 Spring은 받지 않음

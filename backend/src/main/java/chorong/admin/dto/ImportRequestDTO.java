@@ -10,7 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /*
- * 최신 상품 불러오기 시작 (ADMIN-04, API-32)
+ * 최신 상품 갱신 시작 (ADMIN-04, API-32)
  * 모르는 출처는 본문 형식 오류로 400, 같은 출처 두 번은 서비스에서 400
  */
 @Data

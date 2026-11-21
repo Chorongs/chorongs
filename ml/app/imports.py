@@ -1,5 +1,5 @@
 """
-    상품 불러오기 작업 (ADMIN-04, EXT-01·02의 6번 비교 저장, EXT-05)
+    상품 갱신 작업 ([최신 상품 갱신하기], ADMIN-04, EXT-01·02의 6번 비교 저장, EXT-05)
 
     - 시작 (main.py POST /imports): import_job 1행 (RUNNING) → 작업 번호 바로 응답
       base_version(기준 버전)은 시작 때 일단 넣고, 비교하려고 지금 상품을 읽는 시점의 마지막 이력 번호로 DONE 때 다시 씀 (ADMIN-04 '비교할 때의')
@@ -341,22 +341,22 @@ def run_import(engine, job_id, sources):
             done = conn.execute(FINISH_JOB, {"job_id": job_id, "status": "DONE", "source_result": to_json(results),
                                              "error": None})
             if done.rowcount == 0:      # 30분 넘어 FAILED로 바뀐 뒤 늦게 끝난 작업 → 결과 버림
-                logger.warning("불러오기 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
+                logger.warning("갱신 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
                 return
             conn.execute(SET_BASE_VERSION, {"job_id": job_id, "base_version": base_version})
             conn.execute(DELETE_OLD_ITEMS, {"job_id": job_id})
             if items:
                 conn.execute(INSERT_ITEM, [item_row(job_id, item) for item in items])
-        logger.info("불러오기 작업 %d 끝: 정제 %d개, 바뀐 상품 %d개", job_id, len(products), len(items))
-    except Exception as e:     # 어떤 오류든 작업을 FAILED로 남겨야 다음 불러오기가 막히지 않음
-        logger.exception("불러오기 작업 %d 실패", job_id)
+        logger.info("갱신 작업 %d 끝: 정제 %d개, 바뀐 상품 %d개", job_id, len(products), len(items))
+    except Exception as e:     # 어떤 오류든 작업을 FAILED로 남겨야 다음 갱신이 막히지 않음
+        logger.exception("갱신 작업 %d 실패", job_id)
         try:
             with engine.begin() as conn:
                 conn.execute(FINISH_JOB, {"job_id": job_id, "status": "FAILED",
                                           "source_result": to_json(results) if results else None,
                                           "error": f"{type(e).__name__}: {e}"[:500]})
-        except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 불러오기가 FAILED로 바꿈)
-            logger.exception("불러오기 작업 %d FAILED 기록 실패", job_id)
+        except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 갱신이 FAILED로 바꿈)
+            logger.exception("갱신 작업 %d FAILED 기록 실패", job_id)
 
 
 def read_latest_job(conn):

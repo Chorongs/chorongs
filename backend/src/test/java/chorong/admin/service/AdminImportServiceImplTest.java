@@ -27,7 +27,7 @@ import chorong.common.util.MemoryCache;
 import chorong.product.entity.Source;
 
 /*
- * 불러오기 시작, 최근 작업, 반영 (ADMIN-04) / FastAPI 대신 가짜 FastApiClient
+ * 갱신 시작, 최근 작업, 반영 (ADMIN-04) / FastAPI 대신 가짜 FastApiClient
  */
 class AdminImportServiceImplTest {
 

@@ -7,12 +7,12 @@ from pydantic import BaseModel, Field
 Source = Literal["KINFA", "FSS"]     # Literal: 정해진 값만 허용 (다른 값이면 422)
 
 
-# ---------- 상품 불러오기 (ADMIN-04, Spring FastApiImportResponseDTO) ----------
+# ---------- 상품 갱신 (ADMIN-04, Spring FastApiImportResponseDTO) ----------
 
 class ImportStartRequest(BaseModel):
     sources: list[Source] = Field(..., min_length=1, max_length=2,
                                   description="불러올 출처 (KINFA 서민금융진흥원, FSS 금융감독원)")
-    admin_id: int = Field(..., ge=1, description="불러오기를 누른 관리자 번호")
+    admin_id: int = Field(..., ge=1, description="갱신을 누른 관리자 번호")
 
 
 class ImportStartResponse(BaseModel):

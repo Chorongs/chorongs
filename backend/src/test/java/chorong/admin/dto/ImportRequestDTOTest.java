@@ -11,7 +11,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 
 /*
- * 최신 상품 불러오기 (ADMIN-04) 입력 검사 (B2): 허용할 형식만 정의
+ * 최신 상품 갱신 (ADMIN-04) 입력 검사 (B2): 허용할 형식만 정의
  */
 class ImportRequestDTOTest {
 
