@@ -20,7 +20,7 @@ import { formatTime } from '../../utils/format'
 // 로그아웃 → API-30 DELETE → /admin/login / 끝나는 시각이 되면 바로 guest로 → RequireAdmin이 /admin/login (서버 401 기다리지 않음)
 // 관리자 계정 메뉴는 승인권자에게만 보임 (화면 숨김용, 권한 확인은 서버)
 // 메뉴 옆 개수는 현황(API-31 CatalogResponseDTO): autoClosedUncheckedCount, reportedProductCount, pendingAdminCount (관리자는 null → 안 보임)
-// 신고 상품 관리(AD-07, CHORONG-36 ReportedList)와 질문 남기기 관리(AD-08, 2차)는 그 작업이 올라오면 'reported', 'questions' 항목에 연결
+// TODO(AD-07, CHORONG-52 Tong B / AD-08 2차, CHORONG-55 Tong B): 신고 상품 관리(ReportedList)와 질문 남기기 관리가 올라오면 'reported', 'questions' 항목에 연결. 그 전에는 '아직 준비 중인 메뉴예요'
 const MENU_GROUPS = [
   {
     title: '상품 데이터',

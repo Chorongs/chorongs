@@ -190,7 +190,7 @@ export const PRIORITY_OPTIONS = [
 ]
 export const PRIORITY_MAX = 3
 
-// 관리자 화면 글자표 (CHORONG-55, AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
+// 관리자 화면 글자표 (AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
 export const ADMIN_ROLE_LABEL = {
   APPROVER: '승인권자',
   MANAGER: '관리자',

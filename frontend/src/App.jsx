@@ -20,7 +20,7 @@ import AdminPage from './pages/admin/AdminPage'
 //   /ranking RankingPage(CHORONG-60), /calc, /calc/* CalculatorPage(CHORONG-49, 56),
 //   /diagnosis/habit DiagnosisPage(CHORONG-59), /help/* HelpPage(CHORONG-63),
 //   (/login, /oauth/callback, /my, /my/:section 은 CHORONG-43에서 연결함)
-// 관리자 (CHORONG-55): /admin/login, /admin/join은 그대로, /admin, /admin/:section은 RequireAdmin으로 감싸 AdminPage에 연결 (화면 숨김용, 권한 확인은 서버)
+// 관리자: /admin/login, /admin/join은 그대로, /admin, /admin/:section은 RequireAdmin으로 감싸 AdminPage에 연결 (화면 숨김용, 권한 확인은 서버)
 function App() {
   return (
     <Routes>
@@ -32,7 +32,7 @@ function App() {
         <Route path="/diagnosis" element={<DiagnosisPage />}>
           <Route index element={<Navigate to="/diagnosis/credit" replace />} />
           <Route path="credit" element={<CreditCheck />} />
-          {/* TODO(CHORONG-59): habit 하위 Route는 소비 습관 분석 화면이 올라온 뒤 추가한다. */}
+          {/* TODO(LY-01, CHORONG-59 조빌립): habit 하위 Route는 소비 습관 분석 화면이 올라온 뒤 추가한다. */}
         </Route>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />

@@ -1,7 +1,7 @@
 import api from './axiosInstance'
 
 // 관리자 API (API-29~36, 45~48, 54). 본문 { success, data }의 data만 꺼내 돌려준다. 204는 본문 없음
-// API-39, 49 (신고 상품)는 CHORONG-36에서, API-41 (질문 남기기 관리, AD-08)은 그 작업에서 추가한다
+// TODO(API-39, 49, CHORONG-52 Tong B / API-41 AD-08 2차, CHORONG-55 Tong B): 신고 상품 관리, 질문 남기기 관리 API 함수는 그 작업에서 여기에 추가한다
 // 목록 응답은 PageInfo { list, total, page, size } (page는 1부터, 더 보기 = page * size < total)
 
 // API-29 ① 관리자 토큰 요청 (204, 토큰 메일 발송)
