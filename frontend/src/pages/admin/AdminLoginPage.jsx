@@ -190,6 +190,27 @@ function AdminLoginPage() {
 
   if (status === 'authed') return <Navigate to="/admin" replace />
 
+  const head = (
+    <Head>
+      <Mark aria-hidden="true">
+        <Icon name="shield" size={30} />
+      </Mark>
+      <Tagline>캐링 관리자</Tagline>
+      <Title>관리자 로그인</Title>
+      <Guide>승인받은 관리자 이메일로 받은 토큰으로 로그인하세요.</Guide>
+    </Head>
+  )
+
+  // 세션 확인이 끝나기 전에는 입력 칸을 그리지 않음: 이미 관리자면 위 Navigate로 바로 가야 해서, 폼이 보였다 사라지는 깜빡임을 막음
+  if (status === 'checking') {
+    return (
+      <Wrap>
+        {head}
+        <Notice>확인하는 중이에요</Notice>
+      </Wrap>
+    )
+  }
+
   const isTokenSent = status === 'tokenSent'
 
   const handleRequestToken = async () => {
@@ -258,14 +279,7 @@ function AdminLoginPage() {
 
   return (
     <Wrap>
-      <Head>
-        <Mark aria-hidden="true">
-          <Icon name="shield" size={30} />
-        </Mark>
-        <Tagline>캐링 관리자</Tagline>
-        <Title>관리자 로그인</Title>
-        <Guide>승인받은 관리자 이메일로 받은 토큰으로 로그인하세요.</Guide>
-      </Head>
+      {head}
       <Notice>{notice}</Notice>
       <Form onSubmit={handleSubmit} noValidate>
         <Field>
