@@ -4,6 +4,7 @@ import { FEATURE_LABEL } from '../../constants/options'
 import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { CompareButton, Tag } from '../../styles/common'
+import Highlight from '../ui/Highlight'
 import Icon from '../ui/Icon'
 import LikeButton from './LikeButton'
 import LimitText from './LimitText'
@@ -19,7 +20,7 @@ import RateText from './RateText'
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
 //   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
 //   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
-// TODO(CHORONG-64 조빌립, 상품 찾기 간편 검색): 시안은 태그 자리에 'N/M 일치' 글 + 초록 충족 태그(체크 아이콘)를 보여 줌. 이 줄에 hits 같은 props로 추가 (상세 검색은 그대로)
+// 상품 찾기 props (선택, CHORONG-64): keyword → 금융사, 상품명에서 검색어 강조 (Highlight, E1) / hits (충족한 키워드 이유 문구 목록), total (고른 키워드 수) → 간편 검색 줄: 태그 맨 앞에 'N/M 일치' 글 + 이유마다 초록 충족 태그 (체크 아이콘). 상세 검색, 맞춤 추천은 안 넘겨서 그대로
 // TODO(CM-04, CHORONG-68 조빌립): 줄 전체가 role="button"인데 안에 하트, [+ 비교] 버튼이 또 있어 화면 낭독기에서 버튼 안의 버튼으로 읽힘 (카드도 같음). 줄 전체 클릭은 상품명 버튼 하나로 두고 줄 클릭은 마우스용으로만 두는 방식 검토
 // 랭킹(RK-02, CHORONG-60)은 순위 숫자 칸, 1~3위 메달 카드, '최저 금리' 이름표가 달라 이 줄을 쓰지 않고 components/ranking/RankingItem.jsx로 따로 만듦
 const Row = styled.article`
@@ -183,6 +184,15 @@ const Memo = styled.span`
   font-weight: 700;
 `
 
+// 간편 검색 'N/M 일치' 글 (시안 .hit)
+const Hit = styled.b`
+  align-self: center;
+  color: var(--good);
+  font-family: var(--f-num);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+`
+
 function RateCell({ product }) {
   const { rateMin, rateMax } = product
   if (rateMin == null && rateMax == null) return <Memo>금리는 기관 문의</Memo>
@@ -192,7 +202,7 @@ function RateCell({ product }) {
 // 중도상환수수료 없음, 정부/서민 지원은 주황 딱지로 눈에 띄게
 const ACCENT_FEATURES = ['NO_PREPAY_FEE', 'POLICY']
 
-function ProductRow({ product, from = null, rank = null, matchRate = null }) {
+function ProductRow({ product, from = null, rank = null, matchRate = null, keyword = '', hits = null, total = 0 }) {
   const openProduct = useUiStore((state) => state.openProduct)
   const { pathname } = useLocation()
   // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 자금 용도가 안 겹치면 '비교 불가'
@@ -204,6 +214,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
   const traySlot = hasCompare ? trayLabel : null
   const featureTags = (product.features ?? []).slice(0, 2)
   const sector = (product.tags ?? []).find((tag) => tag.tagType === 'SECTOR')?.tagValue
+  const hasHits = Array.isArray(hits) && hits.length > 0
 
   const handleOpen = () => openProduct(product.productId, from)
 
@@ -231,12 +242,27 @@ function ProductRow({ product, from = null, rank = null, matchRate = null }) {
       <Info>
         <Org>
           {rank != null && <RankNo>{rank}위</RankNo>}
-          {product.companyName}
+          <Highlight text={product.companyName} keyword={keyword} />
           {traySlot && <CompareBadge>비교 {traySlot}에 담음</CompareBadge>}
         </Org>
-        <Name>{product.productName}</Name>
-        {(matchRate != null || sector || featureTags.length > 0) && (
+        <Name>
+          <Highlight text={product.productName} keyword={keyword} />
+        </Name>
+        {(hasHits || matchRate != null || sector || featureTags.length > 0) && (
           <Tags>
+            {hasHits && (
+              <>
+                <Hit>
+                  {hits.length}/{total} 일치
+                </Hit>
+                {hits.map((reason, index) => (
+                  <Tag key={`${index}-${reason}`} $variant="good">
+                    <Icon name="check" size={13} />
+                    {reason}
+                  </Tag>
+                ))}
+              </>
+            )}
             {matchRate != null && <Tag $variant="acc">일치도 {matchRate}%</Tag>}
             {sector && <Tag>{sector}</Tag>}
             {featureTags.map((code) => (
