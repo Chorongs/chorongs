@@ -22,6 +22,7 @@ import chorong.common.dto.LoginAdminDTO;
 import chorong.common.dto.LoginMemberDTO;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.common.util.AdminUtil;
 import chorong.common.util.SessionConst;
 
 /*
@@ -97,6 +98,34 @@ class AdminInterceptorTest {
 
 		// Then
 		assertEquals(ErrorCode.LOGIN_REQUIRED, e.getErrorCode());
+	}
+
+	@Test
+	void 로그인_2시간이_지나면_자동_로그아웃_문구() {
+		// Given
+		MockHttpServletRequest request = adminRequest("/api/admin/products", LocalDateTime.now().minusHours(2).minusMinutes(1));
+		givenAdmin(AdminStatus.ACTIVE, AdminRole.APPROVER);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> adminInterceptor.preHandle(request, response, null));
+
+		// Then
+		assertEquals(AdminUtil.MSG_SESSION_EXPIRED, e.getMessage());
+	}
+
+	@Test
+	void 해제된_관리자는_권한이_없어졌어요_문구() {
+		// Given
+		MockHttpServletRequest request = adminRequest("/api/admin/products", LocalDateTime.now());
+		givenAdmin(AdminStatus.REMOVED, AdminRole.MANAGER);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> adminInterceptor.preHandle(request, response, null));
+
+		// Then
+		assertEquals(AdminUtil.MSG_NO_PERMISSION, e.getMessage());
 	}
 
 	@Test

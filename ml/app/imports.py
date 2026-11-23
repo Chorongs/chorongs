@@ -1,13 +1,15 @@
 """
-    상품 불러오기 작업 (ADMIN-04, EXT-01·02의 6번 비교 저장, EXT-05)
+    상품 갱신 작업 ([최신 상품 갱신하기], ADMIN-04, EXT-01·02의 6번 비교 저장, EXT-05)
 
     - 시작 (main.py POST /imports): import_job 1행 (RUNNING) → 작업 번호 바로 응답
       base_version(기준 버전)은 시작 때 일단 넣고, 비교하려고 지금 상품을 읽는 시점의 마지막 이력 번호로 DONE 때 다시 씀 (ADMIN-04 '비교할 때의')
       동시에 1개 (B9): import_job 표를 잠그고 RUNNING이 있으면 IMPORT_RUNNING. 시작한 지 30분 넘은 RUNNING은 FAILED로 바꾸고 진행
+      첫 적재(INIT 이력) 전에는 NOT_INITIALIZED: 빈 상품 표와 비교한 결과는 기준 버전이 없어 반영할 수 없으므로 (먼저 load.py)
     - 응답 뒤 (BackgroundTasks → run_import): 수집 → 지금 상품 읽기 → 정제 (첫 적재와 같은 clean_products) → 비교
       → 이전 작업의 import_item 삭제 → 바뀐 상품을 import_item에 저장 → DONE (출처 모두 실패, 정제 중 오류면 FAILED + 사유)
       (지금 상품을 정제보다 먼저 읽는 이유: 금감원 수집이 빠졌을 때 DB 은행 이름을 정제에 넘기기 위해)
       이 단계에서 loan_product는 바꾸지 않음. 반영은 publish.py
+    - 진행 확인 (main.py GET /imports/{job_id}, GET /imports/latest): read_job, read_latest_job (가장 최근 작업, 화면을 다시 열었을 때)
     - 비교 구분: NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 (판매 종료 상품이 다시 옴) / CHECK 확인 필요 (반영 불가)
     - 비교하는 칸: 상품 내용 칸 (COMPARE_COLS) + 칩 (tags) + 구간 금리 (rates) + 금감원 공시월 (dcls_month)
       base_date (서민은 수집한 날이라 매번 바뀜), raw_json (제출일이 들어 있음)은 비교하지 않고 반영할 때만 새 값으로 씀
@@ -42,7 +44,7 @@ KEEP_HOURS = 24         # DONE 뒤 이 시간이 지나면 EXPIRED (반영 불�
 class JobConflict(Exception):
     """
         409. detail: IMPORT_RUNNING 진행 중 / IMPORT_EXPIRED 24시간 지남 또는 DONE 아님 / VERSION_CONFLICT 기준 버전 다름
-        / NOTHING_TO_ROLLBACK 되돌릴 변경 기록 없음
+        / NOTHING_TO_ROLLBACK 되돌릴 변경 기록 없음 / NOT_INITIALIZED 첫 적재 전 (이력 없음)
     """
 
     def __init__(self, detail):
@@ -83,9 +85,10 @@ INSERT_ITEM = text(
 ).bindparams(bindparam("after_data", type_=CLOB))
 
 # 24시간 판단은 DB 시각(SYSDATE) 기준 (FastAPI PC와 DB 서버의 시간이 다를 수 있음)
-SELECT_JOB = text("SELECT job_id, job_status, base_version, source_result, "
+SELECT_JOB = text("SELECT job_id, job_status, base_version, source_result, created_at, finished_at, "
                   "CASE WHEN finished_at < SYSDATE - :hours / 24 THEN 1 ELSE 0 END AS expired "
                   "FROM import_job WHERE job_id = :job_id")
+LATEST_JOB_ID = text("SELECT MAX(job_id) FROM import_job")    # 가장 최근 작업 (화면을 다시 열었을 때 이어서 보기)
 SELECT_ITEMS = text("SELECT item_id, diff_type, product_id, product_name, company_name, source, "
                     "changed_fields, check_reasons, hidden_yn FROM import_item WHERE job_id = :job_id ORDER BY item_id")
 
@@ -305,15 +308,20 @@ def read_products(conn):
 
 
 def start_job(conn, sources, admin_id):
-    """작업 1행 만들고 번호 돌려줌 (conn은 트랜잭션 안). 진행 중 작업이 있으면 JobConflict(IMPORT_RUNNING)"""
+    """
+        작업 1행 만들고 번호 돌려줌 (conn은 트랜잭션 안)
+        진행 중 작업이 있으면 JobConflict(IMPORT_RUNNING), 첫 적재(INIT 이력) 전이면 JobConflict(NOT_INITIALIZED)
+    """
     conn.execute(LOCK_JOBS)     # 동시에 두 작업이 시작되지 않게 (커밋하면 풀림)
     conn.execute(FAIL_STALE_JOBS, {"msg": f"{STALE_MINUTES}분 넘게 끝나지 않아 실패 처리", "minutes": STALE_MINUTES})
     if conn.execute(COUNT_RUNNING).scalar():
         raise JobConflict("IMPORT_RUNNING")
 
-    conn.execute(INSERT_JOB, {"sources": ",".join(sources),
-                              "base_version": conn.execute(LAST_VERSION).scalar(),
-                              "admin_id": admin_id})
+    base_version = conn.execute(LAST_VERSION).scalar()
+    if base_version is None:    # 이력이 없음 = 첫 적재 전. 빈 표와 비교한 결과는 반영할 수 없으니 시작하지 않음
+        raise JobConflict("NOT_INITIALIZED")
+
+    conn.execute(INSERT_JOB, {"sources": ",".join(sources), "base_version": base_version, "admin_id": admin_id})
     return conn.execute(NEW_JOB_ID).scalar()
 
 
@@ -339,22 +347,28 @@ def run_import(engine, job_id, sources):
             done = conn.execute(FINISH_JOB, {"job_id": job_id, "status": "DONE", "source_result": to_json(results),
                                              "error": None})
             if done.rowcount == 0:      # 30분 넘어 FAILED로 바뀐 뒤 늦게 끝난 작업 → 결과 버림
-                logger.warning("불러오기 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
+                logger.warning("갱신 작업 %d는 이미 RUNNING이 아니라 결과를 저장하지 않음", job_id)
                 return
             conn.execute(SET_BASE_VERSION, {"job_id": job_id, "base_version": base_version})
             conn.execute(DELETE_OLD_ITEMS, {"job_id": job_id})
             if items:
                 conn.execute(INSERT_ITEM, [item_row(job_id, item) for item in items])
-        logger.info("불러오기 작업 %d 끝: 정제 %d개, 바뀐 상품 %d개", job_id, len(products), len(items))
-    except Exception as e:     # 어떤 오류든 작업을 FAILED로 남겨야 다음 불러오기가 막히지 않음
-        logger.exception("불러오기 작업 %d 실패", job_id)
+        logger.info("갱신 작업 %d 끝: 정제 %d개, 바뀐 상품 %d개", job_id, len(products), len(items))
+    except Exception as e:     # 어떤 오류든 작업을 FAILED로 남겨야 다음 갱신이 막히지 않음
+        logger.exception("갱신 작업 %d 실패", job_id)
         try:
             with engine.begin() as conn:
                 conn.execute(FINISH_JOB, {"job_id": job_id, "status": "FAILED",
                                           "source_result": to_json(results) if results else None,
                                           "error": f"{type(e).__name__}: {e}"[:500]})
-        except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 불러오기가 FAILED로 바꿈)
-            logger.exception("불러오기 작업 %d FAILED 기록 실패", job_id)
+        except Exception:      # DB까지 안 되면 로그만 (30분 뒤 다음 갱신이 FAILED로 바꿈)
+            logger.exception("갱신 작업 %d FAILED 기록 실패", job_id)
+
+
+def read_latest_job(conn):
+    """가장 최근 작업의 진행 상태 (GET /imports/latest). 작업이 하나도 없으면 None. 응답 모양, EXPIRED 처리는 read_job과 같음"""
+    job_id = conn.execute(LATEST_JOB_ID).scalar()
+    return None if job_id is None else read_job(conn, job_id)
 
 
 def read_job(conn, job_id):
@@ -370,4 +384,5 @@ def read_job(conn, job_id):
               "hidden_yn": row.hidden_yn}
              for row in conn.execute(SELECT_ITEMS, {"job_id": job_id})]
     return {"job_id": job.job_id, "job_status": status, "base_version": job.base_version,
+            "created_at": job.created_at, "finished_at": job.finished_at,
             "source_results": json.loads(job.source_result) if job.source_result else [], "items": items}
