@@ -200,7 +200,7 @@ export const ADMIN_STATUS_LABEL = {
   ACTIVE: '정상',
 }
 
-// 불러오기 출처 (API-32 sources)
+// 갱신 출처 (API-32 sources)
 export const IMPORT_SOURCE_OPTIONS = [
   { value: 'KINFA', label: '서민금융진흥원' },
   { value: 'FSS', label: '금융감독원' },
