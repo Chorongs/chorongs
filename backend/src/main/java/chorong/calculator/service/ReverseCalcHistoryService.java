@@ -1,0 +1,19 @@
+package chorong.calculator.service;
+
+import chorong.calculator.dto.ReverseCalcHistoryRequestDTO;
+import chorong.calculator.dto.ReverseCalcHistoryResponseDTO;
+
+public interface ReverseCalcHistoryService {
+
+	// 상환능력 기반 대출 계산 기록 저장 (CAL-07). 값 확인 후 저장, 회원당 10개 넘으면 가장 오래된 기록 삭제
+	void saveReverseCalc(Long memberId, ReverseCalcHistoryRequestDTO request);
+
+	// 내 기록 목록 (최신순)
+	ReverseCalcHistoryResponseDTO getReverseCalcs(Long memberId);
+
+	// 내 기록 1건 삭제. 없거나 남의 기록이면 404
+	void deleteReverseCalc(Long memberId, Long reverseId);
+
+	// 내 기록 전체 삭제
+	void deleteReverseCalcs(Long memberId);
+}
