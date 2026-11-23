@@ -404,10 +404,23 @@ CREATE TABLE calc_history (
     grace_months    NUMBER(4)      DEFAULT 0 NOT NULL,
     total_interest  NUMBER(15)     NOT NULL,
     first_payment   NUMBER(15)     NOT NULL,
+    growth_rate     NUMBER(5,2),
+    prepay_round    NUMBER(4),
+    prepay_amount   NUMBER(10),
+    prepay_fee_rate NUMBER(5,2),
+    prepay_mode     VARCHAR2(20),
+    change_round    NUMBER(4),
+    change_rate     NUMBER(5,2),
     calc_at         DATE           DEFAULT SYSDATE NOT NULL,
     CONSTRAINT pk_calc_history  PRIMARY KEY (calc_id),
     CONSTRAINT ck_calc_repay    CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET','GRADUATED')),
     CONSTRAINT ck_calc_positive CHECK (loan_amount > 0 AND loan_months > 0 AND interest_rate >= 0 AND grace_months >= 0),
+    CONSTRAINT ck_calc_extra    CHECK (growth_rate >= 0 AND prepay_round > 0 AND prepay_amount > 0 AND prepay_fee_rate >= 0 AND change_round > 0 AND change_rate >= 0),
+    CONSTRAINT ck_calc_prepay_mode CHECK (prepay_mode IN ('REDUCE_PAYMENT','SHORTEN_TERM')),
+    CONSTRAINT ck_calc_prepay_set  CHECK ((prepay_round IS NULL AND prepay_amount IS NULL AND prepay_fee_rate IS NULL AND prepay_mode IS NULL)
+                                       OR (prepay_round IS NOT NULL AND prepay_amount IS NOT NULL AND prepay_fee_rate IS NOT NULL AND prepay_mode IS NOT NULL)),
+    CONSTRAINT ck_calc_change_set  CHECK ((change_round IS NULL AND change_rate IS NULL)
+                                       OR (change_round IS NOT NULL AND change_rate IS NOT NULL)),
     CONSTRAINT fk_calc_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
 );
 
@@ -421,6 +434,13 @@ COMMENT ON COLUMN calc_history.repay_method   IS 'EQUAL_PI 원리금균등 / EQU
 COMMENT ON COLUMN calc_history.grace_months   IS '기본 0. 거치기간 (이자만 내는 기간). 개월';
 COMMENT ON COLUMN calc_history.total_interest IS '총 이자. 원';
 COMMENT ON COLUMN calc_history.first_payment  IS '첫 달 납부액. 원';
+COMMENT ON COLUMN calc_history.growth_rate    IS '체증식 연 증가율. %. 체증식이 아니면 NULL';
+COMMENT ON COLUMN calc_history.prepay_round   IS '중도상환 회차. 중도상환 없으면 중도상환 4칸 모두 NULL';
+COMMENT ON COLUMN calc_history.prepay_amount  IS '중도상환액. 원';
+COMMENT ON COLUMN calc_history.prepay_fee_rate IS '중도상환수수료율. %';
+COMMENT ON COLUMN calc_history.prepay_mode    IS 'REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN calc_history.change_round   IS '금리 변동 회차. 금리 변동 없으면 금리 변동 2칸 모두 NULL';
+COMMENT ON COLUMN calc_history.change_rate    IS '변동 후 연 금리. %';
 COMMENT ON COLUMN calc_history.calc_at        IS '계산일시 (SYSDATE)';
 
 CREATE TABLE diagnosis_report (
