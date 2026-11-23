@@ -21,7 +21,7 @@ public class SearchHistoryServiceImpl implements SearchHistoryService {
     @Override
     @Transactional(readOnly = true)
     public List<SearchHistoryResponseDTO> getSearchHistories(Long memberId) {
-        List<SearchHistory> searchHistoryList =  searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(memberId);
+        List<SearchHistory> searchHistoryList =  searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(memberId);
         List<SearchHistoryResponseDTO> searchHistoryResponseDTOList =
         searchHistoryList.stream().map(searchHistory -> new  SearchHistoryResponseDTO(searchHistory.getSearchId(), searchHistory.getSearchType(),
                 searchHistory.getSearchLabel(), searchHistory.getSearchCondition(), searchHistory.getSearchedAt())
@@ -42,7 +42,7 @@ public class SearchHistoryServiceImpl implements SearchHistoryService {
             long searchHistoryCount =  searchHistoryRepository.countByMemberId(memberId);
             if (searchHistoryCount >= 10) {
                 Optional<SearchHistory> firstSavedSearch =
-                        searchHistoryRepository.findFirstByMemberIdOrderBySearchedAtAsc(memberId);
+                        searchHistoryRepository.findFirstByMemberIdOrderBySearchIdAsc(memberId);
                 searchHistoryRepository.delete(firstSavedSearch.get());
             }
           SearchHistory saveSearchHistory = SearchHistory.builder()
@@ -75,7 +75,7 @@ public class SearchHistoryServiceImpl implements SearchHistoryService {
     @Override
     @Transactional
     public void deleteSearchHistories(Long memberId) {
-        List<SearchHistory> searchHistoryList = searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(memberId);
+        List<SearchHistory> searchHistoryList = searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(memberId);
         searchHistoryRepository.deleteAll(searchHistoryList);
     }
 }

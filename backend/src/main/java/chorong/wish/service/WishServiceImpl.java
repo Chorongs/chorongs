@@ -34,7 +34,7 @@ public class WishServiceImpl implements WishService {
     @Transactional(readOnly = true)
     public PageInfo<WishResponseDTO> getWishes(Long memberId, int page, int size) {
         if(page < 1 || size < 1 || size > 50) throw new BusinessException(ErrorCode.INVALID_INPUT);
-        List<Wish> wishes = wishRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
+        List<Wish> wishes = wishRepository.findByMemberIdOrderByWishIdDesc(memberId);
         int from = (page - 1) * size;
         int to = Math.min(from + size, wishes.size());
         if(from > 0 && from >= wishes.size()) throw new BusinessException(ErrorCode.INVALID_INPUT);

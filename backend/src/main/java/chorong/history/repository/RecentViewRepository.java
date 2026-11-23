@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface RecentViewRepository extends JpaRepository<RecentView,Long> {
     Optional<RecentView> findByMemberIdAndProductId(Long memberId, Long productId);
     long countByMemberId(Long memberId);
-    Optional<RecentView> findFirstByMemberIdOrderByViewedAtAsc(Long memberId);
-    List<RecentView> findByMemberIdOrderByViewedAtDesc(Long memberId);
+    Optional<RecentView> findFirstByMemberIdOrderByViewIdAsc(Long memberId);
+    List<RecentView> findByMemberIdOrderByViewIdDesc(Long memberId);
+    void deleteByMemberId(Long memberId);
 }

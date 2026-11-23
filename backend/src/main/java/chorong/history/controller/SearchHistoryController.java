@@ -17,6 +17,7 @@ import java.util.Map;
  * 최근 검색 (MEM-09, API-22): GET /api/me/searches, POST /api/me/searches, DELETE /api/me/searches/{searchId}
  * 권한: 회원 (로그인 확인은 LoginInterceptor, 회원 번호는 세션에서만 꺼냄, B3)
  */
+
 @RestController
 @RequestMapping("/api/me/searches")
 @RequiredArgsConstructor

@@ -33,7 +33,7 @@ public class CompareHistoryServiceImpl implements CompareHistoryService {
     @Override
     @Transactional(readOnly = true)
     public List<CompareHistoryResponseDTO> getCompareHistories(Long memberId) {
-        List<CompareHistory> compareList = compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(memberId);
+        List<CompareHistory> compareList = compareHistoryRepository.findByMemberIdOrderByComparedIdDesc(memberId);
 
         List<Long> productIds = compareList.stream()
                 .flatMap(c -> Stream.of(c.getProductAId(), c.getProductBId()))     // A, B 번호를 한 줄로 펼침
@@ -76,7 +76,7 @@ public class CompareHistoryServiceImpl implements CompareHistoryService {
         long compareCount = compareHistoryRepository.countByMemberId(memberId);
         if (compareCount >= 10) {
             Optional<CompareHistory> firstSaveCompare =
-                    compareHistoryRepository.findFirstByMemberIdOrderByComparedAtAsc(memberId);
+                    compareHistoryRepository.findFirstByMemberIdOrderByCompareIdAsc(memberId);
             compareHistoryRepository.delete(firstSaveCompare.get());
         }
         CompareHistory compareHistory = CompareHistory.builder()
@@ -106,7 +106,7 @@ public class CompareHistoryServiceImpl implements CompareHistoryService {
     @Override
     @Transactional
     public void deleteCompareHistories(Long memberId) {
-        List<CompareHistory> compareHistoryList = compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(memberId);
+        List<CompareHistory> compareHistoryList = compareHistoryRepository.findByMemberIdOrderByComparedIdDesc(memberId);
         compareHistoryRepository.deleteAll(compareHistoryList);
     }
 

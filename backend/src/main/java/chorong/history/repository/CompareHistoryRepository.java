@@ -11,7 +11,8 @@ public interface CompareHistoryRepository extends JpaRepository<CompareHistory, 
     boolean existsByMemberIdAndProductAIdAndProductBId(Long memberId, Long productAId, Long productBId);
     //해당 유저의 기록이 몇 개 저장되어있는지 확인
     long countByMemberId(Long memberId);
-    Optional<CompareHistory> findFirstByMemberIdOrderByComparedAtAsc(Long memberId);
+    Optional<CompareHistory> findFirstByMemberIdOrderByCompareIdAsc(Long memberId);
     Optional<CompareHistory> findByMemberIdAndCompareId(Long memberId,  Long compareId);
-    List<CompareHistory> findByMemberIdOrderByComparedAtDesc(Long memberId);
+    List<CompareHistory> findByMemberIdOrderByComparedIdDesc(Long memberId);
+    void deleteByMemberId(Long memberId);
 }

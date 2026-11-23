@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface WishRepository extends JpaRepository<Wish, Long> {
     boolean existsByMemberIdAndProductId(Long memberId, Long productId);
     Long countByMemberId(Long memberId);
-    List<Wish> findByMemberIdOrderByCreatedAtDesc(Long memberId);
+    List<Wish> findByMemberIdOrderByWishIdDesc(Long memberId);
     Optional<Wish> findByMemberIdAndProductId(Long memberId, Long productId);
+    void deleteByMemberId(Long memberId);
 }
