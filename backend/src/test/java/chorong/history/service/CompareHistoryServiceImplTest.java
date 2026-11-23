@@ -319,7 +319,7 @@ class CompareHistoryServiceImplTest {
         givenNoExistingPair();
         when(compareHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
         CompareHistory oldest = compareOf(7L, MEMBER_ID, 1L, 2L, NEWEST.minusDays(30));
-        when(compareHistoryRepository.findFirstByMemberIdOrderByComparedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(compareHistoryRepository.findFirstByMemberIdOrderByCompareIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         compareHistoryService.saveCompareHistory(MEMBER_ID, request(SMALL_ID, BIG_ID));
@@ -337,7 +337,7 @@ class CompareHistoryServiceImplTest {
         givenNoExistingPair();
         when(compareHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(11L);
         CompareHistory oldest = compareOf(7L, MEMBER_ID, 1L, 2L, NEWEST.minusDays(30));
-        when(compareHistoryRepository.findFirstByMemberIdOrderByComparedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(compareHistoryRepository.findFirstByMemberIdOrderByCompareIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         compareHistoryService.saveCompareHistory(MEMBER_ID, request(SMALL_ID, BIG_ID));
@@ -354,7 +354,7 @@ class CompareHistoryServiceImplTest {
         givenNoExistingPair();
         when(compareHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
         CompareHistory oldest = compareOf(7L, MEMBER_ID, 1L, 2L, NEWEST.minusDays(30));
-        when(compareHistoryRepository.findFirstByMemberIdOrderByComparedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(compareHistoryRepository.findFirstByMemberIdOrderByCompareIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         compareHistoryService.saveCompareHistory(MEMBER_ID, request(SMALL_ID, BIG_ID));
@@ -510,7 +510,7 @@ class CompareHistoryServiceImplTest {
         List<CompareHistory> compares = List.of(
                 compareOf(500L, MEMBER_ID, SMALL_ID, BIG_ID, NEWEST),
                 compareOf(501L, MEMBER_ID, SMALL_ID, BIG_ID, NEWEST.minusMinutes(1)));
-        when(compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(MEMBER_ID)).thenReturn(compares);
+        when(compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(MEMBER_ID)).thenReturn(compares);
         LoanProduct small = product(SMALL_ID, ProductStatus.ON);
         LoanProduct big = product(BIG_ID, ProductStatus.ON);
         when(loanProductRepository.findAllById(any())).thenReturn(List.of(small, big));
@@ -560,7 +560,7 @@ class CompareHistoryServiceImplTest {
         compareHistoryService.getCompareHistories(MEMBER_ID);
 
         // Then
-        verify(compareHistoryRepository).findByMemberIdOrderByComparedAtDesc(MEMBER_ID);
+        verify(compareHistoryRepository).findByMemberIdOrderByCompareIdDesc(MEMBER_ID);
     }
 
     // ---------- 한 건 삭제 ----------
@@ -642,7 +642,7 @@ class CompareHistoryServiceImplTest {
         // Given
         List<CompareHistory> mine = List.of(
                 compareOf(500L, MEMBER_ID, 1L, 2L, NEWEST), compareOf(501L, MEMBER_ID, 3L, 4L, NEWEST));
-        when(compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(MEMBER_ID)).thenReturn(mine);
+        when(compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(MEMBER_ID)).thenReturn(mine);
 
         // When
         compareHistoryService.deleteCompareHistories(MEMBER_ID);
@@ -655,20 +655,20 @@ class CompareHistoryServiceImplTest {
     @DisplayName("전체 삭제는 인자로 받은 회원 번호의 기록만 찾는다 (B3)")
     void deleteAllUsesGivenMemberId() {
         // Given
-        when(compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When
         compareHistoryService.deleteCompareHistories(MEMBER_ID);
 
         // Then
-        verify(compareHistoryRepository).findByMemberIdOrderByComparedAtDesc(MEMBER_ID);
+        verify(compareHistoryRepository).findByMemberIdOrderByCompareIdDesc(MEMBER_ID);
     }
 
     @Test
     @DisplayName("지울 기록이 없어도 오류 없이 끝난다")
     void deleteAllWithNoRecords() {
         // Given
-        when(compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When, Then
         assertThatCode(() -> compareHistoryService.deleteCompareHistories(MEMBER_ID)).doesNotThrowAnyException();
@@ -708,7 +708,7 @@ class CompareHistoryServiceImplTest {
         for (int i = 0; i < count; i++) {
             compares.add(compareOf(COMPARE_ID + i, MEMBER_ID, 101L + i, 201L + i, NEWEST.minusMinutes(i)));
         }
-        when(compareHistoryRepository.findByMemberIdOrderByComparedAtDesc(MEMBER_ID)).thenReturn(compares);
+        when(compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(MEMBER_ID)).thenReturn(compares);
     }
 
     // 기록 count개에 맞는 상품(A 101.., B 201..)이 모두 있는 것으로 가정

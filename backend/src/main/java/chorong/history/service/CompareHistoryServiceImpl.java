@@ -33,7 +33,7 @@ public class CompareHistoryServiceImpl implements CompareHistoryService {
     @Override
     @Transactional(readOnly = true)
     public List<CompareHistoryResponseDTO> getCompareHistories(Long memberId) {
-        List<CompareHistory> compareList = compareHistoryRepository.findByMemberIdOrderByComparedIdDesc(memberId);
+        List<CompareHistory> compareList = compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(memberId);
 
         List<Long> productIds = compareList.stream()
                 .flatMap(c -> Stream.of(c.getProductAId(), c.getProductBId()))     // A, B 번호를 한 줄로 펼침
@@ -106,7 +106,7 @@ public class CompareHistoryServiceImpl implements CompareHistoryService {
     @Override
     @Transactional
     public void deleteCompareHistories(Long memberId) {
-        List<CompareHistory> compareHistoryList = compareHistoryRepository.findByMemberIdOrderByComparedIdDesc(memberId);
+        List<CompareHistory> compareHistoryList = compareHistoryRepository.findByMemberIdOrderByCompareIdDesc(memberId);
         compareHistoryRepository.deleteAll(compareHistoryList);
     }
 

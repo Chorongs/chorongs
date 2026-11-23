@@ -242,7 +242,7 @@ class SearchHistoryServiceImplTest {
         givenNoExistingRecord();
         when(searchHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
         SearchHistory oldest = historyOf(7L, MEMBER_ID, "가장 오래된 검색", NEWEST.minusDays(30));
-        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         searchHistoryService.saveSearchHistory(MEMBER_ID, request("FILTER", LABEL, CONDITION));
@@ -259,7 +259,7 @@ class SearchHistoryServiceImplTest {
         givenNoExistingRecord();
         when(searchHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(11L);
         SearchHistory oldest = historyOf(7L, MEMBER_ID, "가장 오래된 검색", NEWEST.minusDays(30));
-        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         searchHistoryService.saveSearchHistory(MEMBER_ID, request("FILTER", LABEL, CONDITION));
@@ -275,7 +275,7 @@ class SearchHistoryServiceImplTest {
         givenNoExistingRecord();
         when(searchHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
         SearchHistory oldest = historyOf(7L, MEMBER_ID, "가장 오래된 검색", NEWEST.minusDays(30));
-        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(searchHistoryRepository.findFirstByMemberIdOrderBySearchIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         searchHistoryService.saveSearchHistory(MEMBER_ID, request("FILTER", LABEL, CONDITION));
@@ -307,7 +307,7 @@ class SearchHistoryServiceImplTest {
     void getKeepsOrder() {
         // Given
         List<SearchHistory> histories = histories(3);
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(histories);
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(histories);
 
         // When
         List<SearchHistoryResponseDTO> result = searchHistoryService.getSearchHistories(MEMBER_ID);
@@ -323,7 +323,7 @@ class SearchHistoryServiceImplTest {
     void getMapsAllFields() {
         // Given
         SearchHistory history = historyOf(SEARCH_ID, MEMBER_ID, LABEL, NEWEST);
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(List.of(history));
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(List.of(history));
 
         // When
         SearchHistoryResponseDTO row = searchHistoryService.getSearchHistories(MEMBER_ID).get(0);
@@ -340,7 +340,7 @@ class SearchHistoryServiceImplTest {
     @DisplayName("기록이 10개이면 10개가 모두 담긴다")
     void getTen() {
         // Given
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(histories(10));
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(histories(10));
 
         // When
         List<SearchHistoryResponseDTO> result = searchHistoryService.getSearchHistories(MEMBER_ID);
@@ -353,7 +353,7 @@ class SearchHistoryServiceImplTest {
     @DisplayName("기록이 없으면 빈 목록이다 (null이 아니다)")
     void getEmpty() {
         // Given
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When
         List<SearchHistoryResponseDTO> result = searchHistoryService.getSearchHistories(MEMBER_ID);
@@ -366,14 +366,14 @@ class SearchHistoryServiceImplTest {
     @DisplayName("목록은 인자로 받은 회원 번호로만 조회한다 (B3)")
     void getUsesGivenMemberId() {
         // Given
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When
         searchHistoryService.getSearchHistories(MEMBER_ID);
 
         // Then
-        verify(searchHistoryRepository).findByMemberIdOrderBySearchedAtDesc(MEMBER_ID);
-        verify(searchHistoryRepository, never()).findByMemberIdOrderBySearchedAtDesc(OTHER_MEMBER_ID);
+        verify(searchHistoryRepository).findByMemberIdOrderBySearchIdDesc(MEMBER_ID);
+        verify(searchHistoryRepository, never()).findByMemberIdOrderBySearchIdDesc(OTHER_MEMBER_ID);
     }
 
     // ---------- 한 건 삭제 ----------
@@ -454,7 +454,7 @@ class SearchHistoryServiceImplTest {
     void deleteAllDeletesMine() {
         // Given
         List<SearchHistory> mine = histories(3);
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(mine);
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(mine);
 
         // When
         searchHistoryService.deleteSearchHistories(MEMBER_ID);
@@ -467,21 +467,21 @@ class SearchHistoryServiceImplTest {
     @DisplayName("전체 삭제는 인자로 받은 회원 번호의 기록만 찾는다 (B3)")
     void deleteAllUsesGivenMemberId() {
         // Given
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When
         searchHistoryService.deleteSearchHistories(MEMBER_ID);
 
         // Then
-        verify(searchHistoryRepository).findByMemberIdOrderBySearchedAtDesc(MEMBER_ID);
-        verify(searchHistoryRepository, never()).findByMemberIdOrderBySearchedAtDesc(OTHER_MEMBER_ID);
+        verify(searchHistoryRepository).findByMemberIdOrderBySearchIdDesc(MEMBER_ID);
+        verify(searchHistoryRepository, never()).findByMemberIdOrderBySearchIdDesc(OTHER_MEMBER_ID);
     }
 
     @Test
     @DisplayName("지울 기록이 없어도 오류 없이 끝난다")
     void deleteAllWithNoRecords() {
         // Given
-        when(searchHistoryRepository.findByMemberIdOrderBySearchedAtDesc(MEMBER_ID)).thenReturn(List.of());
+        when(searchHistoryRepository.findByMemberIdOrderBySearchIdDesc(MEMBER_ID)).thenReturn(List.of());
 
         // When, Then
         assertThatCode(() -> searchHistoryService.deleteSearchHistories(MEMBER_ID)).doesNotThrowAnyException();

@@ -13,6 +13,6 @@ public interface CompareHistoryRepository extends JpaRepository<CompareHistory, 
     long countByMemberId(Long memberId);
     Optional<CompareHistory> findFirstByMemberIdOrderByCompareIdAsc(Long memberId);
     Optional<CompareHistory> findByMemberIdAndCompareId(Long memberId,  Long compareId);
-    List<CompareHistory> findByMemberIdOrderByComparedIdDesc(Long memberId);
+    List<CompareHistory> findByMemberIdOrderByCompareIdDesc(Long memberId);
     void deleteByMemberId(Long memberId);
 }

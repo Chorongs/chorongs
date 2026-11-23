@@ -97,7 +97,7 @@ class MemberControllerTest {
     @DisplayName("회원이 MY 요약을 보면 200")
     void getOk() throws Exception {
         // Given
-        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(3L, 4L, 5L));
+        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
 
         // When, Then
         mockMvc.perform(get(URL).session(memberSession())).andExpect(status().isOk());
@@ -107,21 +107,26 @@ class MemberControllerTest {
     @DisplayName("응답은 ApiResponse의 data 안에 개수를 담는다")
     void getResponseFields() throws Exception {
         // Given
-        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(3L, 4L, 5L));
+        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L));
 
         // When, Then
         mockMvc.perform(get(URL).session(memberSession()))
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.wishCount").value(3))
                 .andExpect(jsonPath("$.data.recentViewCount").value(4))
-                .andExpect(jsonPath("$.data.compareCount").value(5));
+                .andExpect(jsonPath("$.data.compareCount").value(5))
+                .andExpect(jsonPath("$.data.calcCount").value(6))
+                .andExpect(jsonPath("$.data.dsrCount").value(7))
+                .andExpect(jsonPath("$.data.changeCount").value(8))
+                .andExpect(jsonPath("$.data.homeLimitCount").value(9))
+                .andExpect(jsonPath("$.data.reversCalcCount").value(10));
     }
 
     @Test
     @DisplayName("요약은 세션의 회원 번호로 조회한다")
     void getUsesSessionMemberId() throws Exception {
         // Given
-        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(0L, 0L, 0L));
+        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L));
 
         // When
         mockMvc.perform(get(URL).session(memberSession()));
@@ -134,7 +139,7 @@ class MemberControllerTest {
     @DisplayName("요청에 다른 회원 번호를 실어도 세션의 회원 번호만 쓴다 (B3)")
     void getIgnoresMemberIdInRequest() throws Exception {
         // Given
-        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(0L, 0L, 0L));
+        when(memberService.getMySummary(MEMBER_ID)).thenReturn(new MySummaryResponseDTO(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L));
 
         // When
         mockMvc.perform(get(URL).param("memberId", "99").session(memberSession()));

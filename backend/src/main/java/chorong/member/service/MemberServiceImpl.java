@@ -1,7 +1,6 @@
 package chorong.member.service;
 
-import chorong.calculator.entity.CalcHistory;
-import chorong.calculator.repository.CalcHistoryRepository;
+import chorong.calculator.repository.*;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
 import chorong.credit.repository.DiagnosisReportRepository;
@@ -34,6 +33,12 @@ public class MemberServiceImpl implements MemberService {
     private final DiagnosisReportRepository diagnosisReportRepository;
     private final MemberRepository memberRepository;
     private final CalcHistoryRepository calcHistoryRepository;
+    private final DsrCalcHistoryRepository  dsrCalcHistoryRepository;
+    private final ChangeCalcHistoryRepository changeCalcHistory;
+    private final HomeLimitCalcHistoryRepository homeLimitCalcHistory;
+    private final ReverseCalcHistoryRepository reverseCalcHistoryRepository;
+    private final DsrLoanRepository dsrLoanRepository;
+
 
     @Override
     @Transactional(readOnly = true)
@@ -41,7 +46,11 @@ public class MemberServiceImpl implements MemberService {
         return new MySummaryResponseDTO(wishRepository.countByMemberId(memberId),
                 recentViewRepository.countByMemberId(memberId),
                 compareHistoryRepository.countByMemberId(memberId),
-                calcHistoryRepository.countByMemberId(memberId));
+                calcHistoryRepository.countByMemberId(memberId),
+                dsrCalcHistoryRepository.countByMemberId(memberId),
+                changeCalcHistory.countByMemberId(memberId),
+                homeLimitCalcHistory.countByMemberId(memberId),
+                reverseCalcHistoryRepository.countByMemberId(memberId));
 
     }
 
@@ -57,6 +66,13 @@ public class MemberServiceImpl implements MemberService {
         compareHistoryRepository.deleteByMemberId(memberId);
         recommendResultRepository.deleteByMemberId(memberId); // 추천 결과 삭제
         diagnosisReportRepository.findByMemberId(memberId).ifPresent(diagnosisReportRepository::delete);
+        calcHistoryRepository.deleteByMemberId(memberId);
+        dsrLoanRepository.deleteByMemberId(memberId);
+        dsrCalcHistoryRepository.deleteByMemberId(memberId);
+        changeCalcHistory.deleteByMemberId(memberId);
+        homeLimitCalcHistory.deleteByMemberId(memberId);
+        reverseCalcHistoryRepository.deleteByMemberId(memberId);
+
 
         member.withdraw();
 

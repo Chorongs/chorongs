@@ -384,7 +384,7 @@ class WishServiceImplGetWishesTest {
                     .createdAt(NEWEST.minusMinutes(i))
                     .build());
         }
-        when(wishRepository.findByMemberIdOrderByCreatedAtDesc(MEMBER_ID)).thenReturn(wishes);
+        when(wishRepository.findByMemberIdOrderByWishIdDesc(MEMBER_ID)).thenReturn(wishes);
     }
 
     // 찜 count개에 맞는 상품(ON)이 모두 있는 것으로 가정

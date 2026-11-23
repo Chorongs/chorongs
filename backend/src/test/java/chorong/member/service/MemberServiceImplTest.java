@@ -1,5 +1,11 @@
 package chorong.member.service;
 
+import chorong.calculator.repository.CalcHistoryRepository;
+import chorong.calculator.repository.ChangeCalcHistoryRepository;
+import chorong.calculator.repository.DsrCalcHistoryRepository;
+import chorong.calculator.repository.DsrLoanRepository;
+import chorong.calculator.repository.HomeLimitCalcHistoryRepository;
+import chorong.calculator.repository.ReverseCalcHistoryRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
 import chorong.credit.entity.DiagnosisReport;
@@ -17,6 +23,7 @@ import chorong.wish.repository.WishRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -40,15 +48,17 @@ import static org.mockito.Mockito.when;
 /*
  * MEM-13 MY 요약 (API-51), MEM-07 회원 탈퇴 (API-28), 권한 B3
  * 기대값 출처: be_member.md MEM-13, MEM-07
- *   MY 요약: 응답 wishCount, recentViewCount, compareCount, calcCount / 세션 회원 번호로 테이블 4개 개수 세기 (B3)
+ *   MY 요약: 응답 wishCount, recentViewCount, compareCount, calcCount (명세서) / 세션 회원 번호로 개수 세기 (B3)
  *            찜 개수는 판매 종료, 숨김 상품 포함 (상품 상태와 상관없이 회원의 찜 전체)
  *   탈퇴: 1. 찜, 최근 본, 최근 검색, 비교 내역, 계산 기록, 진단 리포트, 추천 결과 삭제
  *         2. member 닉네임 '탈퇴한 회원', 출생연도, 생일, login_type, social_id null, member_status 0 (행은 남김)
  *         한 번에 처리 @Transactional (B16), 중간 실패 시 전부 되돌림
  *   회원 정보 수정 (MEM-11): 닉네임 앞뒤 공백 제거 후 2~12자, 생년월일 형식, 미래 날짜, 1900년 이전 확인 → 저장,
  *         바꿀 것만 (값이 없으면 안 바꿈), 길이, 형식 오류 400 (B2), 세션 회원 번호로만 수정 (B3), 닉네임 중복 허용
- * 명세서와 다른 곳(사용자 결정, 계산 기록 기능을 없앨 예정이라는 이야기가 있어 명세서 수정 전):
- *   MY 요약에 calcCount가 없고 (개수 3개), 탈퇴에서 계산 기록 삭제도 하지 않음
+ * 명세서와 다른 곳(계산기 종류가 5개로 나뉜 develop 반영, 명세서 수정 전):
+ *   MY 요약: calcCount 하나 대신 calcCount(대출 이자), dsrCount, changeCount(갈아타기), homeLimitCount(내집마련), reversCalcCount(상환능력 역산) 8개 필드
+ *   탈퇴: 계산 기록 5종류와 DSR 대출 행(dsr_loan)을 지움. dsr_loan은 dsr_calc_history보다 먼저 지워야 함
+ *         (schema.sql: fk_dsr_loan_calc, dsr_loan이 dsr_calc_history를 참조)
  * 명세서에 없는 선택(사용자 결정): 생년월일은 출생연도와 생일을 함께 보내야 함 (하나만 보내면 400), 닉네임 글 중간의 공백은 허용,
  *   만 19세 미만 제한은 수정에 적용하지 않음
  */
@@ -79,6 +89,24 @@ class MemberServiceImplTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private CalcHistoryRepository calcHistoryRepository;
+
+    @Mock
+    private DsrCalcHistoryRepository dsrCalcHistoryRepository;
+
+    @Mock
+    private ChangeCalcHistoryRepository changeCalcHistoryRepository;
+
+    @Mock
+    private HomeLimitCalcHistoryRepository homeLimitCalcHistoryRepository;
+
+    @Mock
+    private ReverseCalcHistoryRepository reverseCalcHistoryRepository;
+
+    @Mock
+    private DsrLoanRepository dsrLoanRepository;
+
     @InjectMocks
     private MemberServiceImpl memberService;
 
@@ -86,7 +114,7 @@ class MemberServiceImplTest {
     @DisplayName("wishCount는 찜 개수이다")
     void wishCount() {
         // Given
-        givenCounts(3L, 4L, 5L);
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
 
         // When
         MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
@@ -99,7 +127,7 @@ class MemberServiceImplTest {
     @DisplayName("recentViewCount는 최근 본 대출 개수이다")
     void recentViewCount() {
         // Given
-        givenCounts(3L, 4L, 5L);
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
 
         // When
         MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
@@ -112,7 +140,7 @@ class MemberServiceImplTest {
     @DisplayName("compareCount는 비교 내역 개수이다")
     void compareCount() {
         // Given
-        givenCounts(3L, 4L, 5L);
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
 
         // When
         MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
@@ -122,10 +150,75 @@ class MemberServiceImplTest {
     }
 
     @Test
+    @DisplayName("calcCount는 계산 기록 개수이다")
+    void calcCount() {
+        // Given
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+
+        // When
+        MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
+
+        // Then
+        assertThat(result.getCalcCount()).isEqualTo(6L);
+    }
+
+    @Test
+    @DisplayName("dsrCount는 DSR 계산 기록 개수이다")
+    void dsrCount() {
+        // Given
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+
+        // When
+        MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
+
+        // Then
+        assertThat(result.getDsrCount()).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("changeCount는 갈아타기 계산 기록 개수이다")
+    void changeCount() {
+        // Given
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+
+        // When
+        MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
+
+        // Then
+        assertThat(result.getChangeCount()).isEqualTo(8L);
+    }
+
+    @Test
+    @DisplayName("homeLimitCount는 내집마련 한도 계산 기록 개수이다")
+    void homeLimitCount() {
+        // Given
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+
+        // When
+        MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
+
+        // Then
+        assertThat(result.getHomeLimitCount()).isEqualTo(9L);
+    }
+
+    @Test
+    @DisplayName("reversCalcCount는 상환능력 역산 계산 기록 개수이다")
+    void reverseCount() {
+        // Given
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
+
+        // When
+        MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
+
+        // Then
+        assertThat(result.getReversCalcCount()).isEqualTo(10L);
+    }
+
+    @Test
     @DisplayName("기록이 하나도 없으면 개수는 모두 0이다")
     void allZero() {
         // Given
-        givenCounts(0L, 0L, 0L);
+        givenCounts(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L);
 
         // When
         MySummaryResponseDTO result = memberService.getMySummary(MEMBER_ID);
@@ -134,13 +227,18 @@ class MemberServiceImplTest {
         assertThat(result.getWishCount()).isZero();
         assertThat(result.getRecentViewCount()).isZero();
         assertThat(result.getCompareCount()).isZero();
+        assertThat(result.getCalcCount()).isZero();
+        assertThat(result.getDsrCount()).isZero();
+        assertThat(result.getChangeCount()).isZero();
+        assertThat(result.getHomeLimitCount()).isZero();
+        assertThat(result.getReversCalcCount()).isZero();
     }
 
     @Test
     @DisplayName("개수는 인자로 받은 회원 번호로만 센다 (B3)")
     void countsOnlyWithGivenMemberId() {
         // Given
-        givenCounts(3L, 4L, 5L);
+        givenCounts(3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L);
 
         // When
         memberService.getMySummary(MEMBER_ID);
@@ -149,9 +247,19 @@ class MemberServiceImplTest {
         verify(wishRepository).countByMemberId(MEMBER_ID);
         verify(recentViewRepository).countByMemberId(MEMBER_ID);
         verify(compareHistoryRepository).countByMemberId(MEMBER_ID);
+        verify(calcHistoryRepository).countByMemberId(MEMBER_ID);
+        verify(dsrCalcHistoryRepository).countByMemberId(MEMBER_ID);
+        verify(changeCalcHistoryRepository).countByMemberId(MEMBER_ID);
+        verify(homeLimitCalcHistoryRepository).countByMemberId(MEMBER_ID);
+        verify(reverseCalcHistoryRepository).countByMemberId(MEMBER_ID);
         verify(wishRepository, never()).countByMemberId(OTHER_MEMBER_ID);
         verify(recentViewRepository, never()).countByMemberId(OTHER_MEMBER_ID);
         verify(compareHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
+        verify(calcHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
+        verify(dsrCalcHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
+        verify(changeCalcHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
+        verify(homeLimitCalcHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
+        verify(reverseCalcHistoryRepository, never()).countByMemberId(OTHER_MEMBER_ID);
     }
 
     // ---------- 회원 탈퇴 ----------
@@ -281,6 +389,99 @@ class MemberServiceImplTest {
     }
 
     @Test
+    @DisplayName("탈퇴하면 대출 이자 계산 기록을 삭제한다")
+    void withdrawDeletesCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(calcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 DSR 계산 기록을 삭제한다")
+    void withdrawDeletesDsrCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(dsrCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 갈아타기 계산 기록을 삭제한다")
+    void withdrawDeletesChangeCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(changeCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 내집마련 한도 계산 기록을 삭제한다")
+    void withdrawDeletesHomeLimitCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(homeLimitCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 상환능력 역산 계산 기록을 삭제한다")
+    void withdrawDeletesReverseCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(reverseCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 DSR 대출 행을 삭제한다")
+    void withdrawDeletesDsrLoans() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        verify(dsrLoanRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("DSR 대출 행은 DSR 계산 기록보다 먼저 지운다 (fk_dsr_loan_calc)")
+    void withdrawDeletesDsrLoansBeforeDsrCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        InOrder order = inOrder(dsrLoanRepository, dsrCalcHistoryRepository);
+        order.verify(dsrLoanRepository).deleteByMemberId(MEMBER_ID);
+        order.verify(dsrCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
     @DisplayName("탈퇴하면 추천 결과를 삭제한다")
     void withdrawDeletesRecommendResults() {
         // Given
@@ -345,7 +546,9 @@ class MemberServiceImplTest {
 
         // Then
         verifyNoInteractions(wishRepository, recentViewRepository, searchHistoryRepository,
-                compareHistoryRepository, recommendResultRepository, diagnosisReportRepository);
+                compareHistoryRepository, recommendResultRepository, diagnosisReportRepository,
+                calcHistoryRepository, dsrCalcHistoryRepository, changeCalcHistoryRepository,
+                homeLimitCalcHistoryRepository, reverseCalcHistoryRepository, dsrLoanRepository);
     }
 
     @Test
@@ -364,6 +567,12 @@ class MemberServiceImplTest {
         verify(searchHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
         verify(compareHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
         verify(recommendResultRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(calcHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(dsrLoanRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(dsrCalcHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(changeCalcHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(homeLimitCalcHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
+        verify(reverseCalcHistoryRepository, never()).deleteByMemberId(OTHER_MEMBER_ID);
         verify(diagnosisReportRepository, never()).findByMemberId(OTHER_MEMBER_ID);
     }
 
@@ -374,6 +583,20 @@ class MemberServiceImplTest {
         Member member = activeMember();
         givenMember(member);
         doThrow(new IllegalStateException("db error")).when(recommendResultRepository).deleteByMemberId(MEMBER_ID);
+
+        // When, Then
+        assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID)).isInstanceOf(IllegalStateException.class);
+        assertThat(member.getMemberStatus()).isEqualTo(1);
+        assertThat(member.getSocialId()).isEqualTo("kakao-123");
+    }
+
+    @Test
+    @DisplayName("계산 기록 삭제 중 오류가 나면 예외가 그대로 전해지고 member는 바뀌지 않는다")
+    void withdrawCalcDeleteFailureLeavesMemberUnchanged() {
+        // Given
+        Member member = activeMember();
+        givenMember(member);
+        doThrow(new IllegalStateException("db error")).when(dsrLoanRepository).deleteByMemberId(MEMBER_ID);
 
         // When, Then
         assertThatThrownBy(() -> memberService.withdraw(MEMBER_ID)).isInstanceOf(IllegalStateException.class);
@@ -810,9 +1033,15 @@ class MemberServiceImplTest {
     }
 
     // 세 리포지토리가 회원의 개수를 돌려주는 상태
-    private void givenCounts(long wish, long recentView, long compare) {
+    private void givenCounts(long wish, long recentView, long compare, long calc,
+                             long dsr, long change, long homeLimit, long reverse) {
         when(wishRepository.countByMemberId(MEMBER_ID)).thenReturn(wish);
         when(recentViewRepository.countByMemberId(MEMBER_ID)).thenReturn(recentView);
         when(compareHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(compare);
+        when(calcHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(calc);
+        when(dsrCalcHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(dsr);
+        when(changeCalcHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(change);
+        when(homeLimitCalcHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(homeLimit);
+        when(reverseCalcHistoryRepository.countByMemberId(MEMBER_ID)).thenReturn(reverse);
     }
 }
