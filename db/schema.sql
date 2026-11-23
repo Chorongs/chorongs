@@ -1,4 +1,6 @@
 ------------------------------------------------------------------------------------
+--DROP TABLE import_item            CASCADE CONSTRAINTS PURGE;
+--DROP TABLE import_job             CASCADE CONSTRAINTS PURGE;
 --DROP TABLE term_request           CASCADE CONSTRAINTS PURGE;
 --DROP TABLE help_question          CASCADE CONSTRAINTS PURGE;
 --DROP TABLE help_stat              CASCADE CONSTRAINTS PURGE;
@@ -6,7 +8,7 @@
 --DROP TABLE product_snapshot       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE product_update_history CASCADE CONSTRAINTS PURGE;
 --DROP TABLE loan_report            CASCADE CONSTRAINTS PURGE;
---DROP TABLE recommend_result  CASCADE CONSTRAINTS PURGE;
+--DROP TABLE recommend_result       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE diagnosis_report       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE calc_history           CASCADE CONSTRAINTS PURGE;
 --DROP TABLE compare_history        CASCADE CONSTRAINTS PURGE;
@@ -18,7 +20,7 @@
 --DROP TABLE product_tag            CASCADE CONSTRAINTS PURGE;
 --DROP TABLE tag                    CASCADE CONSTRAINTS PURGE;
 --DROP TABLE loan_product           CASCADE CONSTRAINTS PURGE;
---DROP TABLE admin_token                  CASCADE CONSTRAINTS PURGE;
+--DROP TABLE admin_token            CASCADE CONSTRAINTS PURGE;
 --DROP TABLE admin                  CASCADE CONSTRAINTS PURGE;
 --DROP TABLE member                 CASCADE CONSTRAINTS PURGE;
 --DROP SEQUENCE seq_recommend_save;
@@ -402,10 +404,23 @@ CREATE TABLE calc_history (
     grace_months    NUMBER(4)      DEFAULT 0 NOT NULL,
     total_interest  NUMBER(15)     NOT NULL,
     first_payment   NUMBER(15)     NOT NULL,
+    growth_rate     NUMBER(5,2),
+    prepay_round    NUMBER(4),
+    prepay_amount   NUMBER(10),
+    prepay_fee_rate NUMBER(5,2),
+    prepay_mode     VARCHAR2(20),
+    change_round    NUMBER(4),
+    change_rate     NUMBER(5,2),
     calc_at         DATE           DEFAULT SYSDATE NOT NULL,
     CONSTRAINT pk_calc_history  PRIMARY KEY (calc_id),
     CONSTRAINT ck_calc_repay    CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET','GRADUATED')),
     CONSTRAINT ck_calc_positive CHECK (loan_amount > 0 AND loan_months > 0 AND interest_rate >= 0 AND grace_months >= 0),
+    CONSTRAINT ck_calc_extra    CHECK (growth_rate >= 0 AND prepay_round > 0 AND prepay_amount > 0 AND prepay_fee_rate >= 0 AND change_round > 0 AND change_rate >= 0),
+    CONSTRAINT ck_calc_prepay_mode CHECK (prepay_mode IN ('REDUCE_PAYMENT','SHORTEN_TERM')),
+    CONSTRAINT ck_calc_prepay_set  CHECK ((prepay_round IS NULL AND prepay_amount IS NULL AND prepay_fee_rate IS NULL AND prepay_mode IS NULL)
+                                       OR (prepay_round IS NOT NULL AND prepay_amount IS NOT NULL AND prepay_fee_rate IS NOT NULL AND prepay_mode IS NOT NULL)),
+    CONSTRAINT ck_calc_change_set  CHECK ((change_round IS NULL AND change_rate IS NULL)
+                                       OR (change_round IS NOT NULL AND change_rate IS NOT NULL)),
     CONSTRAINT fk_calc_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
 );
 
@@ -419,6 +434,13 @@ COMMENT ON COLUMN calc_history.repay_method   IS 'EQUAL_PI 원리금균등 / EQU
 COMMENT ON COLUMN calc_history.grace_months   IS '기본 0. 거치기간 (이자만 내는 기간). 개월';
 COMMENT ON COLUMN calc_history.total_interest IS '총 이자. 원';
 COMMENT ON COLUMN calc_history.first_payment  IS '첫 달 납부액. 원';
+COMMENT ON COLUMN calc_history.growth_rate    IS '체증식 연 증가율. %. 체증식이 아니면 NULL';
+COMMENT ON COLUMN calc_history.prepay_round   IS '중도상환 회차. 중도상환 없으면 중도상환 4칸 모두 NULL';
+COMMENT ON COLUMN calc_history.prepay_amount  IS '중도상환액. 원';
+COMMENT ON COLUMN calc_history.prepay_fee_rate IS '중도상환수수료율. %';
+COMMENT ON COLUMN calc_history.prepay_mode    IS 'REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN calc_history.change_round   IS '금리 변동 회차. 금리 변동 없으면 금리 변동 2칸 모두 NULL';
+COMMENT ON COLUMN calc_history.change_rate    IS '변동 후 연 금리. %';
 COMMENT ON COLUMN calc_history.calc_at        IS '계산일시 (SYSDATE)';
 
 CREATE TABLE diagnosis_report (
@@ -673,4 +695,72 @@ COMMENT ON COLUMN term_request.term_word         IS '요청한 단어. 30자까�
 COMMENT ON COLUMN term_request.request_count     IS '요청 횟수. 기본 1';
 COMMENT ON COLUMN term_request.created_at        IS '처음 요청한 일시 (SYSDATE)';
 COMMENT ON COLUMN term_request.last_requested_at IS '가장 최근 요청 일시';
+-- ============================================================
+
+-- ============================================================
+-- 8. 상품 불러오기 반영 대기 (관리자 [최신 상품 불러오기] → 바뀐 상품 확인 → 반영)
+--    쓰는 쪽: FastAPI(ml/app)만 읽고 씀. Spring 엔티티 없음
+--    불러오기는 1.5~5분 걸려서, 작업 번호를 먼저 돌려주고 결과는 이 표에 24시간 보관
+-- ============================================================
+CREATE TABLE import_job (
+    job_id         NUMBER GENERATED ALWAYS AS IDENTITY,
+    job_status     VARCHAR2(10)        DEFAULT 'RUNNING' NOT NULL,
+    sources        VARCHAR2(20)        NOT NULL,
+    base_version   NUMBER,
+    source_result  CLOB,
+    error_msg      VARCHAR2(500 CHAR),
+    requested_by   NUMBER              NOT NULL,
+    created_at     DATE                DEFAULT SYSDATE NOT NULL,
+    finished_at    DATE,
+    CONSTRAINT pk_import_job     PRIMARY KEY (job_id),
+    CONSTRAINT ck_ijob_status    CHECK (job_status IN ('RUNNING','DONE','FAILED','PUBLISHED','EXPIRED')),
+    CONSTRAINT ck_ijob_sources   CHECK (sources IN ('KINFA','FSS','KINFA,FSS')),
+    CONSTRAINT fk_ijob_admin     FOREIGN KEY (requested_by) REFERENCES admin (admin_id)
+);
+
+COMMENT ON TABLE  import_job IS '상품 불러오기 작업 (불러오기 1번 = 1행). 외부 API 수집, 정제, 비교 결과를 관리자가 고를 때까지 24시간 보관. 서버를 다시 켜도 결과가 남고, 누가 언제 불러왔고 어떻게 끝났는지 확인 가능. FastAPI만 읽고 씀 (기능명세서 ADMIN-04, EXT-05). 행은 지우지 않음';
+COMMENT ON COLUMN import_job.job_id        IS '자동 증가(IDENTITY). 작업 번호';
+COMMENT ON COLUMN import_job.job_status    IS 'RUNNING 진행 중 / DONE 비교 끝 / FAILED 실패 / PUBLISHED 반영함 / EXPIRED 24시간 지남. 시작할 때 RUNNING';
+COMMENT ON COLUMN import_job.sources       IS '불러온 출처. KINFA / FSS / KINFA,FSS (product_update_history.source와 같은 값)';
+COMMENT ON COLUMN import_job.base_version  IS '비교할 때의 마지막 반영 이력 번호 (product_update_history.history_id). 이력이 없으면 NULL. FK는 걸지 않음';
+COMMENT ON COLUMN import_job.source_result IS '출처별 성공 여부, 상품 수, 실패 사유 (JSON)';
+COMMENT ON COLUMN import_job.error_msg     IS 'FAILED일 때 사유';
+COMMENT ON COLUMN import_job.requested_by  IS '불러온 관리자 (admin.admin_id)';
+COMMENT ON COLUMN import_job.created_at    IS '시작 시각 (SYSDATE)';
+COMMENT ON COLUMN import_job.finished_at   IS 'DONE 또는 FAILED가 된 시각. 24시간 보관은 이 시각부터 셈';
+
+CREATE TABLE import_item (
+    item_id        NUMBER GENERATED ALWAYS AS IDENTITY,
+    job_id         NUMBER              NOT NULL,
+    diff_type      VARCHAR2(10)        NOT NULL,
+    product_id     NUMBER,
+    source         VARCHAR2(10)        NOT NULL,
+    product_name   VARCHAR2(200 CHAR),
+    company_name   VARCHAR2(100 CHAR),
+    changed_fields VARCHAR2(1000 CHAR),
+    check_reasons  VARCHAR2(500 CHAR),
+    hidden_yn      CHAR(1)             DEFAULT 'N' NOT NULL,
+    after_data     CLOB,
+    CONSTRAINT pk_import_item     PRIMARY KEY (item_id),
+    CONSTRAINT ck_iitem_diff      CHECK (diff_type IN ('NEW','CHANGE','REMOVE','REOPEN','CHECK')),
+    CONSTRAINT ck_iitem_source    CHECK (source IN ('KINFA','FSS')),
+    CONSTRAINT ck_iitem_hidden    CHECK (hidden_yn IN ('Y','N')),
+    CONSTRAINT fk_iitem_job       FOREIGN KEY (job_id)     REFERENCES import_job (job_id),
+    CONSTRAINT fk_iitem_product   FOREIGN KEY (product_id) REFERENCES loan_product (product_id)
+);
+
+CREATE INDEX idx_import_item_job ON import_item (job_id);
+
+COMMENT ON TABLE  import_item IS '불러오기로 바뀐 상품 (바뀐 상품 1개 = 1행). 관리자가 화면에서 골라 반영. 새 불러오기를 시작할 때 이전 작업의 행을 FastAPI가 삭제 (import_job 행은 남김). job_id FK에 ON DELETE 옵션 없음 (import_job 행은 지우지 않으므로)';
+COMMENT ON COLUMN import_item.item_id        IS '자동 증가(IDENTITY). 항목 번호 (화면에서 고르는 번호)';
+COMMENT ON COLUMN import_item.job_id         IS '어느 불러오기 작업의 항목인지 (import_job.job_id). idx_import_item_job 사용';
+COMMENT ON COLUMN import_item.diff_type      IS 'NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 / CHECK 확인 필요';
+COMMENT ON COLUMN import_item.product_id     IS '지금 상품 번호 (loan_product.product_id). 신규(NEW)는 NULL';
+COMMENT ON COLUMN import_item.source         IS 'KINFA / FSS (loan_product.source와 같음)';
+COMMENT ON COLUMN import_item.product_name   IS '화면 표시용 상품명 (loan_product.product_name과 같은 길이). 확인 필요의 ''상품명 없음''은 NULL';
+COMMENT ON COLUMN import_item.company_name   IS '화면 표시용 회사명 (loan_product.company_name과 같은 길이)';
+COMMENT ON COLUMN import_item.changed_fields IS '바뀐 칸 이름 목록 (쉼표로 구분). 화면 ''바뀐 내용''에 사용';
+COMMENT ON COLUMN import_item.check_reasons  IS '확인 필요 사유. CHECK일 때만 사용';
+COMMENT ON COLUMN import_item.hidden_yn      IS 'Y/N. 기본 N. 지금 숨김(HIDDEN) 중인 상품이면 Y';
+COMMENT ON COLUMN import_item.after_data     IS '반영할 정제 결과 1개 (JSON: 상품 칸 + 태그 + 금리). REMOVE는 NULL';
 -- ============================================================

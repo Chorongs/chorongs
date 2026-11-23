@@ -32,7 +32,7 @@ export const LOGIN_TYPE_LABEL = {
 
 // 신용 셀프 진단 문항 10개 (CR-02). 보기 번호 = 보기 순서 1, 2, ... / 0은 '잘 모르겠어요' (hasUnknown인 문항만)
 // 보기 순서와 허용 문항은 ml/app/credit.py OPTIONS, API-09와 같게. label은 결과 카드 항목 이름.
-// 문항 5(이용 금융권)는 여러 개 고르는 선택 문항 (대출이 있을 때만)
+// 문항 5(이용 금융권)는 여러 개 고르는 필수 문항. '없음' 보기는 CreditCheck가 화면에서만 붙임 (서버에는 빈 목록)
 export const CREDIT_QUESTIONS = [
   { no: 1, label: '1년 내 연체', title: '최근 1년 안에 30일 이상 연체한 적이 있나요?', options: ['없음', '1회', '2회 이상'] },
   { no: 2, label: '3개월 내 연체', title: '최근 3개월 안에 가장 길었던 연체 기간은 얼마인가요?', options: ['없음', '10일 미만', '10~29일', '30일 이상'] },
@@ -42,7 +42,6 @@ export const CREDIT_QUESTIONS = [
     no: 5,
     label: '이용 금융권',
     title: '이용 중인 금융권을 모두 골라 주세요.',
-    hint: '대출이 있을 때만 골라 주세요.',
     options: ['은행', '카드/캐피탈', '저축은행(상호금융 포함)', '대부업'],
     isMultiple: true,
   },
