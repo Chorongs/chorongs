@@ -60,7 +60,7 @@ import static org.mockito.Mockito.when;
  *   탈퇴: 계산 기록 5종류와 DSR 대출 행(dsr_loan)을 지움. dsr_loan은 dsr_calc_history보다 먼저 지워야 함
  *         (schema.sql: fk_dsr_loan_calc, dsr_loan이 dsr_calc_history를 참조)
  * 명세서에 없는 선택(사용자 결정): 생년월일은 출생연도와 생일을 함께 보내야 함 (하나만 보내면 400), 닉네임 글 중간의 공백은 허용,
- *   만 19세 미만 제한은 수정에 적용하지 않음
+ *   만 19세 미만 생년월일로는 수정할 수 없음 (400, 가입과 같은 계산, 사용자 결정으로 명세서 수정 전)
  */
 @ExtendWith(MockitoExtension.class)
 class MemberServiceImplTest {
@@ -822,8 +822,8 @@ class MemberServiceImplTest {
     }
 
     @Test
-    @DisplayName("오늘 날짜는 미래가 아니라서 통과한다")
-    void updateTodayBirth() {
+    @DisplayName("오늘 태어난 것으로 바꾸면 미성년자라 400이다")
+    void updateTodayBirthIsMinor() {
         // Given
         Member member = activeMember();
         givenMember(member);
@@ -831,12 +831,80 @@ class MemberServiceImplTest {
         String year = String.valueOf(today.getYear());
         String day = String.format("%02d-%02d", today.getMonthValue(), today.getDayOfMonth());
 
+        // When, Then
+        assertThatThrownBy(() -> memberService.updateMember(MEMBER_ID, update(null, year, day)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+        assertThat(member.getBirthYear()).isEqualTo("1990");
+    }
+
+    @Test
+    @DisplayName("만 19세 생일 당일이면 바뀐다")
+    void updateBirthOnNineteenthBirthday() {
+        // Given
+        Member member = activeMember();
+        givenMember(member);
+        LocalDate birth = LocalDate.now().minusYears(19);
+        String year = String.valueOf(birth.getYear());
+        String day = String.format("%02d-%02d", birth.getMonthValue(), birth.getDayOfMonth());
+
         // When
         memberService.updateMember(MEMBER_ID, update(null, year, day));
 
         // Then
         assertThat(member.getBirthYear()).isEqualTo(year);
         assertThat(member.getBirthDay()).isEqualTo(day);
+    }
+
+    @Test
+    @DisplayName("만 19세 생일 하루 전이면 미성년자라 400이고 바뀌지 않는다")
+    void updateBirthOneDayBeforeNineteenthBirthday() {
+        // Given
+        Member member = activeMember();
+        givenMember(member);
+        LocalDate birth = LocalDate.now().minusYears(19).plusDays(1);
+        String year = String.valueOf(birth.getYear());
+        String day = String.format("%02d-%02d", birth.getMonthValue(), birth.getDayOfMonth());
+
+        // When, Then
+        assertThatThrownBy(() -> memberService.updateMember(MEMBER_ID, update(null, year, day)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+        assertThat(member.getBirthYear()).isEqualTo("1990");
+        assertThat(member.getBirthDay()).isEqualTo("01-01");
+    }
+
+    @Test
+    @DisplayName("10살이 되는 생년월일이면 400이다")
+    void updateBirthTenYearsOld() {
+        // Given
+        givenMember(activeMember());
+        LocalDate birth = LocalDate.now().minusYears(10);
+        String year = String.valueOf(birth.getYear());
+        String day = String.format("%02d-%02d", birth.getMonthValue(), birth.getDayOfMonth());
+
+        // When, Then
+        assertThatThrownBy(() -> memberService.updateMember(MEMBER_ID, update(null, year, day)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
+    @Test
+    @DisplayName("미성년자 생년월일이면 같이 보낸 닉네임도 바뀌지 않는다")
+    void updateMinorBirthKeepsNickname() {
+        // Given
+        Member member = activeMember();
+        givenMember(member);
+        LocalDate birth = LocalDate.now().minusYears(15);
+        String year = String.valueOf(birth.getYear());
+        String day = String.format("%02d-%02d", birth.getMonthValue(), birth.getDayOfMonth());
+
+        // When
+        assertThatThrownBy(() -> memberService.updateMember(MEMBER_ID, update("새닉네임", year, day)))
+                .isInstanceOf(BusinessException.class);
+
+        // Then
+        assertThat(member.getMemberNickname()).isEqualTo("캐링");
     }
 
     @Test

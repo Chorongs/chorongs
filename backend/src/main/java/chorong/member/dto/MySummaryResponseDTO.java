@@ -20,7 +20,4 @@ public class MySummaryResponseDTO {
     private long changeCount; //갈아타기 계산 저장 갯수
     private long homeLimitCount; //내집마련 대출 한도 게산 저장 갯수
     private long reversCalcCount; //상환능력기반 대출 계산 저장 갯수
-
-
-
 }

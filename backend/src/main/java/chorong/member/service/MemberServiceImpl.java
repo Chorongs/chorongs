@@ -24,6 +24,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class MemberServiceImpl implements MemberService {
     private static final int MIN_BIRTH_YEAR = 1900;
+    private static final int MIN_AGE = 19;
 
     private final WishRepository wishRepository;
     private final RecentViewRepository recentViewRepository;
@@ -75,8 +76,6 @@ public class MemberServiceImpl implements MemberService {
 
 
         member.withdraw();
-
-
     }
 
     @Override
@@ -109,7 +108,7 @@ public class MemberServiceImpl implements MemberService {
         return MemberResponseDTO.from(member);
     }
 
-    // 생년월일: 둘 다 있고, 실제 있는 날짜이고, 1900년 이후이고, 미래가 아니어야 함 (아니면 400)
+    // 생년월일: 둘 다 있고, 실제 있는 날짜이고, 1900년 이후이고, 미래가 아니고, 만 19세 이상이어야 함 (아니면 400)
     private void validateBirth(String birthYear, String birthDay) {
         if (birthYear == null || birthDay == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
@@ -118,7 +117,16 @@ public class MemberServiceImpl implements MemberService {
             String[] monthDay = birthDay.split("-");
             int year = Integer.parseInt(birthYear);
             LocalDate birth = LocalDate.of(year, Integer.parseInt(monthDay[0]), Integer.parseInt(monthDay[1]));
-            if (year < MIN_BIRTH_YEAR || birth.isAfter(LocalDate.now())) {
+            LocalDate today = LocalDate.now();
+            if (year < MIN_BIRTH_YEAR || birth.isAfter(today)) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT);
+            }
+            // 만 나이 (가입과 같은 계산: 올해 생일이 아직 안 지났으면 1살 뺌), 미성년자는 400
+            int age = today.getYear() - birth.getYear();
+            if (today.isBefore(birth.withYear(today.getYear()))) {
+                age--;
+            }
+            if (age < MIN_AGE) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT);
             }
         } catch (NumberFormatException | ArrayIndexOutOfBoundsException | DateTimeException e) {
