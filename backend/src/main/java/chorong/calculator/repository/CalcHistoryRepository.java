@@ -15,6 +15,9 @@ public interface CalcHistoryRepository extends JpaRepository<CalcHistory, Long> 
 	// 내 기록 1건 (남의 기록, 없는 기록은 비어 있음)
 	Optional<CalcHistory> findByCalcIdAndMemberId(Long calcId, Long memberId);
 
+	// 내 기록 개수 (MY 요약 MEM-13이 가져다 씀)
+	long countByMemberId(Long memberId);
+
 	// 내 기록 전체 삭제
 	void deleteByMemberId(Long memberId);
 }
