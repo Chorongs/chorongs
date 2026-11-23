@@ -13,7 +13,7 @@ const Wrap = styled.div`
   gap: 8px 12px;
   padding: 12px 16px;
   border-radius: var(--r-sm);
-  background: var(--brand-soft);
+  background: var(--mist);
   color: var(--cocoa);
   font-size: var(--fs-md);
   font-weight: 600;
@@ -22,13 +22,30 @@ const Wrap = styled.div`
   }
 `
 
-// 비교함 첫 상품의 자금 용도, 상환 방식: 흰 알약 칩에 주황 글자 (문장은 회색, 띠 바탕과 같은 색이라 칩은 흰색으로 둠)
+// 비교함 첫 상품의 자금 용도, 상환 방식: 흰 알약 칩에 회색 글자 (문장과 같은 회색, 띠 바탕(회색)과 구분되게 칩은 흰색으로 둠)
 const ConditionChip = styled(Tag)`
   padding: 2px 10px;
   border-radius: var(--r-pill);
   background: var(--paper);
+  color: var(--cocoa);
   font-size: var(--fs-sm);
   font-weight: 700;
+`
+
+// 같은 종류 칩끼리는 가깝게(6px), 자금 용도 묶음과 상환 방식 묶음 사이에는 세로 구분선 ( | ). 선 양쪽 간격은 12px씩
+const ChipGroup = styled.span`
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  & + &::before {
+    content: '';
+    width: 1px;
+    height: 16px;
+    margin-right: 6px;
+    background: var(--muted);
+    opacity: 0.6;
+  }
 `
 
 const Count = styled.span`
@@ -48,16 +65,22 @@ function PurposeFilterBanner({ hiddenCount = 0 }) {
     <Wrap role="status">
       <Icon name="bulb" size={16} />
       자금 용도와 상환 방식이 겹치는 상품만 보여요
-      {first.purposes.map((purpose) => (
-        <ConditionChip key={purpose} $variant="acc">
-          {purpose}
-        </ConditionChip>
-      ))}
-      {methodLabels.map((label) => (
-        <ConditionChip key={label} $variant="acc">
-          {label}
-        </ConditionChip>
-      ))}
+      <ChipGroup>
+        {first.purposes.map((purpose) => (
+          <ConditionChip key={purpose}>
+            {purpose}
+          </ConditionChip>
+        ))}
+      </ChipGroup>
+      {methodLabels.length > 0 && (
+        <ChipGroup>
+          {methodLabels.map((label) => (
+            <ConditionChip key={label}>
+              {label}
+            </ConditionChip>
+          ))}
+        </ChipGroup>
+      )}
       {hiddenCount > 0 && <Count>숨긴 상품 {hiddenCount}개</Count>}
     </Wrap>
   )
