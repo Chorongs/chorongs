@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -12,14 +13,18 @@ import static org.mockito.Mockito.when;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.entity.Member;
+import chorong.member.repository.MemberRepository;
 import chorong.product.entity.LoanProduct;
 import chorong.product.entity.ProductStatus;
 import chorong.product.repository.LoanProductRepository;
@@ -42,6 +47,7 @@ class RecommendResultServiceImplTest {
 	private RecommendResultRepository recommendResultRepository;
 	private LoanProductRepository loanProductRepository;
 	private ProductTagRepository productTagRepository;
+	private MemberRepository memberRepository;
 	private RecommendResultServiceImpl recommendResultService;
 
 	@BeforeEach
@@ -50,8 +56,11 @@ class RecommendResultServiceImplTest {
 		loanProductRepository = mock(LoanProductRepository.class);
 		productTagRepository = mock(ProductTagRepository.class);
 		TagRepository tagRepository = mock(TagRepository.class);
+		memberRepository = mock(MemberRepository.class);
+		// 저장하는 회원은 DB에 있음 (회원 행 잠금 조회가 회원을 돌려줌)
+		when(memberRepository.findLockedByMemberId(MEMBER_ID)).thenReturn(Optional.of(BeanUtils.instantiateClass(Member.class)));
 		recommendResultService = new RecommendResultServiceImpl(recommendResultRepository, loanProductRepository,
-				productTagRepository, tagRepository);
+				productTagRepository, tagRepository, memberRepository);
 	}
 
 	// ---- 테스트 데이터 ----
@@ -140,8 +149,8 @@ class RecommendResultServiceImplTest {
 
 	@Test
 	void 시나리오14_11번째_저장이면_가장_오래된_묶음을_삭제() {
-		// Given: 저장 묶음 11개 (11이 최신, 1이 가장 오래됨)
-		List<Long> productIds = List.of(11L);
+		// Given: 저장 묶음 11개 (11이 최신, 1이 가장 오래됨). 이번 저장은 상품 12라 기존 저장(상품 11)과 같은 결과가 아님
+		List<Long> productIds = List.of(12L);
 		givenProducts(productIds);
 		when(recommendResultRepository.nextSaveId()).thenReturn(11L);
 		List<RecommendResult> rows = new ArrayList<>();
@@ -155,6 +164,103 @@ class RecommendResultServiceImplTest {
 
 		// Then
 		verify(recommendResultRepository).deleteBySaveIdAndMemberId(1L, MEMBER_ID);
+	}
+
+	// ---- 같은 결과 다시 저장 (B9) ----
+
+	// 이미 있는 저장 5번: 같은 라벨, 상품 11(1위), 12(2위)
+	private void givenSavedResult() {
+		when(recommendResultRepository.findByMemberIdOrderBySaveIdDescRankNoAsc(MEMBER_ID))
+				.thenReturn(List.of(row(5L, 11L, 1), row(5L, 12L, 2)));
+	}
+
+	@Test
+	void 같은_결과를_다시_저장하면_409() {
+		// Given
+		List<Long> productIds = List.of(11L, 12L);
+		givenProducts(productIds);
+		givenSavedResult();
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> recommendResultService.saveRecommendResult(MEMBER_ID, request(productIds)));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 같은_결과면_새로_저장하지_않음() {
+		// Given
+		List<Long> productIds = List.of(11L, 12L);
+		givenProducts(productIds);
+		givenSavedResult();
+
+		// When
+		assertThrows(BusinessException.class, () -> recommendResultService.saveRecommendResult(MEMBER_ID, request(productIds)));
+
+		// Then
+		verify(recommendResultRepository, never()).saveAll(anyList());
+	}
+
+	@Test
+	void 상품_순위만_달라도_새로_저장() {
+		// Given: 기존 저장은 11, 12 순서, 이번은 12, 11 순서
+		List<Long> productIds = List.of(12L, 11L);
+		givenProducts(productIds);
+		givenSavedResult();
+
+		// When
+		recommendResultService.saveRecommendResult(MEMBER_ID, request(productIds));
+
+		// Then
+		verify(recommendResultRepository).saveAll(anyList());
+	}
+
+	@Test
+	void 조건이_다르면_같은_상품이어도_새로_저장() {
+		// Given: 기존 저장은 '생활비 1,000만원 / 3년 / 직장인', 이번은 필요 금액 2,000만원
+		List<Long> productIds = List.of(11L, 12L);
+		givenProducts(productIds);
+		givenSavedResult();
+		RecommendSaveRequestDTO request = new RecommendSaveRequestDTO("생활비", 2000, 36, "OFFICE", productIds);
+
+		// When
+		recommendResultService.saveRecommendResult(MEMBER_ID, request);
+
+		// Then
+		verify(recommendResultRepository).saveAll(anyList());
+	}
+
+	@Test
+	void 저장_전에_회원_행을_잠금() {
+		// Given
+		List<Long> productIds = List.of(11L);
+		givenProducts(productIds);
+		InOrder order = inOrder(memberRepository, recommendResultRepository);
+
+		// When
+		recommendResultService.saveRecommendResult(MEMBER_ID, request(productIds));
+
+		// Then: 잠금 조회 → 같은 결과 확인 → 저장 순서
+		order.verify(memberRepository).findLockedByMemberId(MEMBER_ID);
+		order.verify(recommendResultRepository).findByMemberIdOrderBySaveIdDescRankNoAsc(MEMBER_ID);
+		order.verify(recommendResultRepository).saveAll(anyList());
+	}
+
+	@Test
+	void 회원_행이_없으면_401() {
+		// Given
+		List<Long> productIds = List.of(11L);
+		givenProducts(productIds);
+		when(memberRepository.findLockedByMemberId(MEMBER_ID)).thenReturn(Optional.empty());
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> recommendResultService.saveRecommendResult(MEMBER_ID, request(productIds)));
+
+		// Then
+		assertEquals(ErrorCode.LOGIN_REQUIRED, e.getErrorCode());
 	}
 
 	@Test
