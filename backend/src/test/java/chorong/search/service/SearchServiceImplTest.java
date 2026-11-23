@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +94,7 @@ class SearchServiceImplTest {
 	private void givenSearchPage(List<LoanProduct> content, long total) {
 		Page<LoanProduct> page = new PageImpl<>(content, PageRequest.of(0, 20), total);
 		when(loanProductRepository.searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(), anyLong(),
-				any(Pageable.class))).thenReturn(page);
+				anyInt(), any(), any(), any(), any(), any(Pageable.class))).thenReturn(page);
 	}
 
 	private ProductSearchRequestDTO request() {
@@ -183,7 +185,7 @@ class SearchServiceImplTest {
 		ArgumentCaptor<Collection<Long>> tagIds = ArgumentCaptor.forClass(Collection.class);
 		ArgumentCaptor<Long> groupCount = ArgumentCaptor.forClass(Long.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(),
-				tagIds.capture(), groupCount.capture(), any(Pageable.class));
+				tagIds.capture(), groupCount.capture(), anyInt(), any(), any(), any(), any(), any(Pageable.class));
 		assertEquals(2, tagIds.getAllValues().get(0).size());
 		assertTrue(tagIds.getAllValues().get(0).containsAll(List.of(4L, 5L)));
 		assertEquals(1L, groupCount.getAllValues().get(0));
@@ -206,7 +208,7 @@ class SearchServiceImplTest {
 		ArgumentCaptor<Collection<Long>> tagIds = ArgumentCaptor.forClass(Collection.class);
 		ArgumentCaptor<Long> groupCount = ArgumentCaptor.forClass(Long.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(),
-				tagIds.capture(), groupCount.capture(), any(Pageable.class));
+				tagIds.capture(), groupCount.capture(), anyInt(), any(), any(), any(), any(), any(Pageable.class));
 		assertTrue(tagIds.getAllValues().get(0).containsAll(List.of(1L, 2L, 3L, 4L)));
 		assertEquals(2L, groupCount.getAllValues().get(0));
 	}
@@ -240,7 +242,7 @@ class SearchServiceImplTest {
 		ArgumentCaptor<Integer> useTags = ArgumentCaptor.forClass(Integer.class);
 		ArgumentCaptor<Collection<Long>> tagIds = ArgumentCaptor.forClass(Collection.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(),
-				useTags.capture(), tagIds.capture(), anyLong(), any(Pageable.class));
+				useTags.capture(), tagIds.capture(), anyLong(), anyInt(), any(), any(), any(), any(), any(Pageable.class));
 		assertEquals(0, useTags.getAllValues().get(0));
 		assertEquals(List.of(-1L), List.copyOf(tagIds.getAllValues().get(0)));
 	}
@@ -260,7 +262,7 @@ class SearchServiceImplTest {
 		ArgumentCaptor<String> q = ArgumentCaptor.forClass(String.class);
 		ArgumentCaptor<Collection<Long>> qTagIds = ArgumentCaptor.forClass(Collection.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), q.capture(),
-				qTagIds.capture(), anyInt(), any(), anyLong(), any(Pageable.class));
+				qTagIds.capture(), anyInt(), any(), anyLong(), anyInt(), any(), any(), any(), any(), any(Pageable.class));
 		assertEquals("서울", q.getAllValues().get(0));
 		assertEquals(List.of(1L), List.copyOf(qTagIds.getAllValues().get(0)));
 	}
@@ -279,7 +281,7 @@ class SearchServiceImplTest {
 		// Then: 찾을 칩이 없어 -1 하나
 		ArgumentCaptor<Collection<Long>> qTagIds = ArgumentCaptor.forClass(Collection.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), qTagIds.capture(),
-				anyInt(), any(), anyLong(), any(Pageable.class));
+				anyInt(), any(), anyLong(), anyInt(), any(), any(), any(), any(), any(Pageable.class));
 		assertEquals(List.of(-1L), List.copyOf(qTagIds.getAllValues().get(0)));
 	}
 
@@ -288,7 +290,7 @@ class SearchServiceImplTest {
 	private Sort firstSort() {
 		ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
 		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
-				anyLong(), pageable.capture());
+				anyLong(), anyInt(), any(), any(), any(), any(), pageable.capture());
 		return pageable.getAllValues().get(0).getSort();
 	}
 
@@ -345,10 +347,10 @@ class SearchServiceImplTest {
 		// Given: 금리 표시 탭(NUM) 결과 7건, 다른 탭(MEMO) 3건
 		givenTags();
 		when(loanProductRepository.searchProducts(any(), org.mockito.ArgumentMatchers.eq(1), anyInt(), any(), any(),
-				anyInt(), any(), anyLong(), any(Pageable.class)))
+				anyInt(), any(), anyLong(), anyInt(), any(), any(), any(), any(), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 7));
 		when(loanProductRepository.searchProducts(any(), org.mockito.ArgumentMatchers.eq(2), anyInt(), any(), any(),
-				anyInt(), any(), anyLong(), any(Pageable.class)))
+				anyInt(), any(), anyLong(), anyInt(), any(), any(), any(), any(), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 1), 3));
 
 		// When
@@ -477,7 +479,7 @@ class SearchServiceImplTest {
 	// ---- 간편 검색 (SEARCH-02) ----
 
 	private KeywordSearchRequestDTO keywords(String... values) {
-		return new KeywordSearchRequestDTO(Arrays.asList(values));
+		return new KeywordSearchRequestDTO(Arrays.asList(values), null);
 	}
 
 	private void givenKeywordData(LoanProduct... products) {
@@ -587,5 +589,201 @@ class SearchServiceImplTest {
 
 		// Then
 		assertEquals(5, response.getItems().size());
+	}
+
+	// ---- 비교함 기준 cmp (요청서 A): 서버가 자금 용도 겹침 + 상환 방식 겹침으로 거름 ----
+
+	private ProductTag link(long productId, long tagId) {
+		ProductTag link = mock(ProductTag.class);
+		when(link.getProductId()).thenReturn(productId);
+		when(link.getTagId()).thenReturn(tagId);
+		return link;
+	}
+
+	// 칩 마스터: 1 생활비, 2 전월세 (자금 용도) / 3 원리금균등, 4 원금균등, 5 만기일시, 6 기타 (상환 방법)
+	private void givenCmpTags() {
+		givenTags(tag(1, TagType.PURPOSE, "생활비"), tag(2, TagType.PURPOSE, "전월세"), tag(3, TagType.REPAY, "원리금균등"),
+				tag(4, TagType.REPAY, "원금균등"), tag(5, TagType.REPAY, "만기일시"), tag(6, TagType.REPAY, "기타"));
+	}
+
+	// 기준 상품 (게시 ON)과 그 상품의 칩
+	private void givenBaseProduct(long productId, ProductStatus status, ProductTag... links) {
+		LoanProduct base = product(productId, "기준은행", "기준 상품", "3.0");
+		when(base.getProductStatus()).thenReturn(status);
+		when(loanProductRepository.findById(productId)).thenReturn(Optional.of(base));
+		when(productTagRepository.findByProductIdIn(any())).thenReturn(List.of(links));
+	}
+
+	// 검색 쿼리: 비교함 기준을 쓰면 건수 4, 안 쓰면 10 (숨긴 수 6)
+	private void givenCountsByCmp() {
+		when(loanProductRepository.searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(), anyLong(),
+				anyInt(), any(), any(), any(), any(), any(Pageable.class)))
+				.thenAnswer(call -> new PageImpl<LoanProduct>(List.of(), PageRequest.of(0, 20),
+						(int) call.getArgument(8) == 1 ? 4 : 10));
+	}
+
+	private ProductSearchRequestDTO cmpRequest(String cmp) {
+		ProductSearchRequestDTO request = request();
+		request.setCmp(cmp);
+		return request;
+	}
+
+	@Test
+	void cmp가_숫자가_아니거나_3개_이상이면_400이고_상품을_조회하지_않는다() {
+		// Given, When, Then
+		for (String bad : List.of("abc", "1,2,3", "1,,2", "1,x", "-1")) {
+			BusinessException error = assertThrows(BusinessException.class, () -> service.searchProducts(cmpRequest(bad)));
+			assertEquals(ErrorCode.INVALID_INPUT, error.getErrorCode());
+		}
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void 간편_검색도_cmp가_숫자가_아니면_400이다() {
+		// Given
+		KeywordSearchRequestDTO request = new KeywordSearchRequestDTO(List.of("비대면"), "1,2,3");
+
+		// When
+		BusinessException error = assertThrows(BusinessException.class, () -> service.searchKeywords(request));
+
+		// Then
+		assertEquals(ErrorCode.INVALID_INPUT, error.getErrorCode());
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void cmp가_없으면_거르지_않고_숨긴_수는_0이다() {
+		// Given
+		givenCmpTags();
+		givenCountsByCmp();
+
+		// When
+		ProductSearchResponseDTO response = service.searchProducts(request());
+
+		// Then: 거르지 않으므로 건수 쿼리는 2번 (금리 탭, 다른 탭)
+		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
+				anyLong(), eq(0), any(), any(), any(), any(), any(Pageable.class));
+		assertEquals(10L, response.getTotal());
+		assertEquals(0, response.getHiddenCount());
+	}
+
+	@Test
+	void 기준_상품이_없거나_게시가_아니면_거르지_않는다() {
+		// Given: 번호 99는 없는 상품, 번호 98은 판매 종료 상품 (요청서 A4, C2)
+		givenCmpTags();
+		givenCountsByCmp();
+		givenBaseProduct(98, ProductStatus.CLOSED, link(98, 1), link(98, 3));
+
+		// When
+		ProductSearchResponseDTO none = service.searchProducts(cmpRequest("99"));
+		ProductSearchResponseDTO closed = service.searchProducts(cmpRequest("98"));
+
+		// Then
+		verify(loanProductRepository, times(4)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
+				anyLong(), eq(0), any(), any(), any(), any(), any(Pageable.class));
+		assertEquals(0, none.getHiddenCount());
+		assertEquals(0, closed.getHiddenCount());
+	}
+
+	@Test
+	void 기준_상품의_용도와_방식_칩으로_거르고_숨긴_수를_센다() {
+		// Given: 기준 상품 10은 생활비 + 원리금균등. 비교함에는 10, 11
+		givenCmpTags();
+		givenCountsByCmp();
+		givenBaseProduct(10, ProductStatus.ON, link(10, 1), link(10, 3));
+
+		// When
+		ProductSearchResponseDTO response = service.searchProducts(cmpRequest("10,11"));
+
+		// Then: 비교함 번호, 기준 용도 칩(생활비), 세 방식 칩, 기준 방식 칩(원리금균등)을 쿼리에 보냄
+		ArgumentCaptor<Collection<Long>> cmpIds = ArgumentCaptor.forClass(Collection.class);
+		ArgumentCaptor<Collection<Long>> purposeIds = ArgumentCaptor.forClass(Collection.class);
+		ArgumentCaptor<Collection<Long>> allMethodIds = ArgumentCaptor.forClass(Collection.class);
+		ArgumentCaptor<Collection<Long>> methodIds = ArgumentCaptor.forClass(Collection.class);
+		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
+				anyLong(), eq(1), cmpIds.capture(), purposeIds.capture(), allMethodIds.capture(), methodIds.capture(),
+				any(Pageable.class));
+		assertTrue(cmpIds.getAllValues().get(0).containsAll(List.of(10L, 11L)));
+		assertEquals(List.of(1L), List.copyOf(purposeIds.getAllValues().get(0)));
+		assertTrue(allMethodIds.getAllValues().get(0).containsAll(List.of(3L, 4L, 5L)));
+		assertEquals(3, allMethodIds.getAllValues().get(0).size());
+		assertEquals(List.of(3L), List.copyOf(methodIds.getAllValues().get(0)));
+		// 건수는 거른 뒤 값 (4), 숨긴 수는 거르기 전 10 - 4
+		assertEquals(4L, response.getTotal());
+		assertEquals(6, response.getHiddenCount());
+	}
+
+	@Test
+	void 기준_상품에_방식_칩이_없으면_세_방식_모두로_본다() {
+		// Given: 기준 상품 10은 생활비만, 상환 방식은 기타(세 방식 아님)
+		givenCmpTags();
+		givenCountsByCmp();
+		givenBaseProduct(10, ProductStatus.ON, link(10, 1), link(10, 6));
+
+		// When
+		service.searchProducts(cmpRequest("10"));
+
+		// Then
+		ArgumentCaptor<Collection<Long>> methodIds = ArgumentCaptor.forClass(Collection.class);
+		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
+				anyLong(), eq(1), any(), any(), any(), methodIds.capture(), any(Pageable.class));
+		assertEquals(3, methodIds.getAllValues().get(0).size());
+		assertTrue(methodIds.getAllValues().get(0).containsAll(List.of(3L, 4L, 5L)));
+	}
+
+	@Test
+	void 기준_상품에_용도_칩이_없으면_겹치는_용도가_없다() {
+		// Given: 기준 상품 10은 칩이 원리금균등뿐 (용도 없음)
+		givenCmpTags();
+		givenCountsByCmp();
+		givenBaseProduct(10, ProductStatus.ON, link(10, 3));
+
+		// When
+		service.searchProducts(cmpRequest("10"));
+
+		// Then: 용도 칩 자리에 -1 하나 (자기 자신만 보임)
+		ArgumentCaptor<Collection<Long>> purposeIds = ArgumentCaptor.forClass(Collection.class);
+		verify(loanProductRepository, times(2)).searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(),
+				anyLong(), eq(1), any(), purposeIds.capture(), any(), any(), any(Pageable.class));
+		assertEquals(List.of(-1L), List.copyOf(purposeIds.getAllValues().get(0)));
+	}
+
+	@Test
+	void 간편_검색은_용도와_방식이_겹치는_상품만_남기고_비교함_상품은_항상_보인다() {
+		// Given: 기준 10 = 생활비 + 원리금균등. 모두 비대면 (키워드 충족)
+		// A 생활비+원리금균등 (통과) / B 전월세 (용도 안 겹침) / C 생활비+만기일시 (방식 안 겹침)
+		// D 생활비, 방식 칩 없음 (세 방식 모두라 통과) / E 전월세지만 비교함 상품 (항상 보임)
+		givenKeywordData(online(1, "A"), online(2, "B"), online(3, "C"), online(4, "D"), online(5, "E"));
+		givenCmpTags();
+		givenBaseProduct(10, ProductStatus.ON, link(10, 1), link(10, 3));
+		List<ProductTag> links = List.of(link(1, 1), link(1, 3), link(2, 2), link(3, 1), link(3, 5), link(4, 1), link(5, 2));
+		when(productTagRepository.findAll()).thenReturn(links);
+
+		// When
+		KeywordSearchResponseDTO response = service
+				.searchKeywords(new KeywordSearchRequestDTO(List.of("비대면"), "10,5"));
+
+		// Then
+		assertEquals(List.of("A", "D", "E"), response.getItems().stream().map(item -> item.getProduct().getProductName()).toList());
+		assertEquals(2, response.getHiddenCount());
+	}
+
+	@Test
+	void 간편_검색에_cmp가_없으면_숨긴_수는_0이다() {
+		// Given
+		givenKeywordData(online(1, "A"));
+
+		// When
+		KeywordSearchResponseDTO response = service.searchKeywords(keywords("비대면"));
+
+		// Then
+		assertEquals(1, response.getItems().size());
+		assertEquals(0, response.getHiddenCount());
+	}
+
+	private LoanProduct online(long id, String name) {
+		LoanProduct product = product(id, "은행" + id, name, "3.0");
+		when(product.getOnlineYn()).thenReturn("Y");
+		return product;
 	}
 }

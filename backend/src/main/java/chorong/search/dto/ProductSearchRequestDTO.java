@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
  * 상품 상세 검색 요청 (SEARCH-01, GET /api/products 쿼리 값)
  * 필터 8개는 칩 값을 쉼표로 이은 글 (예: region=서울,부산). 값이 정해진 목록에 있는지, 칩 20개 이하인지는 Service에서 확인 (B19)
  * 비어 있으면 기본값: rt NUM, sort base, page 1, size 20
+ * cmp(비교함 상품 번호)가 있으면 첫 상품과 자금 용도, 상환 방식이 겹치는 상품만 (요청서 A)
  */
 @Data
 @NoArgsConstructor
@@ -44,6 +45,9 @@ public class ProductSearchRequestDTO {
 
 	@Size(max = 1000)
 	private String credit;		// 신용점수 구간
+
+	@Pattern(regexp = "[0-9]{1,18}(,[0-9]{1,18})?")
+	private String cmp;			// 비교함 상품 번호 1~2개 (쉼표, 첫 번째가 기준 상품). 없으면 거르지 않음
 
 	@Pattern(regexp = "NUM|MEMO")
 	private String rt;			// NUM 금리 표시 / MEMO 금리 기관 문의

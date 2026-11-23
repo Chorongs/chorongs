@@ -1,6 +1,7 @@
 package chorong.search.service;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -93,6 +94,14 @@ public class SearchServiceImpl implements SearchService {
 	private record Scored(Candidate candidate, List<String> matched, List<String> reasons) {
 	}
 
+	// 비교함 기준 상품 (요청서 A): ids = 비교함 상품 번호 (항상 보임), purposes = 기준 상품의 자금 용도 칩 값,
+	// methods = 기준 상품의 상환 방식 칩 값 (원리금균등, 원금균등, 만기일시 중. 이 셋이 하나도 없으면 셋 모두)
+	private record CmpBase(Set<Long> ids, Set<String> purposes, Set<String> methods) {
+	}
+
+	private static final int MAX_CMP = 2;							// 비교함 상품 수
+	private static final List<String> REPAY_METHODS = List.of("원리금균등", "원금균등", "만기일시");
+
 	private static final List<GroupDef> FIN_GROUPS = List.of(
 			new GroupDef("은행권", List.of("시중은행", "지방은행", "특수은행", "인터넷은행")),
 			new GroupDef("비은행권", List.of("저축은행", "캐피탈", "생명보험", "신협", "카드사", "손해보험")),
@@ -145,6 +154,7 @@ public class SearchServiceImpl implements SearchService {
 			sort = SORT_BASE;
 		}
 		Map<String, List<String>> selected = readFilters(request);
+		List<Long> cmpIds = readCmpIds(request.getCmp());
 
 		// 3. 필터: 고른 필터마다 칩 번호 모으기. 칩이 DB에 하나도 없는 필터가 있으면 맞는 상품이 없음
 		List<Tag> allTags = getAllTags();
@@ -165,11 +175,19 @@ public class SearchServiceImpl implements SearchService {
 					.map(Tag::getTagId)
 					.toList();
 			if (ids.isEmpty()) {
-				return new ProductSearchResponseDTO(List.of(), 0L, page, size, 0, 0);
+				return new ProductSearchResponseDTO(List.of(), 0L, page, size, 0, 0, 0);
 			}
 			tagIds.addAll(ids);
 			groupCount++;
 		}
+
+		// 비교함 기준 (cmp): 기준 상품(첫 번호)이 게시(ON)가 아니거나 없으면 거르지 않음
+		CmpBase cmpBase = findCmpBase(cmpIds, allTags);
+		int useCmp = cmpBase == null ? 0 : 1;
+		List<Long> cmpIdsArg = cmpBase == null ? List.of(NO_ID) : List.copyOf(cmpBase.ids());
+		List<Long> cmpPurposeArg = cmpBase == null ? List.of(NO_ID) : tagIdsOf(allTags, TagType.PURPOSE, cmpBase.purposes());
+		List<Long> allMethodArg = tagIdsOf(allTags, TagType.REPAY, REPAY_METHODS);
+		List<Long> cmpMethodArg = cmpBase == null ? List.of(NO_ID) : tagIdsOf(allTags, TagType.REPAY, cmpBase.methods());
 
 		// 6. 검색어 q: 상품명, 취급기관명 (Repository에서) + 상품 칩 값 (여기서 칩 번호로)
 		String lowerQ = q.toLowerCase(Locale.ROOT);
@@ -187,19 +205,106 @@ public class SearchServiceImpl implements SearchService {
 		List<Long> tagIdsArg = tagIds.isEmpty() ? List.of(NO_ID) : List.copyOf(tagIds);
 		Pageable pageable = PageRequest.of(page - 1, size, buildSort(sort));
 		Page<LoanProduct> result = loanProductRepository.searchProducts(ProductStatus.ON, rateMode(rt), useQ, qArg,
-				qIdsArg, useTags, tagIdsArg, groupCount, pageable);
+				qIdsArg, useTags, tagIdsArg, groupCount, useCmp, cmpIdsArg, cmpPurposeArg, allMethodArg, cmpMethodArg,
+				pageable);
 
 		// 8. 금리 안내, 금리 기관 문의 건수는 rt 조건을 뺀 값 (다른 탭 건수는 한 줄만 받아 건수만 읽음)
 		String otherRt = RT_NUM.equals(rt) ? RT_MEMO : RT_NUM;
 		long otherTotal = loanProductRepository.searchProducts(ProductStatus.ON, rateMode(otherRt), useQ, qArg, qIdsArg,
-				useTags, tagIdsArg, groupCount, PageRequest.of(0, 1)).getTotalElements();
+				useTags, tagIdsArg, groupCount, useCmp, cmpIdsArg, cmpPurposeArg, allMethodArg, cmpMethodArg,
+				PageRequest.of(0, 1)).getTotalElements();
 		int thisCount = Math.toIntExact(result.getTotalElements());
 		int otherCount = Math.toIntExact(otherTotal);
 		int numCount = RT_NUM.equals(rt) ? thisCount : otherCount;
 		int memoCount = RT_NUM.equals(rt) ? otherCount : thisCount;
 
+		// 숨긴 상품 수: 비교함 기준을 뺀 같은 검색의 지금 금리 탭 건수 - 거른 뒤 건수 (비교함 기준이 없으면 0)
+		int hiddenCount = 0;
+		if (useCmp == 1) {
+			long unfiltered = loanProductRepository.searchProducts(ProductStatus.ON, rateMode(rt), useQ, qArg, qIdsArg,
+					useTags, tagIdsArg, groupCount, 0, List.of(NO_ID), List.of(NO_ID), List.of(NO_ID), List.of(NO_ID),
+					PageRequest.of(0, 1)).getTotalElements();
+			hiddenCount = Math.toIntExact(unfiltered - result.getTotalElements());
+		}
+
 		return new ProductSearchResponseDTO(List.copyOf(toSummaries(result.getContent())), result.getTotalElements(),
-				page, size, numCount, memoCount);
+				page, size, numCount, memoCount, hiddenCount);
+	}
+
+	// cmp 읽기: 숫자 1~2개 (쉼표). 숫자가 아니거나 3개 이상이면 400. 비었으면 빈 목록 (거르지 않음)
+	private List<Long> readCmpIds(String cmp) {
+		if (cmp == null || cmp.isBlank()) {
+			return List.of();
+		}
+		Set<Long> ids = new LinkedHashSet<>();
+		String[] parts = cmp.split(",", -1);
+		if (parts.length > MAX_CMP) {
+			throw new BusinessException(ErrorCode.INVALID_INPUT);
+		}
+		for (String part : parts) {
+			String text = part.trim();
+			if (!text.matches("[0-9]{1,18}")) {
+				throw new BusinessException(ErrorCode.INVALID_INPUT);
+			}
+			ids.add(Long.parseLong(text));
+		}
+		return List.copyOf(ids);
+	}
+
+	// 비교함 기준 상품의 용도, 상환 방식 칩 읽기. 첫 번호 상품이 없거나 게시(ON)가 아니면 null (요청서 C2)
+	private CmpBase findCmpBase(List<Long> cmpIds, List<Tag> allTags) {
+		if (cmpIds.isEmpty()) {
+			return null;
+		}
+		LoanProduct base = loanProductRepository.findById(cmpIds.get(0)).orElse(null);
+		if (base == null || base.getProductStatus() != ProductStatus.ON) {
+			return null;
+		}
+		Map<Long, Tag> tagById = new HashMap<>();
+		for (Tag tag : allTags) {
+			tagById.put(tag.getTagId(), tag);
+		}
+		Set<String> purposes = new HashSet<>();
+		Set<String> methods = new HashSet<>();
+		for (ProductTag productTag : productTagRepository.findByProductIdIn(List.of(base.getProductId()))) {
+			Tag tag = tagById.get(productTag.getTagId());
+			if (tag == null) {
+				continue;
+			}
+			if (tag.getTagType() == TagType.PURPOSE) {
+				purposes.add(tag.getTagValue());
+			} else if (tag.getTagType() == TagType.REPAY && REPAY_METHODS.contains(tag.getTagValue())) {
+				methods.add(tag.getTagValue());
+			}
+		}
+		// 세 방식이 하나도 없으면 방식 정보가 없는 상품: 세 방식 모두 가능
+		if (methods.isEmpty()) {
+			methods.addAll(REPAY_METHODS);
+		}
+		return new CmpBase(Set.copyOf(cmpIds), Set.copyOf(purposes), Set.copyOf(methods));
+	}
+
+	// 칩 종류, 값 -> 칩 번호 목록 (없으면 -1 하나)
+	private List<Long> tagIdsOf(List<Tag> allTags, TagType type, Collection<String> values) {
+		List<Long> ids = allTags.stream()
+				.filter(tag -> tag.getTagType() == type && values.contains(tag.getTagValue()))
+				.map(Tag::getTagId)
+				.toList();
+		return ids.isEmpty() ? List.of(NO_ID) : ids;
+	}
+
+	// 비교함 기준을 통과하는지 (간편 검색, 메모리 판정). 규칙은 위 searchProducts 쿼리, 프론트 E15와 같음
+	private boolean passesCmp(CmpBase cmp, Candidate candidate) {
+		if (cmp.ids().contains(candidate.product().getProductId())) {
+			return true;
+		}
+		Set<String> purposes = candidate.tagValues().getOrDefault(TagType.PURPOSE, Set.of());
+		if (purposes.stream().noneMatch(cmp.purposes()::contains)) {
+			return false;
+		}
+		Set<String> own = new HashSet<>(candidate.tagValues().getOrDefault(TagType.REPAY, Set.of()));
+		own.retainAll(REPAY_METHODS);
+		return own.isEmpty() || own.stream().anyMatch(cmp.methods()::contains);
 	}
 
 	private boolean isKnownSort(String sort) {
@@ -384,9 +489,12 @@ public class SearchServiceImpl implements SearchService {
 	public KeywordSearchResponseDTO searchKeywords(KeywordSearchRequestDTO request) {
 		// 1. 정해진 키워드만 (중복은 뺌), 최대 5개
 		List<String> keywords = readKeywords(request);
+		List<Long> cmpIds = readCmpIds(request.getCmp());
+		CmpBase cmpBase = findCmpBase(cmpIds, getAllTags());
 
 		// 2, 3. 게시이고 금리 숫자 있는 상품마다 키워드별 충족 여부와 이유 문구
 		List<Scored> scored = new ArrayList<>();
+		int hiddenCount = 0;
 		for (Candidate candidate : getCandidates()) {
 			List<String> matched = new ArrayList<>();
 			List<String> reasons = new ArrayList<>();
@@ -399,7 +507,12 @@ public class SearchServiceImpl implements SearchService {
 			}
 			// 4. 충족 키워드 1개 이상인 상품만
 			if (!matched.isEmpty()) {
-				scored.add(new Scored(candidate, matched, reasons));
+				// 비교함 기준에 안 맞는 상품은 빼고 숨긴 수만 셈
+				if (cmpBase != null && !passesCmp(cmpBase, candidate)) {
+					hiddenCount++;
+				} else {
+					scored.add(new Scored(candidate, matched, reasons));
+				}
 			}
 		}
 
@@ -424,7 +537,7 @@ public class SearchServiceImpl implements SearchService {
 				}
 			}
 		}
-		return new KeywordSearchResponseDTO(List.copyOf(items), List.copyOf(missed));
+		return new KeywordSearchResponseDTO(List.copyOf(items), List.copyOf(missed), hiddenCount);
 	}
 
 	// 키워드 확인 (B19): 모르는 키워드, 없음, 중복을 뺀 6개 이상은 400

@@ -61,7 +61,7 @@ class SearchControllerTest {
 	void 정상_요청은_200이고_빈_결과도_오류가_아니다() throws Exception {
 		// Given
 		when(loanProductRepository.searchProducts(any(), anyInt(), anyInt(), any(), any(), anyInt(), any(), anyLong(),
-				any(Pageable.class)))
+				anyInt(), any(), any(), any(), any(), any(Pageable.class)))
 				.thenReturn(new PageImpl<LoanProduct>(List.of(), PageRequest.of(0, 20), 0));
 
 		// When, Then
@@ -96,6 +96,17 @@ class SearchControllerTest {
 		mockMvc.perform(get("/api/products").param("page", "abc"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		verifyNoInteractions(loanProductRepository);
+	}
+
+	@Test
+	void 비교함_cmp가_숫자가_아니거나_3개_이상이면_400이다() throws Exception {
+		// Given, When, Then
+		for (String bad : List.of("abc", "1,2,3", "1,,2", "")) {
+			mockMvc.perform(get("/api/products").param("cmp", bad))
+					.andExpect(status().isBadRequest())
+					.andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+		}
 		verifyNoInteractions(loanProductRepository);
 	}
 
