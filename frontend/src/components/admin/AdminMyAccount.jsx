@@ -11,7 +11,8 @@ import Modal from '../ui/Modal'
 
 // AD-10 내 계정: 이름, 이메일, 역할, 로그인 끝나는 시각, 승인 일시 · 승인한 사람, 마지막 로그인 (API-47 GET) / [관리자 탈퇴]
 // [관리자 탈퇴] → 확인 창 (되돌릴 수 없음, 내 이메일 다시 입력. 다르면 버튼 잠금) → API-47 DELETE → 스토어 guest → /admin/login
-// 마지막 승인권자 → 서버 문구 ('다른 승인권자를 먼저 지정해 주세요') / 연타 방지 (E5) / 관리자는 언제든 탈퇴 가능
+// 마지막 승인권자 → 열 때 정상 승인권자 수를 세어 (API-46 GET) 요청 전에 [관리자 탈퇴] 잠금 + 문구
+//   목록을 못 읽으면 열어 둠, 서버 409 '다른 승인권자를 먼저 지정해 주세요'는 두 번째 방어 / 연타 방지 (E5)
 // AdminResponseDTO: adminName, adminEmail, adminRole, approvedBy, approvedByName, approvedAt, lastLoginAt
 const Wrap = styled.section`
   display: flex;
@@ -92,6 +93,15 @@ const Status = styled.p`
   text-align: center;
 `
 
+// 마지막 승인권자라 탈퇴를 잠갔을 때 설명 아래 안내 (주의 색)
+const LockNote = styled.strong`
+  display: block;
+  margin-top: 8px;
+  color: var(--warn);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+`
+
 const DialogTitle = styled.h2`
   margin-bottom: 16px;
   font-size: var(--fs-h3);
@@ -146,12 +156,24 @@ const DialogActions = styled.div`
   gap: 8px;
 `
 
+const LAST_APPROVER_TEXT = '마지막 승인권자라 탈퇴할 수 없어요. 관리자 계정에서 다른 승인권자를 먼저 지정해 주세요'
+
+// 정상 승인권자가 나 혼자인지 (서버와 같은 기준: 정상 + 승인권자, 잠김도 셈). 목록을 못 읽으면 false (버튼은 열어 둠)
+async function checkLastApprover() {
+  try {
+    const admins = await adminApi.getAdmins('ACTIVE')
+    return (admins ?? []).filter((admin) => admin.adminRole === 'APPROVER').length <= 1
+  } catch {
+    return false
+  }
+}
+
 // 승인한 사람: 이름 / 번호만 있으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자
 function AdminMyAccount() {
   const navigate = useNavigate()
   const expiresAt = useAdminStore((state) => state.expiresAt)
   const showToast = useUiStore((state) => state.showToast)
-  const [result, setResult] = useState({ status: 'loading', me: null })
+  const [result, setResult] = useState({ status: 'loading', me: null, isLastApprover: false })
   const [attempt, setAttempt] = useState(0)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [emailInput, setEmailInput] = useState('')
@@ -160,13 +182,16 @@ function AdminMyAccount() {
 
   useEffect(() => {
     let isCancelled = false
+    // 내 정보 + (승인권자면) 마지막 승인권자 여부를 다 받은 뒤 그림 (버튼이 열렸다 잠기는 깜빡임 없게)
     adminApi
       .getAdminMe()
-      .then((data) => {
-        if (!isCancelled) setResult({ status: 'done', me: data ?? null })
+      .then(async (data) => {
+        const me = data ?? null
+        const isLastApprover = me?.adminRole === 'APPROVER' ? await checkLastApprover() : false
+        if (!isCancelled) setResult({ status: 'done', me, isLastApprover })
       })
       .catch((err) => {
-        if (!isCancelled && err.response?.status !== 401) setResult({ status: 'error', me: null })
+        if (!isCancelled && err.response?.status !== 401) setResult({ status: 'error', me: null, isLastApprover: false })
       })
     return () => {
       isCancelled = true
@@ -174,7 +199,7 @@ function AdminMyAccount() {
   }, [attempt])
 
   const reload = () => {
-    setResult({ status: 'loading', me: null })
+    setResult({ status: 'loading', me: null, isLastApprover: false })
     setAttempt((count) => count + 1)
   }
 
@@ -238,8 +263,9 @@ function AdminMyAccount() {
           <div>
             <b>관리자 탈퇴</b>
             <p>탈퇴하면 이메일과 이름을 지우고 바로 로그아웃해요. 남긴 기록은 ‘탈퇴한 관리자’로 보여요. 같은 이메일로 다시 쓰려면 새로 가입 신청해야 해요.</p>
+            {result.isLastApprover && <LockNote>{LAST_APPROVER_TEXT}</LockNote>}
           </div>
-          <Button $size="sm" $variant="outline" onClick={openConfirm}>
+          <Button $size="sm" $variant="outline" onClick={openConfirm} disabled={result.isLastApprover}>
             관리자 탈퇴
           </Button>
         </Out>
