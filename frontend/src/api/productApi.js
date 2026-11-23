@@ -27,7 +27,7 @@ export const postEligibility = async (productId, input) => {
   return response.data.data
 }
 
-// API-01 상품 상세 검색 (SR-02): { q, target, purpose, amount, repay, fin, inst, region, credit (쉼표로 이은 글), rt, sort, page, size }
+// API-01 상품 상세 검색 (SR-02): { q, target, purpose, amount, repay, fin, inst, region, credit (쉼표로 이은 글), rt, sort, page, size, cmp (비교함 상품 번호, 쉼표로 이은 글, 선택) }
 export async function getProducts(params) {
   const response = await api.get('/api/products', { params })
   return response.data.data

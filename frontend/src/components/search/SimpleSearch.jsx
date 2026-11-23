@@ -5,7 +5,7 @@ import { postSearch } from '../../api/myApi'
 import { postKeywordSearch } from '../../api/recommendApi'
 import { getKeywordLabel, KEYWORD_ALL, KEYWORD_GROUPS, KEYWORD_MAX } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import useCompareStore from '../../store/useCompareStore'
 import { Button, EmptyBox, Panel } from '../../styles/common'
 import ProductList from '../common/ProductList'
 import PurposeFilterBanner from '../common/PurposeFilterBanner'
@@ -20,10 +20,11 @@ import SimpleSummary from './SimpleSummary'
     - 키워드가 0개면 안내 글만 (요청 안 보냄). 결과 0건이면 빈 상태 (E11), 실패면 문구 + [다시 시도] (E3)
     - 회원: 키워드가 바뀌고 0.7초 뒤 최근 검색 기록 (API-22 POST, SIMPLE) 한 번만. 실패해도 안내 안 함
       label '간편 검색 · A + B', condition 키워드 목록 (JSON 글)
-    - 비교함에 상품이 있으면 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품은 숨기고 위에 띠 + 숨긴 개수 (CM-10, E15)
+    - 비교함에 상품이 있으면 그 상품 번호를 cmp로 같이 보내 서버가 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
+      위 띠에는 응답의 hiddenCount (숨긴 개수)를 넘김. 프론트는 목록을 따로 거르지 않음. 비교함이 바뀌면 다시 추천
     - 상품 한 줄에는 충족한 키워드 이유 문구 + 'N/M 일치' (ProductRow hits, total). 일치 개수는 이유 문구 개수로 셈
     - 서버 응답 칸 이름은 CHORONG-65 DTO가 올라올 때 맞춘다 (지금은 아래처럼 가정, docs/history/CHORONG-64/fe_search_history.md)
-      API-07: { items: [{ product (ProductSummaryDTO), reasons (충족한 키워드별 이유 문구 목록) }], missedKeywords (1위 상품이 못 맞춘 키워드) }
+      API-07: { items: [{ product (ProductSummaryDTO), reasons (충족한 키워드별 이유 문구 목록) }], missedKeywords (1위 상품이 못 맞춘 키워드), hiddenCount (비교함 기준으로 빠진 수) }
 */
 const RECORD_DELAY_MS = 700 // 키워드가 바뀌고 이만큼 지난 뒤 최근 검색 기록
 
@@ -83,20 +84,27 @@ function SimpleSearch() {
 
   // 추천 요청 (API-07)
   const [attempt, setAttempt] = useState(0)
-  const requestKey = keywords.length > 0 ? JSON.stringify({ keywords, attempt }) : ''
-  const [result, setResult] = useState({ key: '', status: 'loading', items: [], missedKeywords: [] })
+  const cmp = tray.map((item) => item.productId).join(',') // 비교함 상품 번호 (첫 상품이 기준, 비면 '')
+  const requestKey = keywords.length > 0 ? JSON.stringify({ keywords, cmp, attempt }) : ''
+  const [result, setResult] = useState({ key: '', status: 'loading', items: [], missedKeywords: [], hiddenCount: 0 })
   useEffect(() => {
     if (!requestKey) return
-    const { keywords: list } = JSON.parse(requestKey)
+    const { keywords: list, cmp: cmpText } = JSON.parse(requestKey)
     let isCancelled = false
-    postKeywordSearch(list)
+    postKeywordSearch(list, cmpText)
       .then((data) => {
         if (!isCancelled) {
-          setResult({ key: requestKey, status: 'done', items: data?.items ?? [], missedKeywords: data?.missedKeywords ?? [] })
+          setResult({
+            key: requestKey,
+            status: 'done',
+            items: data?.items ?? [],
+            missedKeywords: data?.missedKeywords ?? [],
+            hiddenCount: data?.hiddenCount ?? 0,
+          })
         }
       })
       .catch(() => {
-        if (!isCancelled) setResult({ key: requestKey, status: 'error', items: [], missedKeywords: [] })
+        if (!isCancelled) setResult({ key: requestKey, status: 'error', items: [], missedKeywords: [], hiddenCount: 0 })
       })
     return () => {
       isCancelled = true
@@ -117,14 +125,7 @@ function SimpleSearch() {
     return () => clearTimeout(timer)
   }, [isMember, historyLabel, conditionText])
 
-  // 비교함 필터: 비교함 첫 상품과 안 겹치는 상품은 숨김 (이미 비교함에 담긴 상품은 보임)
-  const isHiddenByTray = (product) =>
-    tray.length > 0 &&
-    !tray.some((item) => item.productId === product.productId) &&
-    getCompareBlock(tray[0], product) !== null
-  const shownItems = view.items.filter((item) => !isHiddenByTray(item.product))
-  const hiddenCount = view.items.length - shownItems.length
-  // 요약은 서버가 준 1위 기준 (1위가 비교함 때문에 숨겨져도 요약은 그대로)
+  // 요약은 서버가 준 1위 기준 (비교함 기준으로 거른 뒤의 1위)
   const best = view.items[0]
 
   const renderResults = () => {
@@ -142,6 +143,9 @@ function SimpleSearch() {
         </EmptyBox>
       )
     }
+    if (view.items.length === 0 && view.hiddenCount > 0) {
+      return <EmptyBox>비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 키워드를 바꿔 보세요.</EmptyBox>
+    }
     if (view.items.length === 0) return <EmptyBox>이 조합에 맞는 상품이 없어요. 키워드를 줄여 보세요.</EmptyBox>
     return (
       <>
@@ -151,12 +155,11 @@ function SimpleSearch() {
           matchedCount={best.reasons?.length ?? 0}
           missedKeywords={view.missedKeywords}
         />
-        <PurposeFilterBanner hiddenCount={hiddenCount} />
+        <PurposeFilterBanner hiddenCount={view.hiddenCount} />
         <ListWrap>
           <ProductList
-            items={shownItems.map((item) => item.product)}
-            emptyText="비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요"
-            getRowProps={(_, index) => ({ hits: shownItems[index].reasons ?? [], total: keywords.length })}
+            items={view.items.map((item) => item.product)}
+            getRowProps={(_, index) => ({ hits: view.items[index].reasons ?? [], total: keywords.length })}
           />
         </ListWrap>
       </>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { getSearches, postSearch } from '../../api/myApi'
@@ -11,9 +11,9 @@ import {
   SEARCH_SORT_OPTIONS,
 } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import useCompareStore from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, Panel } from '../../styles/common'
+import { Button, EmptyBox, IconButton, Panel } from '../../styles/common'
 import ProductList from '../common/ProductList'
 import PurposeFilterBanner from '../common/PurposeFilterBanner'
 import Icon from '../ui/Icon'
@@ -25,14 +25,15 @@ import ResultBar from './ResultBar'
 
 /*
     SR-02 상세 검색 탭 (/search): 검색칸 + 필터 8줄 + 적용 조건 + 최근 검색 + 결과 바 + 상품 목록
-    - 조건은 주소(?q=&target=&purpose=&amount=&repay=&fin=&inst=&region=&credit=&rt=&sort=)에 남김 (useSearchParams, 여러 값은 쉼표).
-      바꿀 때는 replace로 주소를 갈아끼움 (뒤로 가기가 조건 한 칸씩이 아니라 이전 화면으로 가게). page는 주소에 안 넣음
+    - 조건은 주소(?q=&target=&purpose=&amount=&repay=&fin=&inst=&region=&credit=&rt=&sort=&page=)에 남김 (useSearchParams, 여러 값은 쉼표).
+      바꿀 때는 replace로 주소를 갈아끼움 (뒤로 가기가 조건 한 칸씩이 아니라 이전 화면으로 가게). page는 1쪽이면 안 적음
     - 주소 값은 누구나 바꿀 수 있어서 정해진 값만 씀: rt, sort는 정해진 코드 아니면 기본값, 필터 값은 API-52 칩 목록에 있는 것만
       → 칩 목록을 받은 뒤에 검색함. 칩 목록을 못 받으면 필터 구역만 실패 문구 + [다시 시도] (E3), 검색은 검색어만으로 함
-    - 검색어는 입력 멈춘 뒤 0.3초 뒤 요청 (E8, SearchField), 결과는 20개씩 [더 보기] (E7)
+    - 검색어는 입력 멈춘 뒤 0.3초 뒤 요청 (E8, SearchField), 결과는 20개씩 번호 쪽 나눔 (이전, 다음 + '1 / 70' + 쪽 번호 입력 이동, 요청서 D7). 조건이 바뀌면 1쪽으로
     - 회원: 조건이 바뀌고 0.7초 뒤 최근 검색 기록 (API-22 POST, FILTER). 실패해도 안내 안 함 (서버 CHORONG-42가 올라오기 전에는 '준비 중')
     - 조건도 검색 기록도 없으면 상품 목록 대신 맞춤 추천 바로가기만 (명세서 SR-02)
-    - 비교함에 상품이 있으면 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품은 숨기고 위에 띠 + 숨긴 개수 (CM-10, E15). 숨긴 개수는 지금까지 받은 목록 기준
+    - 비교함에 상품이 있으면 그 상품 번호를 cmp(쉼표, 첫 상품이 기준)로 같이 보내 서버가 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
+      → 목록, 건수, 쪽 수는 거른 뒤 값. 위 띠에는 응답의 hiddenCount (숨긴 개수, 지금 금리 탭 기준)를 넘김. 프론트는 목록을 따로 거르지 않음. 비교함이 바뀌면 다시 검색
     - 서버 응답 칸 이름은 CHORONG-65 DTO가 올라올 때 맞춘다 (지금은 아래처럼 가정, docs/history/CHORONG-64/fe_search_history.md)
       API-01: { list, total, page, size, numCount (금리 표시 상품 수), memoCount (금리 기관 문의 상품 수) }
       API-52: { filters: [{ key, chips: [{ value, label, count }], groups (금융권만): [{ value, label, count, members: [세분류 값] }] }] }
@@ -42,6 +43,7 @@ const RATE_TYPES = ['NUM', 'MEMO']
 const SORTS = SEARCH_SORT_OPTIONS.map((option) => option.value)
 const RECORD_DELAY_MS = 700 // 조건이 바뀌고 이만큼 지난 뒤 최근 검색 기록 (SR-02)
 const LABEL_MAX = 200 // 최근 검색 label 최대 글자 수 (서버 B2)
+const PAGE_MAX = 100000 // 서버가 받는 쪽 번호 최대 (ProductSearchRequestDTO)
 // 필터 줄 아래 작은 안내: 신용점수는 'NICE 기준' (SR-03), 필요 금액은 한도 기준 (칩이 상품의 최대 한도로 붙어서)
 const FILTER_HINT = {
   amount: '한도(최대로 빌릴 수 있는 금액) 기준이에요.',
@@ -111,6 +113,60 @@ const Results = styled.div`
   gap: 12px;
 `
 
+// 쪽을 넘기면 여기로 스크롤 (위쪽 고정 머리 높이만큼 띄움)
+const ResultsTop = styled.div`
+  scroll-margin-top: 84px;
+`
+
+// 쪽 넘김: 맞춤 추천 결과(RecommendResult)와 같은 모양 (이전, 다음 화살표 + '1 / 70')
+const Pager = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 20px;
+`
+
+const PrevButton = styled(IconButton)`
+  & [data-icon] {
+    transform: rotate(180deg);
+  }
+`
+
+const PageNumber = styled.span`
+  color: var(--cocoa);
+  font-size: var(--fs-sm);
+  font-weight: 800;
+`
+
+// 쪽 번호를 입력해 바로 이동
+const GoForm = styled.form`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+`
+
+const GoInput = styled.input`
+  width: 64px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: var(--fs-base);
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  &:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+  }
+`
+
 // 쉼표로 이은 글 → 값 목록 (빈 값, 중복 제거, 한 필터 20개까지)
 function parseList(text) {
   const values = String(text ?? '')
@@ -131,11 +187,14 @@ function readParams(searchParams) {
   let sort = SORTS.includes(sortValue) ? sortValue : 'base'
   // 금리 기관 문의 탭에서는 금리 낮은 순을 끔
   if (rt === 'MEMO' && sort === 'rate') sort = 'base'
-  return { q: (searchParams.get('q') ?? '').trim().slice(0, SEARCH_QUERY_MAX), lists, rt, sort }
+  // 쪽: 1 이상 정수만 (이상한 값은 1쪽)
+  const pageNumber = Number(searchParams.get('page'))
+  const page = Number.isInteger(pageNumber) && pageNumber >= 1 ? Math.min(pageNumber, PAGE_MAX) : 1
+  return { q: (searchParams.get('q') ?? '').trim().slice(0, SEARCH_QUERY_MAX), lists, rt, sort, page }
 }
 
 // 조건 → 주소 값 (기본값은 안 적음)
-function buildSearchParams({ q, lists, rt, sort }) {
+function buildSearchParams({ q, lists, rt, sort, page }) {
   const params = new URLSearchParams()
   if (q) params.set('q', q)
   SEARCH_FILTERS.forEach(({ key }) => {
@@ -143,6 +202,7 @@ function buildSearchParams({ q, lists, rt, sort }) {
   })
   if (rt !== 'NUM') params.set('rt', rt)
   if (sort !== 'base') params.set('sort', sort)
+  if (page > 1) params.set('page', String(page))
   return params
 }
 
@@ -195,9 +255,9 @@ function DetailSearch() {
   const baseLists = isChipsDone ? applied : raw.lists
   const hasConditions = Boolean(raw.q) || SEARCH_FILTERS.some(({ key }) => baseLists[key].length > 0)
 
-  // 주소 바꾸기 (바꿀 것만 넘김)
+  // 주소 바꾸기 (바꿀 것만 넘김). 조건을 바꾸면 1쪽으로, 쪽만 바꿀 때는 page를 같이 넘김
   const writeParams = (changes) => {
-    setSearchParams(buildSearchParams({ ...raw, lists: baseLists, ...changes }), { replace: true })
+    setSearchParams(buildSearchParams({ ...raw, lists: baseLists, page: 1, ...changes }), { replace: true })
   }
   const handleSearch = (text) => writeParams({ q: text })
   const handleFilterChange = (key, values) => writeParams({ lists: { ...baseLists, [key]: values } })
@@ -277,7 +337,7 @@ function DetailSearch() {
       lists[key] = parseList(Array.isArray(saved[key]) ? saved[key].join(',') : saved[key])
     })
     setSearchParams(
-      buildSearchParams({ q: String(saved.q ?? '').trim().slice(0, SEARCH_QUERY_MAX), lists, rt: 'NUM', sort: 'base' }),
+      buildSearchParams({ q: String(saved.q ?? '').trim().slice(0, SEARCH_QUERY_MAX), lists, rt: 'NUM', sort: 'base', page: 1 }),
       { replace: true },
     )
   }
@@ -285,35 +345,34 @@ function DetailSearch() {
   // 상품 목록 (API-01): 칩 목록 확인이 끝나면, 조건이 있거나 최근 검색이 있을 때만
   const isShortcut = !hasConditions && isHistoryReady && historyItems.length === 0
   const canSearch = chipsState.status !== 'loading' && (hasConditions || (isHistoryReady && !isShortcut))
-  const params = { rt: raw.rt, sort: raw.sort, size: SEARCH_PAGE_SIZE }
+  const params = { rt: raw.rt, sort: raw.sort, size: SEARCH_PAGE_SIZE, page: raw.page }
+  if (tray.length > 0) params.cmp = tray.map((item) => item.productId).join(',') // 비교함 상품 번호 (첫 상품이 기준)
   if (raw.q) params.q = raw.q
   SEARCH_FILTERS.forEach(({ key }) => {
     if (applied[key].length > 0) params[key] = applied[key].join(',')
   })
   const [attempt, setAttempt] = useState(0)
   const requestKey = canSearch ? JSON.stringify({ params, attempt }) : ''
-  const [result, setResult] = useState({ key: '', status: 'loading', items: [], numCount: 0, memoCount: 0, page: 1, isEnd: false })
+  const [result, setResult] = useState({ key: '', status: 'loading', items: [], numCount: 0, memoCount: 0, hiddenCount: 0 })
   useEffect(() => {
     if (!requestKey) return
     const { params: query } = JSON.parse(requestKey)
     let isCancelled = false
-    getProducts({ ...query, page: 1 })
+    getProducts(query)
       .then((data) => {
         if (isCancelled) return
-        const items = data?.list ?? []
         setResult({
           key: requestKey,
           status: 'done',
-          items,
+          items: data?.list ?? [],
           numCount: data?.numCount ?? 0,
           memoCount: data?.memoCount ?? 0,
-          page: 1,
-          isEnd: items.length < SEARCH_PAGE_SIZE,
+          hiddenCount: data?.hiddenCount ?? 0,
         })
       })
       .catch(() => {
         if (!isCancelled) {
-          setResult({ key: requestKey, status: 'error', items: [], numCount: 0, memoCount: 0, page: 1, isEnd: true })
+          setResult({ key: requestKey, status: 'error', items: [], numCount: 0, memoCount: 0, hiddenCount: 0 })
         }
       })
     return () => {
@@ -323,42 +382,26 @@ function DetailSearch() {
   // 조건이 바뀌어 새로 받는 중이면 지난 결과를 안 보여 줌
   const view = result.key === requestKey ? result : { ...result, status: 'loading', items: [] }
 
-  // [더 보기]: 다음 쪽을 받아 뒤에 붙임 (E7, 연타 방지 E5)
-  const [isMoreLoading, setIsMoreLoading] = useState(false)
-  const handleMore = async () => {
-    if (isMoreLoading) return
-    setIsMoreLoading(true)
-    const key = requestKey
-    try {
-      const data = await getProducts({ ...params, page: view.page + 1 })
-      const received = data?.list ?? []
-      setResult((prev) => {
-        if (prev.key !== key) return prev
-        const known = new Set(prev.items.map((item) => item.productId))
-        return {
-          ...prev,
-          items: [...prev.items, ...received.filter((item) => !known.has(item.productId))],
-          page: prev.page + 1,
-          isEnd: received.length < SEARCH_PAGE_SIZE,
-        }
-      })
-    } catch {
-      showToast('상품을 더 불러오지 못했어요. 다시 시도해 주세요')
-    } finally {
-      setIsMoreLoading(false)
-    }
-  }
-
+  // 쪽 넘김 (요청서 D7): 지금 금리 탭의 건수로 전체 쪽 수를 셈. 쪽을 넘기면 결과 바 위로 스크롤
   const tabCount = raw.rt === 'NUM' ? view.numCount : view.memoCount
-  const hasMore = !view.isEnd && view.items.length < tabCount
-
-  // 비교함 필터: 비교함 첫 상품과 안 겹치는 상품은 숨김 (이미 비교함에 담긴 상품은 보임)
-  const isHiddenByTray = (product) =>
-    tray.length > 0 &&
-    !tray.some((item) => item.productId === product.productId) &&
-    getCompareBlock(tray[0], product) !== null
-  const shownItems = view.items.filter((product) => !isHiddenByTray(product))
-  const hiddenCount = view.items.length - shownItems.length
+  const pageCount = Math.max(1, Math.ceil(tabCount / SEARCH_PAGE_SIZE))
+  const resultsRef = useRef(null)
+  const goPage = (page) => {
+    writeParams({ page })
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  // 쪽 번호 입력 이동: 1부터 전체 쪽 수 사이의 정수만 (E2), 아니면 알림
+  const [pageText, setPageText] = useState('')
+  const handleGo = (event) => {
+    event.preventDefault()
+    const number = Number(pageText)
+    if (pageText === '' || !Number.isInteger(number) || number < 1 || number > pageCount) {
+      showToast(`1~${pageCount} 사이의 쪽 번호를 입력해 주세요`)
+      return
+    }
+    setPageText('')
+    if (number !== raw.page) goPage(number)
+  }
 
   const renderResults = () => {
     if (view.status === 'loading') return <EmptyBox role="status">상품을 불러오는 중이에요</EmptyBox>
@@ -372,6 +415,21 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
+    // 건수는 있는데 이 쪽이 비었으면 없는 쪽 (주소의 page를 직접 고쳤을 때 등)
+    if (view.items.length === 0 && tabCount > 0) {
+      return (
+        <EmptyBox>
+          없는 쪽이에요 (전체 {pageCount}쪽)
+          <Button $variant="outline" $size="sm" onClick={() => goPage(1)}>
+            1쪽으로
+          </Button>
+        </EmptyBox>
+      )
+    }
+    // 비교함 기준 때문에 모두 빠진 경우 (서버가 알려 준 숨긴 개수가 있음)
+    if (view.items.length === 0 && view.hiddenCount > 0) {
+      return <EmptyBox>비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>
+    }
     if (view.items.length === 0) {
       return (
         <EmptyBox>
@@ -384,27 +442,7 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
-    if (shownItems.length === 0) {
-      return (
-        <EmptyBox>
-          비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 아직 없어요
-          {hasMore && (
-            <Button $variant="outline" $size="sm" onClick={handleMore} disabled={isMoreLoading}>
-              {isMoreLoading ? '불러오는 중' : '더 보기'}
-            </Button>
-          )}
-        </EmptyBox>
-      )
-    }
-    return (
-      <ProductList
-        items={shownItems}
-        hasMore={hasMore}
-        onMore={handleMore}
-        isMoreLoading={isMoreLoading}
-        getRowProps={() => ({ keyword: raw.q })}
-      />
-    )
+    return <ProductList items={view.items} getRowProps={() => ({ keyword: raw.q })} />
   }
 
   return (
@@ -477,7 +515,7 @@ function DetailSearch() {
           </Button>
         </Shortcut>
       ) : (
-        <>
+        <ResultsTop ref={resultsRef}>
           <ResultBar
             numCount={view.status === 'done' ? view.numCount : null}
             memoCount={view.status === 'done' ? view.memoCount : null}
@@ -487,10 +525,37 @@ function DetailSearch() {
             onChangeSort={handleChangeSort}
           />
           <Results>
-            {view.status === 'done' && <PurposeFilterBanner hiddenCount={hiddenCount} />}
+            {view.status === 'done' && <PurposeFilterBanner hiddenCount={view.hiddenCount} />}
             {renderResults()}
+            {view.status === 'done' && view.items.length > 0 && pageCount > 1 && (
+              <Pager>
+                <PrevButton aria-label="이전 쪽" disabled={raw.page <= 1} onClick={() => goPage(raw.page - 1)}>
+                  <Icon name="chevron_right" />
+                </PrevButton>
+                <PageNumber aria-label={`${pageCount}쪽 중 ${raw.page}쪽`}>
+                  {raw.page} / {pageCount}
+                </PageNumber>
+                <IconButton aria-label="다음 쪽" disabled={raw.page >= pageCount} onClick={() => goPage(raw.page + 1)}>
+                  <Icon name="chevron_right" />
+                </IconButton>
+                <GoForm onSubmit={handleGo}>
+                  <GoInput
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    aria-label="이동할 쪽 번호"
+                    placeholder="쪽"
+                    value={pageText}
+                    onChange={(event) => setPageText(event.target.value.replace(/\D/g, '').slice(0, String(pageCount).length))}
+                  />
+                  <Button type="submit" $variant="outline" $size="sm">
+                    이동
+                  </Button>
+                </GoForm>
+              </Pager>
+            )}
           </Results>
-        </>
+        </ResultsTop>
       )}
     </section>
   )
