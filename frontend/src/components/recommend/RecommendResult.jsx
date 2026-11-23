@@ -221,6 +221,7 @@ const getConditionLabels = (input) => {
     - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
     - 같은 내용은 중복 저장하지 않음: 저장에 성공하면 그 내용(조건 + 순위대로 상품 번호, getSaveKey)을 useRecommendStore.savedKey에 기억하고,
       지금 결과가 같은 내용이면 버튼을 '저장했어요'로 잠금 (새로 추천받아 내용이 달라지면 다시 풀림, 새로고침 뒤에도 유지, 로그아웃 때 clear()로 지움)
+    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 다른 탭, 단말기에서 저장했거나 저장 목록에서 불러온 추천이면 409 → 오류 알림 대신 안내 + 같은 방식으로 '저장했어요' 잠금
     - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
       (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
@@ -275,8 +276,15 @@ function RecommendResult() {
       markSaved(saveKey)
       showToast('추천 결과를 저장했어요')
     } catch (error) {
+      const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 실패 알림을 겹쳐 띄우지 않음 (E4)
-      if (error.response?.status === 401) return
+      if (status === 401) return
+      // 409: 서버에 같은 결과가 이미 있음 (다른 탭, 단말기, 저장 목록에서 불러온 추천). 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (RC-07)
+      if (status === 409) {
+        markSaved(saveKey)
+        showToast('이미 저장한 추천 결과예요')
+        return
+      }
       showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
