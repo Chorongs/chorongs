@@ -18,8 +18,6 @@ public class KeywordSearchResponseDTO {
 
 	private List<Item> items;				// 충족 키워드 수 많은 순 (최대 5개)
 	private List<String> missedKeywords;	// 1위 상품이 못 맞춘 키워드 (고른 순서)
-	private Integer hiddenCount;			// 충족 키워드가 1개 이상인 상품 중 비교함 기준(cmp)으로 빠진 수 (cmp가 없으면 0)
-
 	@Data
 	@NoArgsConstructor
 	@AllArgsConstructor

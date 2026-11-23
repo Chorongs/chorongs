@@ -492,10 +492,12 @@ public class SearchServiceImpl implements SearchService {
 		List<Long> cmpIds = readCmpIds(request.getCmp());
 		CmpBase cmpBase = findCmpBase(cmpIds, getAllTags());
 
-		// 2, 3. 게시이고 금리 숫자 있는 상품마다 키워드별 충족 여부와 이유 문구
+		// 2, 3. 게시이고 금리 숫자 있는 상품 중 비교함 기준에 맞는 것만, 상품마다 키워드별 충족 여부와 이유 문구
 		List<Scored> scored = new ArrayList<>();
-		int hiddenCount = 0;
 		for (Candidate candidate : getCandidates()) {
+			if (cmpBase != null && !passesCmp(cmpBase, candidate)) {
+				continue;
+			}
 			List<String> matched = new ArrayList<>();
 			List<String> reasons = new ArrayList<>();
 			for (String keyword : keywords) {
@@ -507,12 +509,7 @@ public class SearchServiceImpl implements SearchService {
 			}
 			// 4. 충족 키워드 1개 이상인 상품만
 			if (!matched.isEmpty()) {
-				// 비교함 기준에 안 맞는 상품은 빼고 숨긴 수만 셈
-				if (cmpBase != null && !passesCmp(cmpBase, candidate)) {
-					hiddenCount++;
-				} else {
-					scored.add(new Scored(candidate, matched, reasons));
-				}
+				scored.add(new Scored(candidate, matched, reasons));
 			}
 		}
 
@@ -537,7 +534,7 @@ public class SearchServiceImpl implements SearchService {
 				}
 			}
 		}
-		return new KeywordSearchResponseDTO(List.copyOf(items), List.copyOf(missed), hiddenCount);
+		return new KeywordSearchResponseDTO(List.copyOf(items), List.copyOf(missed));
 	}
 
 	// 키워드 확인 (B19): 모르는 키워드, 없음, 중복을 뺀 6개 이상은 400

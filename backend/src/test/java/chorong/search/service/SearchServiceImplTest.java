@@ -765,20 +765,18 @@ class SearchServiceImplTest {
 
 		// Then
 		assertEquals(List.of("A", "D", "E"), response.getItems().stream().map(item -> item.getProduct().getProductName()).toList());
-		assertEquals(2, response.getHiddenCount());
 	}
 
 	@Test
-	void 간편_검색에_cmp가_없으면_숨긴_수는_0이다() {
-		// Given
-		givenKeywordData(online(1, "A"));
+	void 간편_검색에_cmp가_없으면_거르지_않는다() {
+		// Given: 상품 둘 다 비대면
+		givenKeywordData(online(1, "A"), online(2, "B"));
 
 		// When
 		KeywordSearchResponseDTO response = service.searchKeywords(keywords("비대면"));
 
 		// Then
-		assertEquals(1, response.getItems().size());
-		assertEquals(0, response.getHiddenCount());
+		assertEquals(2, response.getItems().size());
 	}
 
 	private LoanProduct online(long id, String name) {
