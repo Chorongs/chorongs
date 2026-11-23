@@ -10,7 +10,7 @@ import jakarta.servlet.http.HttpSession;
  */
 public interface AdminJoinService {
 
-	/** 가입 인증 토큰: 이미 있는 이메일 409 (메일 안 보냄), 아니면 인증 메일을 보낸 뒤 세션에 해시 (이메일과 묶음) + 시각만 저장 */
+	/** 가입 인증 토큰: 이미 있는 이메일 409 (메일 안 보냄), 아니면 인증 메일 보내기를 맡기고 (응답 뒤 전송) 세션에 해시 (이메일과 묶음) + 시각만 저장 */
 	void requestJoinToken(HttpSession session, AdminJoinTokenRequestDTO request);
 
 	/** 가입 신청: 세션 토큰 확인 → 정상 관리자 0명이면 ACTIVE + APPROVER + 바로 로그인, 아니면 PENDING */

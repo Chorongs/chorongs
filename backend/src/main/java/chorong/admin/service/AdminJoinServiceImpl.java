@@ -42,7 +42,7 @@ public class AdminJoinServiceImpl implements AdminJoinService {
 		String email = AdminUtil.normalizeEmail(request.getEmail());
 		checkNotRegistered(email);
 
-		// 메일을 먼저 보내고, 보내진 뒤에만 세션에 저장 (이메일과 묶은 해시: 다른 이메일로는 못 씀)
+		// 인증 메일은 응답 뒤 보냄 (@Async, 실패는 로그만) / 세션에는 이메일과 묶은 해시만 (다른 이메일로는 못 씀)
 		String token = AdminUtil.newToken();
 		adminMailService.sendJoinToken(email, token);
 		session.setAttribute(SessionConst.ADMIN_JOIN_HASH, AdminUtil.sha256(email + ":" + token));
