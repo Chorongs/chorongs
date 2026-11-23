@@ -1,5 +1,7 @@
 package chorong.member.service;
 
+import chorong.calculator.entity.CalcHistory;
+import chorong.calculator.repository.CalcHistoryRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
 import chorong.credit.repository.DiagnosisReportRepository;
@@ -31,13 +33,15 @@ public class MemberServiceImpl implements MemberService {
     private final RecommendResultRepository recommendResultRepository;
     private final DiagnosisReportRepository diagnosisReportRepository;
     private final MemberRepository memberRepository;
+    private final CalcHistoryRepository calcHistoryRepository;
 
     @Override
     @Transactional(readOnly = true)
     public MySummaryResponseDTO getMySummary(Long memberId) {
         return new MySummaryResponseDTO(wishRepository.countByMemberId(memberId),
                 recentViewRepository.countByMemberId(memberId),
-                compareHistoryRepository.countByMemberId(memberId));
+                compareHistoryRepository.countByMemberId(memberId),
+                calcHistoryRepository.countByMemberId(memberId));
 
     }
 
