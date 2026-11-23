@@ -42,6 +42,11 @@ const RATE_TYPES = ['NUM', 'MEMO']
 const SORTS = SEARCH_SORT_OPTIONS.map((option) => option.value)
 const RECORD_DELAY_MS = 700 // 조건이 바뀌고 이만큼 지난 뒤 최근 검색 기록 (SR-02)
 const LABEL_MAX = 200 // 최근 검색 label 최대 글자 수 (서버 B2)
+// 필터 줄 아래 작은 안내: 신용점수는 'NICE 기준' (SR-03), 필요 금액은 한도 기준 (칩이 상품의 최대 한도로 붙어서)
+const FILTER_HINT = {
+  amount: '한도(최대로 빌릴 수 있는 금액) 기준이에요.',
+  credit: '신용점수 구간은 NICE 기준이에요.',
+}
 
 const Box = styled(Panel)`
   display: flex;
@@ -443,7 +448,7 @@ function DetailSearch() {
                   chips={getFilter(key)?.chips ?? []}
                   groups={getFilter(key)?.groups ?? []}
                   selected={applied[key]}
-                  hint={key === 'credit' ? '신용점수 구간은 NICE 기준이에요.' : ''}
+                  hint={FILTER_HINT[key] ?? ''}
                   onChange={(values) => handleFilterChange(key, values)}
                 />
               ))}
