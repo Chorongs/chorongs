@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import { ShortcutPanel } from '../../styles/common'
 import Icon from '../ui/Icon'
 
 // 다른 도구로 가는 알약 버튼 8개 (이동 주소는 화면 목록 순서대로)
@@ -194,22 +195,6 @@ const SampleChip = styled.span`
   color: var(--good);
   font-size: var(--fs-xs);
   font-weight: 800;
-`
-
-// 바로가기 판 (공통 Panel(UI-05)과 여백이 달라 이름을 따로 둠)
-// TODO(RC-10): HelpShortcuts.jsx에 똑같은 ShortcutPanel이 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
-const ShortcutPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 44px 40px;
-  border-radius: var(--r-lg);
-  background: var(--mist);
-
-  @media (max-width: 899px) {
-    padding: 28px 20px 20px;
-  }
 `
 
 const PanelText = styled.p`
