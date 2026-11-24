@@ -31,7 +31,7 @@ class RecommendControllerTest {
 	void setUp() {
 		RecommendService recommendService = mock(RecommendService.class);
 		when(recommendService.getRecommendations(any(), any()))
-				.thenReturn(new RecommendResponseDTO(0, List.of(), List.of(), null, List.of()));
+				.thenReturn(new RecommendResponseDTO(0, List.of(), List.of(), null, List.of(), false));
 		mockMvc = MockMvcBuilders.standaloneSetup(new RecommendController(recommendService, new RequestLimiter()))
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.build();

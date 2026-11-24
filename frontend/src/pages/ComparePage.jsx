@@ -30,7 +30,7 @@ import {
 } from '../utils/loanMath'
 import requireLogin from '../utils/requireLogin'
 
-// CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도가 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
+// CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도와 상환 방식이 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
 //   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
 // 화면을 열면 비교함 스토어의 pair(A, B)로 상품을 받는다 (API-03). 두 상품이 들어오면 금액, 기간을 두 상품에 맞게 조정하고 알림.
 // [결과 저장] → API-23 (회원). 같은 조합은 409 '이미 저장한 조합' 안내, 요청 중 버튼 잠금 (E5)
@@ -430,7 +430,7 @@ function ComparePage() {
         onMonthsChange={handleMonthsChange}
         onMethodChange={handleMethodChange}
       />
-      <Desc>자금 용도가 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
+      <Desc>자금 용도와 상환 방식이 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
       {isComparable && (
         <CalcNote>
           {getCalcLines(plan).map((line) => (
