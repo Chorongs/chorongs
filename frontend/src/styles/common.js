@@ -357,3 +357,23 @@ export const CompareButton = styled(Button)`
       color: var(--muted);
     `}
 `
+
+// 숫자 + 작은 단위 글자 모양 (CM-12 MoneyText, RateText 공통): Num 숫자 / Unit 작은 단위
+// $weight: 숫자 굵기 / $size: 단위 크기 'xs' | 'sm' | 'base' / $tone: 단위 색 'inherit'(숫자와 같은 색) | 'muted'(설명 글자색) | 'soft'(숫자색을 옅게)
+const UNIT_SIZE = { xs: 'var(--fs-xs)', sm: 'var(--fs-sm)', base: 'var(--fs-base)' }
+const UNIT_WEIGHT = { xs: 800, sm: 700, base: 800 }
+
+export const Num = styled.span`
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: ${({ $weight }) => $weight};
+`
+
+export const Unit = styled.small`
+  margin-left: 2px;
+  color: ${({ $tone }) => ($tone === 'muted' ? 'var(--cocoa)' : 'inherit')};
+  font-family: var(--f-ui);
+  font-size: ${({ $size }) => UNIT_SIZE[$size]};
+  font-weight: ${({ $size }) => UNIT_WEIGHT[$size]};
+  opacity: ${({ $tone }) => ($tone === 'soft' ? 0.8 : 1)};
+`

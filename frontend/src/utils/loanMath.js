@@ -1,4 +1,4 @@
-import { LONG_TERM_MONTHS, REPAY_METHOD_CODE, SHORT_TERM_MONTHS } from '../constants/options'
+import { MONTHS_OPTIONS_DEFAULT, MONTHS_OPTIONS_HOUSING, REPAY_METHOD_CODE } from '../constants/options'
 import { formatMoney, formatNumber } from './format'
 
 // 대출 계산 함수 (화면 없는 계산)
@@ -245,15 +245,15 @@ export const CALC_DEFAULTS = { amount: FALLBACK_AMOUNT_MAN, months: 36, rate: 5,
 const PREPAY_MODES = ['REDUCE_PAYMENT', 'SHORTEN_TERM']
 
 // 기간 선택지 전체 (12, 36, 60, 120, 180개월)
-const ALL_TERM_MONTHS = [...new Set([...SHORT_TERM_MONTHS, ...LONG_TERM_MONTHS])].sort((a, b) => a - b)
+const ALL_TERM_MONTHS = [...new Set([...MONTHS_OPTIONS_DEFAULT, ...MONTHS_OPTIONS_HOUSING])].sort((a, b) => a - b)
 
 // 넘어온 기간으로 기간 칩 목록 정하기: 계산기는 넘어온 용도를 모르므로 기간으로 짐작한다.
 // 12, 36은 그 밖 용도(12, 36, 60), 120, 180은 전월세, 주택 구입(60, 120, 180), 60이나 모르는 값은 용도를 알 수 없어 전체
 export function getCalcTermOptions(months) {
-  const isShort = SHORT_TERM_MONTHS.includes(months)
-  const isLong = LONG_TERM_MONTHS.includes(months)
-  if (isShort && !isLong) return SHORT_TERM_MONTHS
-  if (isLong && !isShort) return LONG_TERM_MONTHS
+  const isShort = MONTHS_OPTIONS_DEFAULT.includes(months)
+  const isLong = MONTHS_OPTIONS_HOUSING.includes(months)
+  if (isShort && !isLong) return MONTHS_OPTIONS_DEFAULT
+  if (isLong && !isShort) return MONTHS_OPTIONS_HOUSING
   return ALL_TERM_MONTHS
 }
 
