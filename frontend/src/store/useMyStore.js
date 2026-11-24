@@ -10,7 +10,6 @@ const useMyStore = create((set, get) => ({
 
   // API-20 GET: 찜은 최대 30개라 size=30 한 번에 모두 받음. 실패하면 빈 목록 그대로
   // 찜 목록 응답은 공통 PageInfo { list, total, page, size } (2026-11-17 백엔드 담당 결정)
-  // TODO(API-20, CHORONG-42 BE): 찜 API는 아직 서버에 없음. 올라오면 응답이 위 모양인지 확인
   loadLikes: async () => {
     try {
       const data = await myApi.getLikes({ page: 1, size: LIKE_MAX })

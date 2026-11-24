@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { NavLink, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import AdminAccounts from '../../components/admin/AdminAccounts'
@@ -8,6 +8,7 @@ import AutoClosedList from '../../components/admin/AutoClosedList'
 import ImportDiff from '../../components/admin/ImportDiff'
 import ImportPanel from '../../components/admin/ImportPanel'
 import PublishHistory from '../../components/admin/PublishHistory'
+import SideNavLayout from '../../components/layout/SideNavLayout'
 import Icon from '../../components/ui/Icon'
 import { ADMIN_ROLE_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
@@ -128,96 +129,12 @@ const WhoText = styled.div`
   }
 `
 
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: 230px minmax(0, 1fr);
-  gap: 40px;
-  align-items: start;
-  @media (max-width: 899px) {
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-  }
-`
 
-const Menu = styled.nav`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  @media (max-width: 899px) {
-    flex-flow: row wrap;
-    gap: 6px;
-  }
-`
 
-const MenuGroup = styled.div`
-  @media (max-width: 899px) {
-    display: contents;
-  }
-`
 
-const MenuTitle = styled.h4`
-  margin-bottom: 4px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid var(--ink);
-  font-size: var(--fs-base);
-  font-weight: 800;
-  @media (max-width: 899px) {
-    display: none;
-  }
-`
 
-const MenuLink = styled(NavLink)`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 2px;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  transition: color var(--t-fast);
-  &:hover {
-    color: var(--brand-text);
-  }
-  &.active {
-    color: var(--ink);
-    font-weight: 800;
-  }
-  @media (max-width: 899px) {
-    padding: 9px 14px;
-    border-radius: var(--r-pill);
-    background: var(--mist);
-    font-size: var(--fs-sm);
-    font-weight: 700;
-    &.active {
-      background: var(--ink);
-      color: var(--paper);
-    }
-  }
-`
 
-// 메뉴 옆 개수: 빨간 알약
-const Count = styled.span`
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
-  border-radius: var(--r-sm);
-  background: var(--bad);
-  color: #fff;
-  font-family: var(--f-num);
-  font-size: var(--fs-xs);
-  font-weight: 900;
-`
 
-const Content = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 48px;
-  min-width: 0;
-`
 
 // 관리자 목록 안 빈 상태, 안내: 테두리 없는 작은 글씨 (fe_design 빈 상태)
 const Status = styled.p`
@@ -287,6 +204,20 @@ function AdminPage() {
     navigate('/admin/login', { replace: true })
   }
 
+  // 옆 메뉴: 승인권자 전용 메뉴는 승인권자에게만, 개수는 현황(API-31)
+  const menuGroups = MENU_GROUPS.map((group) => ({
+    title: group.title,
+    items: group.items
+      .filter((item) => !item.isApproverOnly || isApprover)
+      .map((item) => ({
+        to: item.key ? `/admin/${item.key}` : '/admin',
+        label: item.label,
+        end: item.key === null,
+        count: item.countKey ? catalog.data?.[item.countKey] : null,
+        countLabel: item.countLabel,
+      })),
+  }))
+
   let content
   if (current.key === null) {
     content = (
@@ -341,29 +272,9 @@ function AdminPage() {
           </Button>
         </Who>
       </Head>
-      <Grid>
-        <Menu aria-label="관리자 메뉴">
-          {MENU_GROUPS.map((group) => {
-            const items = group.items.filter((item) => !item.isApproverOnly || isApprover)
-            if (items.length === 0) return null
-            return (
-              <MenuGroup key={group.title}>
-                <MenuTitle>{group.title}</MenuTitle>
-                {items.map((item) => {
-                  const count = item.countKey ? catalog.data?.[item.countKey] : null
-                  return (
-                    <MenuLink key={item.label} to={item.key ? `/admin/${item.key}` : '/admin'} end={item.key === null}>
-                      {item.label}
-                      {count > 0 && <Count aria-label={`${item.countLabel} ${count}`}>{count}</Count>}
-                    </MenuLink>
-                  )
-                })}
-              </MenuGroup>
-            )
-          })}
-        </Menu>
-        <Content>{content}</Content>
-      </Grid>
+      <SideNavLayout label="관리자 메뉴" groups={menuGroups} activeTone="ink">
+        {content}
+      </SideNavLayout>
     </>
   )
 }

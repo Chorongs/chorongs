@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Panel } from '../../styles/common'
+import { Button, InlineError } from '../../styles/common'
 import { getTodayText } from '../../utils/format'
 import { BIRTH_ERROR, isValidBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
+import AuthLayout from '../layout/AuthLayout'
 import Checkbox from '../ui/Checkbox'
 
 // AU-03 약관 동의, 생년월일 입력: 가입 단계 (OAuthCallbackPage의 result=SIGNUP)
@@ -21,19 +22,6 @@ import Checkbox from '../ui/Checkbox'
 //     / 정상 '생년월일 입력 완료'(6-3)
 //   - 덜 입력한 날짜는 브라우저가 값을 빈 글자로 넘기므로 validity.badInput으로 따로 구분
 //   - 오류 문구 BIRTH_ERROR, 오늘 날짜 getTodayText는 MY 회원 정보와 같이 씀 (utils/validate.js, utils/format.js)
-
-const Wrap = styled(Panel)`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 520px;
-  margin: 0 auto;
-`
-
-const Title = styled.h1`
-  font-size: var(--fs-h3);
-  font-weight: 800;
-`
 
 const AgreeList = styled.div`
   display: flex;
@@ -178,8 +166,7 @@ function TermsAgreement({ needBirth, onDone }) {
   }
 
   return (
-    <Wrap>
-      <Title>캐링 가입하기</Title>
+    <AuthLayout mark="logo" tagline="대출, 더 쉽게 연결되다" title="캐링 가입하기">
 
       <Checkbox checked={isAllAgreed} onChange={handleAll} label="전체 동의" />
       <AgreeList>
@@ -227,7 +214,7 @@ function TermsAgreement({ needBirth, onDone }) {
       </Actions>
 
       <TermsDialog kind={termsKind} onClose={() => setTermsKind(null)} />
-    </Wrap>
+    </AuthLayout>
   )
 }
 

@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { PREPARING_TEXT } from '../../api/axiosInstance'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton } from '../../styles/common'
+import SectionHeader from '../common/SectionHeader'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 
@@ -14,29 +15,7 @@ import Modal from '../ui/Modal'
 // onRemove, onClearAll을 안 넘기면 X, '지우기'를 안 그림 (찜한 대출) / isInline: 줄 대신 칩처럼 옆으로 (최근 검색)
 // status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'preparing' 서버 API가 아직 없음 → '아직 준비 중인 서비스예요' (Q5) / 'done' 목록 또는 빈 상태 (E11)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
-const Wrap = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`
-
-const Head = styled.div`
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-`
-
-const Title = styled.h2`
-  font-size: var(--fs-h4);
-  font-weight: 800;
-`
-
-const Desc = styled.p`
-  margin-top: 4px;
-  color: var(--cocoa);
-  font-size: var(--fs-md);
-`
+const Wrap = styled.section``
 
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
 const List = styled.ul`
@@ -70,6 +49,7 @@ const Status = styled.p`
 const More = styled.div`
   display: flex;
   justify-content: center;
+  margin-top: 20px;
 `
 
 const DialogText = styled.p`
@@ -186,17 +166,13 @@ function MySection({
 
   return (
     <Wrap>
-      <Head>
-        <div>
-          <Title>{title}</Title>
-          {description && <Desc>{description}</Desc>}
-        </div>
+      <SectionHeader title={title} description={description} size="md">
         {onClearAll && status === 'done' && items.length > 0 && (
           <Button $size="sm" $variant="ghost" onClick={() => setIsConfirmOpen(true)}>
             지우기
           </Button>
         )}
-      </Head>
+      </SectionHeader>
 
       {body}
 

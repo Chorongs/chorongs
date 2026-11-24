@@ -8,7 +8,8 @@ import naverSymbol from '../assets/images/naver_symbol.png'
 import useAdminStore from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
-import { Button, Panel } from '../styles/common'
+import AuthLayout from '../components/layout/AuthLayout'
+import { Button } from '../styles/common'
 
 // AU-01 로그인 화면 (/login): 소셜 로그인 시작. 자체 회원가입, 비밀번호 없음
 // 이미 로그인 → /my / 버튼 → API-18 (카카오, 네이버 로그인 화면으로 이동)
@@ -22,26 +23,11 @@ const ERROR_TEXT = {
   FAILED: '로그인에 실패했어요.\n다시 시도해 주세요',
 }
 
-const Wrap = styled(Panel)`
+// 소셜 버튼 두 개 (버튼 사이 8px)
+const Social = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 440px;
-  margin: 0 auto;
-  text-align: center;
-`
-
-const Title = styled.h1`
-  font-size: var(--fs-h1);
-  font-weight: 800;
-`
-
-// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
-const Guide = styled.p`
-  white-space: pre-line;
-  margin-bottom: 8px;
-  color: ${({ $isError }) => ($isError ? 'var(--bad)' : 'var(--cocoa)')};
-  font-weight: 600;
+  gap: 8px;
 `
 
 function LoginPage() {
@@ -95,20 +81,24 @@ function LoginPage() {
   }
 
   return (
-    <Wrap>
-      <Title>로그인</Title>
-      <Guide $isError={Boolean(errorText)} role={errorText ? 'alert' : undefined}>
-        {errorText ?? '로그인 방법을 선택하세요'}
-      </Guide>
-      <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking}>
-        <img src={kakaoSymbol} alt="" />
-        카카오 로그인
-      </Button>
-      <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking}>
-        <img src={naverSymbol} alt="" />
-        네이버 로그인
-      </Button>
-    </Wrap>
+    <AuthLayout
+      mark="logo"
+      tagline="대출, 더 쉽게 연결되다"
+      title="로그인"
+      description={errorText ?? '로그인 방법을 선택하세요'}
+      isError={Boolean(errorText)}
+    >
+      <Social>
+        <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking}>
+          <img src={kakaoSymbol} alt="" />
+          카카오 로그인
+        </Button>
+        <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking}>
+          <img src={naverSymbol} alt="" />
+          네이버 로그인
+        </Button>
+      </Social>
+    </AuthLayout>
   )
 }
 

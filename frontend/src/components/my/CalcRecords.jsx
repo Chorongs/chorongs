@@ -1,11 +1,53 @@
+import { useState } from 'react'
+import styled from 'styled-components'
+import { PREPARING_TEXT } from '../../api/axiosInstance'
+import { Chip, EmptyBox } from '../../styles/common'
 import CalcHistoryList from '../calculator/CalcHistoryList'
+import SectionHeader from '../common/SectionHeader'
 
-// MY-10 계산 기록: 계산 기록 전체 (CalcHistoryList 다시 사용, API-24는 CalcHistoryList가 부름)
-// 제목, 지우기, 준비 중 안내(API-24가 서버에 올라오기 전, Q5)는 CalcHistoryList가 MySection으로 그림
-// [불러오기]는 계산기(/calc)로 이동하며 값을 넘김
-// TODO(API-24, CHORONG-48 BE): 계산 기록 API가 올라오면 axiosInstance PREPARING_APIS에서 그 줄만 지우면 됨
+// MY-10 계산 기록: 맨 위 계산기 종류 칩 5개 (계산기 탭 순서, 처음은 대출 이자) / 칩을 누르면 그 종류 목록만
+// 대출 이자는 CalcHistoryList(API-24)를 다시 씀. [불러오기]는 계산기(/calc)로 이동하며 값을 넘김
+// TODO(MY-10, CHORONG-56 김진석): 나머지 4종 목록 부품(ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList,
+//   ReverseHistoryList, API-56부터 59까지)이 올라오면 KINDS의 list에 연결 (그 전까지는 준비 중 안내)
+const KINDS = [
+  { key: 'interest', label: '대출 이자', list: CalcHistoryList },
+  { key: 'change', label: '대출 갈아타기', list: null },
+  { key: 'dsr', label: 'DSR', list: null },
+  { key: 'home', label: '내 집 대출한도', list: null },
+  { key: 'reverse', label: '상환능력 기반 대출', list: null },
+]
+
+const Chips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+`
+
 function CalcRecords() {
-  return <CalcHistoryList />
+  const [kindKey, setKindKey] = useState(KINDS[0].key)
+  const kind = KINDS.find((item) => item.key === kindKey)
+  const List = kind.list
+
+  return (
+    <section>
+      <Chips role="group" aria-label="계산기 종류">
+        {KINDS.map((item) => (
+          <Chip key={item.key} $size="sm" aria-pressed={item.key === kindKey} onClick={() => setKindKey(item.key)}>
+            {item.label}
+          </Chip>
+        ))}
+      </Chips>
+      {List ? (
+        <List />
+      ) : (
+        <>
+          <SectionHeader title="계산 기록" description="[결과 저장]을 누른 기록이에요." size="md" />
+          <EmptyBox>{PREPARING_TEXT}</EmptyBox>
+        </>
+      )}
+    </section>
+  )
 }
 
 export default CalcRecords

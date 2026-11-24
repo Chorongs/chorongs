@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import Icon from '../../components/ui/Icon'
+import AuthLayout from '../../components/layout/AuthLayout'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
@@ -23,48 +23,6 @@ const TOKEN_ERROR_TEXT = {
   423: '5번 틀려서 잠겼어요. 30분 뒤 다시 시도하세요',
   429: '잠시 후 다시 시도해 주세요',
 }
-
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 440px;
-  margin: 8px auto 0;
-`
-
-const Head = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  text-align: center;
-`
-
-const Mark = styled.span`
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--r-lg);
-  background: var(--ink);
-  color: var(--paper);
-`
-
-const Tagline = styled.span`
-  color: var(--cocoa);
-  font-size: var(--fs-base);
-  font-weight: 700;
-`
-
-const Title = styled.h1`
-  font-size: var(--fs-h2);
-  font-weight: 800;
-`
-
-const Guide = styled.p`
-  color: var(--cocoa);
-`
 
 const Form = styled.form`
   display: flex;
@@ -190,24 +148,19 @@ function AdminLoginPage() {
 
   if (status === 'authed') return <Navigate to="/admin" replace />
 
-  const head = (
-    <Head>
-      <Mark aria-hidden="true">
-        <Icon name="shield" size={30} />
-      </Mark>
-      <Tagline>캐링 관리자</Tagline>
-      <Title>관리자 로그인</Title>
-      <Guide>승인받은 관리자 이메일로 받은 토큰으로 로그인하세요.</Guide>
-    </Head>
-  )
+  const authHead = {
+    mark: 'shield',
+    tagline: '캐링 관리자',
+    title: '관리자 로그인',
+    description: '승인받은 관리자 이메일로 받은 토큰으로 로그인하세요.',
+  }
 
   // 세션 확인이 끝나기 전에는 입력 칸을 그리지 않음: 이미 관리자면 위 Navigate로 바로 가야 해서, 폼이 보였다 사라지는 깜빡임을 막음
   if (status === 'checking') {
     return (
-      <Wrap>
-        {head}
+      <AuthLayout {...authHead}>
         <Notice>확인하는 중이에요</Notice>
-      </Wrap>
+      </AuthLayout>
     )
   }
 
@@ -278,8 +231,7 @@ function AdminLoginPage() {
   }
 
   return (
-    <Wrap>
-      {head}
+    <AuthLayout {...authHead}>
       <Notice>{notice}</Notice>
       <Form onSubmit={handleSubmit} noValidate>
         <Field>
@@ -336,7 +288,7 @@ function AdminLoginPage() {
         <br />
         <Link to="/admin/join">관리자 가입 신청</Link>
       </JoinLink>
-    </Wrap>
+    </AuthLayout>
   )
 }
 

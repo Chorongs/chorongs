@@ -10,6 +10,7 @@ import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError } from '../../styles/common'
 import { getTodayText } from '../../utils/format'
 import { BIRTH_ERROR, isValidBirthDate, isValidNickname } from '../../utils/validate'
+import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
 import Modal from '../ui/Modal'
 
@@ -17,7 +18,6 @@ import Modal from '../ui/Modal'
 // 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜 → 오류 문구 (E2) / 400 → 서버 문구
 // 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 후 [탈퇴하기] → sessionStorage 비움
 //   → 안내 창 → 닫으면 새로고침하며 메인(/)으로 (로그아웃과 같은 방식, 2026-11-17 사용자 결정) / 누르는 중 잠금 (E5)
-// TODO(API-28, CHORONG-42 BE): 회원 정보 수정, 탈퇴 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 // 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
 //   - 생년월일: 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate). 달력도 1900-01-01부터 오늘까지만
@@ -38,12 +38,6 @@ const WIPED_RECORDS = [
   '계산 기록',
   '닉네임, 생년월일, 소셜 연결 정보',
 ]
-
-const Head = styled.h2`
-  margin-bottom: 20px;
-  font-size: var(--fs-h4);
-  font-weight: 800;
-`
 
 const Form = styled.div`
   display: flex;
@@ -233,7 +227,7 @@ function MemberInfo() {
 
   return (
     <section>
-      <Head>회원 정보</Head>
+      <SectionHeader title="회원 정보" description="닉네임과 생년월일을 바꿀 수 있어요." size="md" />
       <Card>
         <Form>
           <Field>

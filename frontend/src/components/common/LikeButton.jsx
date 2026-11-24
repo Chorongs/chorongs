@@ -11,7 +11,6 @@ import Icon from '../ui/Icon'
 // hasLabel: false(목록) 하트만 / true(상세 창) 글자 버튼
 // 누르는 중 잠금 (E5). 성공했을 때만 하트가 바뀌므로 실패하면 원래 모양 그대로 + 알림 (E3)
 // 상품 줄 안에서 눌러도 상세 창이 열리지 않게 클릭을 줄까지 안 퍼지게 함 (CM-04)
-// TODO(API-20, CHORONG-42 BE): 찜 API가 아직 서버에 없어 지금은 '준비 중' 알림 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const LOGIN_TEXT = '찜하기는 회원 전용이에요.'
 
 const Heart = styled.span`

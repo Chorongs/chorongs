@@ -11,7 +11,6 @@ import MySection from './MySection'
 // 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / 지우기 → API-23 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료, 숨긴 상품이 있으면 딱지 + 안내
 // '다시 비교' → useCompareStore.setPair(productA.productId, productB.productId) 후 /compare (ST-04)
-// TODO(API-23, CHORONG-42 BE): 비교 내역 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const Row = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -39,8 +38,9 @@ const Names = styled.p`
 
 const Versus = styled.span`
   color: var(--muted);
+  font-family: var(--f-num);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 900;
 `
 
 const Meta = styled.span`

@@ -12,7 +12,6 @@ import MySection from './MySection'
 // 찜 취소는 줄의 하트(LikeButton)로 함 (X, 지우기 없음)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
 // 찜 목록 응답은 공통 PageInfo { list, total, page, size } (2026-11-17 백엔드 담당 결정)
-// TODO(API-20, CHORONG-42 BE): 찜 API는 아직 서버에 없음. 올라오면 응답이 위 모양인지 확인
 // '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음: 추천받기 전이면 추천 창, 받은 뒤면 /recommend (hasResult = useRecommendStore result 유무)
 const PAGE_SIZE = 20
 

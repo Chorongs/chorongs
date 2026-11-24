@@ -5,41 +5,61 @@ import * as myApi from '../../api/myApi'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card } from '../../styles/common'
+import { Button } from '../../styles/common'
 
 // MY-02 프로필, 요약 숫자 (한눈에 보기): 닉네임, 로그인 방법 / 찜, 최근 본, 비교 내역, 계산 기록 개수 (누르면 그 항목)
+// onLogin을 넘기면 비회원 모양: 같은 회색 판에 로그인 안내 + [로그인] (요약 숫자는 안 그림, MY-01 비회원)
 // 개수 불러오기 실패 → 숫자 자리 '-' (E3)
 // 로그아웃 → LY-08과 같은 창을 엶 (openLogout. 창은 Layout이 그리는 LogoutDialog 하나를 같이 씀)
-// TODO(API-51, CHORONG-42 BE): MY 요약 API가 아직 서버에 없어 지금은 숫자 자리가 '-' (서버가 올라오면 그대로 동작)
+// keys: 더해서 보여 줄 응답 칸. 계산 기록은 서버가 계산기 5종 개수를 따로 주므로 합계
 const COUNTS = [
-  { key: 'wishCount', label: '찜한 대출', to: '/my/liked' },
-  { key: 'recentViewCount', label: '최근 본 대출', to: '/my/recent' },
-  { key: 'compareCount', label: '비교 내역', to: '/my/compares' },
-  { key: 'calcCount', label: '계산 기록', to: '/my/calcs' },
+  { keys: ['wishCount'], label: '찜한 대출', to: '/my/liked' },
+  { keys: ['recentViewCount'], label: '최근 본 대출', to: '/my/recent' },
+  { keys: ['compareCount'], label: '비교 내역', to: '/my/compares' },
+  {
+    keys: ['calcCount', 'changeCount', 'dsrCount', 'homeLimitCount', 'reversCalcCount'],
+    label: '계산 기록',
+    to: '/my/calcs',
+  },
 ]
+
+// 칸이 하나라도 숫자가 아니면(불러오기 실패, 응답에 없음) '-'
+const getCountText = (summary, keys) => {
+  const values = keys.map((key) => summary?.[key])
+  return values.every((value) => typeof value === 'number') ? values.reduce((sum, value) => sum + value, 0) : '-'
+}
 
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
-  gap: 20px;
-`
-
-const Profile = styled(Card)`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
   gap: 12px;
 `
 
-const Name = styled.p`
-  font-size: var(--fs-h4);
-  font-weight: 800;
+// 프로필 판: 회색 바탕, 왼쪽 글 / 오른쪽 버튼
+const Profile = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px;
+  border-radius: var(--r-lg);
+  background: var(--mist);
+  @media (max-width: 899px) {
+    padding: 20px;
+  }
 `
 
-const Login = styled.p`
-  color: var(--cocoa);
-  font-size: var(--fs-sm);
+const ProfileText = styled.div`
+  flex: 1;
+  min-width: 180px;
+  b {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+  }
+  p {
+    color: var(--cocoa);
+    font-size: var(--fs-md);
+  }
 `
 
 const Tiles = styled.ul`
@@ -51,37 +71,40 @@ const Tiles = styled.ul`
   }
 `
 
+// 숫자 칸: 테두리만, 마우스를 올리면 회색 바탕
 const Tile = styled(Link)`
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 18px 20px;
+  border: 1px solid var(--line);
   border-radius: var(--r-md);
-  background: var(--mist);
   transition: background var(--t-fast);
   &:hover {
-    background: var(--mist-2);
+    background: var(--mist);
   }
 `
 
-const TileLabel = styled.span`
+const TileLabel = styled.small`
   color: var(--cocoa);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 700;
 `
 
 const TileValue = styled.b`
   font-family: var(--f-num);
-  font-size: var(--fs-h3);
+  font-size: var(--fs-h2);
   font-weight: 900;
 `
 
-function MyOverview() {
+function MyOverview({ onLogin }) {
   const user = useAuthStore((state) => state.user)
   const openLogout = useUiStore((state) => state.openLogout)
   const [summary, setSummary] = useState(null)
+  const isGuest = Boolean(onLogin)
 
   useEffect(() => {
+    if (isGuest) return undefined
     let isCancelled = false
     myApi
       .getMySummary()
@@ -94,15 +117,28 @@ function MyOverview() {
     return () => {
       isCancelled = true
     }
-  }, [])
+  }, [isGuest])
+
+  if (isGuest) {
+    return (
+      <Profile>
+        <ProfileText>
+          <b>로그인하면 찜과 기록을 MY에서 볼 수 있어요</b>
+        </ProfileText>
+        <Button $size="sm" onClick={onLogin}>
+          로그인
+        </Button>
+      </Profile>
+    )
+  }
 
   return (
     <Wrap>
       <Profile>
-        <div>
-          <Name>{user.memberNickname}님</Name>
-          <Login>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType} 로그인</Login>
-        </div>
+        <ProfileText>
+          <b>{user.memberNickname}님</b>
+          <p>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType} 계정으로 로그인했어요</p>
+        </ProfileText>
         <Button $size="sm" $variant="outline" onClick={openLogout}>
           로그아웃
         </Button>
@@ -110,10 +146,10 @@ function MyOverview() {
 
       <Tiles>
         {COUNTS.map((count) => (
-          <li key={count.key}>
+          <li key={count.to}>
             <Tile to={count.to}>
               <TileLabel>{count.label}</TileLabel>
-              <TileValue>{typeof summary?.[count.key] === 'number' ? summary[count.key] : '-'}</TileValue>
+              <TileValue>{getCountText(summary, count.keys)}</TileValue>
             </Tile>
           </li>
         ))}
