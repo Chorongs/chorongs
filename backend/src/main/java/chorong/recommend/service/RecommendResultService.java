@@ -5,7 +5,7 @@ import chorong.recommend.dto.SavedRecommendResponseDTO;
 
 public interface RecommendResultService {
 
-	// 추천 결과 저장 (LOAN-04). 저장 묶음 번호(saveId) 반환, 회원당 10개 넘으면 가장 오래된 묶음 삭제
+	// 추천 결과 저장 (LOAN-04). 저장 묶음 번호(saveId) 반환, 같은 결과(조건 라벨과 순위별 상품 번호가 모두 같음)를 이미 저장했으면 409, 회원당 10개 넘으면 가장 오래된 묶음 삭제
 	Long saveRecommendResult(Long memberId, RecommendSaveRequestDTO request);
 
 	// 내 저장 목록 (최신순, 상품은 지금 정보)

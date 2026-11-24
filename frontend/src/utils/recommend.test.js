@@ -227,16 +227,25 @@ describe('getSaveKey', () => {
     expect(first).toBe(second)
   })
 
-  it('금액이나 순위가 다르면 다른 글을 돌려준다', () => {
+  it('금액이 다르면 다른 글을 돌려준다', () => {
     // Given
     const lastInput = { purpose: '생활비', need: 500, months: 36, job: 'OFFICE' }
     const items = [{ product: { productId: 7 } }, { product: { productId: 3 } }]
     // When
     const base = getSaveKey(buildSavePayload(lastInput, items))
     const otherNeed = getSaveKey(buildSavePayload({ ...lastInput, need: 600 }, items))
-    const otherOrder = getSaveKey(buildSavePayload(lastInput, [...items].reverse()))
     // Then
     expect(otherNeed).not.toBe(base)
+  })
+
+  it('순위가 다르면 다른 글을 돌려준다', () => {
+    // Given
+    const lastInput = { purpose: '생활비', need: 500, months: 36, job: 'OFFICE' }
+    const items = [{ product: { productId: 7 } }, { product: { productId: 3 } }]
+    // When
+    const base = getSaveKey(buildSavePayload(lastInput, items))
+    const otherOrder = getSaveKey(buildSavePayload(lastInput, [...items].reverse()))
+    // Then
     expect(otherOrder).not.toBe(base)
   })
 })

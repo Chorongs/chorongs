@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import { formatMatchRate } from '../../utils/recommend'
 
-// 가안(.sh-sec): 제목 줄(제목 + 추천도)은 박스 위, 이유 줄만 연회색 박스 안에
+// 제목 줄(제목 + 추천도)은 박스 위, 이유 줄만 연회색 박스 안에
 const Wrap = styled.section`
   display: flex;
   flex-direction: column;
@@ -24,7 +24,7 @@ const Title = styled.h3`
   font-weight: 800;
 `
 
-// 제목 옆 작은 글 '조건 추천도 N%' (가안)
+// 제목 옆 작은 글 '추천도 N%' (RC-09)
 const MatchRate = styled.span`
   color: var(--cocoa);
   font-size: var(--fs-sm);
@@ -50,7 +50,7 @@ const Reasons = styled.ul`
     - props: productId
     - useRecommendStore의 result.items에서 product.productId가 같은 항목을 찾아 reasons(최대 5개), matchRate 표시
     - 문장은 서버가 완성해서 보냄 (화면은 글자로만 표시: E1). 추천 결과에 없는 상품이면 아무것도 안 그림
-    - 참고(RC-09, 시안과 다름): 가안은 이유 줄 앞에 좋음은 체크, 주의는 느낌표 아이콘을 보여 주는데, 명세서 RC-09는 '표시만'이고 서버도 중립 문장이 섞인 글자 배열(reasons)이라 구분하지 않고 글자만 표시함 (명세서 변경 요청 A12)
+    - 이유 줄은 아이콘 없이 글자만 표시 (RC-09 '화면은 표시만', 서버 reasons는 좋음과 주의를 나누지 않은 글자 배열이고 중립 문장도 섞여 있음)
 */
 function ReasonList({ productId }) {
   const item = useRecommendStore((state) =>
@@ -63,7 +63,7 @@ function ReasonList({ productId }) {
     <Wrap aria-label="추천 이유">
       <Head>
         <Title>추천 이유</Title>
-        <MatchRate>조건 추천도 {formatMatchRate(item.matchRate)}%</MatchRate>
+        <MatchRate>추천도 {formatMatchRate(item.matchRate)}%</MatchRate>
       </Head>
       <Reasons>
         {item.reasons.map((reason, index) => (

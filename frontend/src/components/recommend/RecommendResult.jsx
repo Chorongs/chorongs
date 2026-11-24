@@ -37,7 +37,7 @@ const DISCLAIMER_TEXT = '실제 심사가 아닌 참고용이에요. 예상 금�
 // 서민금융진흥원 누리집 (0건 안내의 상담 안내에서 새 창으로)
 const KINFA_URL = 'https://www.kinfa.or.kr/main.do'
 
-// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록, 버튼 글자는 가안 기준)
+// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록, 버튼 글자는 RC-07)
 const EMPTY_SHORTCUTS = [
   { label: '상세 검색으로 찾기', to: '/search' },
   { label: '신용 셀프 진단', to: '/diagnosis/credit' },
@@ -67,7 +67,7 @@ const HeadMain = styled.div`
   gap: 12px;
 `
 
-// 줄이 바뀌어도 오른쪽 끝에 붙음 (가안 .save-row)
+// 줄이 바뀌어도 오른쪽 끝에 붙음
 const SaveButton = styled(Button)`
   margin-left: auto;
 `
@@ -90,8 +90,8 @@ const ConditionTags = styled.div`
   gap: 6px;
 `
 
-// 안내 줄: 앞에 느낌표 아이콘 (가안). 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
-// 안내 줄 사이 간격 20, 카드까지 20 (가안 .excl)
+// 안내 줄: 앞에 느낌표 아이콘. 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
+// 안내 줄 사이 간격 20, 카드까지 20
 const Notes = styled.ul`
   margin: 0 0 8px;
   padding: 0;
@@ -115,7 +115,7 @@ const NoteLine = styled.li`
   }
 `
 
-// 1~3위 카드는 한 줄에 하나씩 세로로 (가안)
+// 1~3위 카드는 한 줄에 하나씩 세로로
 const CardList = styled.div`
   display: flex;
   flex-direction: column;
@@ -149,7 +149,7 @@ const Hint = styled.p`
   font-size: var(--fs-sm);
 `
 
-// 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼 (가안)
+// 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼
 const EmptyText = styled.p`
   margin: 0;
   color: var(--ink-2);
@@ -182,7 +182,7 @@ const getBandText = (creditBand) => {
   return /^\d+ /.test(label) ? label.replace(' ', '점 ') : `${label}점`
 }
 
-// 입력 조건 태그 (가안 순서: 직업, 나이, 지역, 소득, 용도 금액 · 기간, 신용, 기존 대출, 연체, 중요한 것)
+// 입력 조건 태그 (RC-07 순서: 직업, 나이, 지역, 소득, 용도 금액 · 기간, 신용, 기존 대출, 연체, 중요한 것)
 const getConditionLabels = (input) => {
   if (!input) return []
   const job = JOB_OPTIONS.find((option) => option.value === input.job)
@@ -217,12 +217,12 @@ const getConditionLabels = (input) => {
     - [결과 저장] → API-38 (purpose, need, months, job + 순위대로 productIds), 연타 방지 (E5)
     - 서버가 준 안내 문구(notes, hint)와 제외 요약은 글자로만 출력 (E1)
     - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 추천도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
-    - TODO(LY-01, 각 이슈 담당): 0건 바로가기의 /search(CHORONG-64 조빌립), /diagnosis/credit(CHORONG-51 김진석), /ranking(CHORONG-60 김채희) 화면은 각 이슈가 라우트를 추가해야 생김 (그 전에는 '찾을 수 없음' 화면)
+    - TODO(LY-01): 0건 바로가기 중 /ranking은 아직 라우트가 없어 '찾을 수 없음' 화면이 나옴 (App.jsx에 랭킹 Route가 생기면 지움)
     - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
     - 같은 내용은 중복 저장하지 않음: 저장에 성공하면 그 내용(조건 + 순위대로 상품 번호, getSaveKey)을 useRecommendStore.savedKey에 기억하고,
-      지금 결과가 같은 내용이면 버튼을 '저장했어요'로 잠금 (새로 추천받아 내용이 달라지면 다시 풀림, 새로고침 뒤에도 유지, 로그아웃 때 clear()로 지움)
-    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 다른 탭, 단말기에서 저장했거나 저장 목록에서 불러온 추천이면 409 → 오류 알림 대신 안내 + 같은 방식으로 '저장했어요' 잠금
-    - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
+      지금 결과가 같은 내용이면 버튼을 '저장했어요'로 잠금 (새로 추천받아 내용이 달라지면 다시 풀림, 새로고침 뒤에도 유지, 로그아웃과 탈퇴 때 clear()로 지움)
+    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 다른 탭이나 다른 단말기에서 같은 결과를 이미 저장했으면 409 → 오류 알림 대신 안내 + 버튼을 '저장했어요'로 잠금
+    - 비교함 필터 (CM-10): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
       (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
 function RecommendResult() {
@@ -279,7 +279,7 @@ function RecommendResult() {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 실패 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      // 409: 서버에 같은 결과가 이미 있음 (다른 탭, 단말기, 저장 목록에서 불러온 추천). 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (RC-07)
+      // 409: 서버에 같은 결과가 이미 있음 (다른 탭이나 다른 단말기에서 저장함). 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (RC-07)
       if (status === 409) {
         markSaved(saveKey)
         showToast('이미 저장한 추천 결과예요')
@@ -291,7 +291,7 @@ function RecommendResult() {
     }
   }
 
-  // 비회원이면 저장 대신 로그인 안내 창 (RC-07 비회원: requireLogin, 문구는 CM-17 '추천 결과 저장', CHORONG-43에서 연결)
+  // 비회원이면 저장 대신 로그인 안내 창 (RC-07 비회원: requireLogin, 문구는 CM-17 '추천 결과 저장')
   const handleSave = () => requireLogin(saveResult, '추천 결과 저장은 회원 전용이에요.')
 
   return (

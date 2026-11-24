@@ -38,7 +38,7 @@ public class RecommendResultController {
 		return ResponseEntity.ok(ApiResponse.success(recommendResultService.getRecommendResults(memberId)));
 	}
 
-	// 저장 -> 201 + saveId
+	// 저장 -> 201 + saveId, 같은 결과를 이미 저장했으면 409
 	@PostMapping
 	public ResponseEntity<ApiResponse<RecommendSaveResponseDTO>> saveRecommendResult(
 			@Valid @RequestBody RecommendSaveRequestDTO request, HttpSession session) {

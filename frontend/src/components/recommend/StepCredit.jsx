@@ -47,7 +47,7 @@ const DiagLink = styled.button.attrs({ type: 'button' })`
   }
 `
 
-// 구간 아래 안내: 진단 구간과 같으면 초록 체크, 다르면 주의 색 + 느낌표 (가안)
+// 구간 아래 안내: 진단 구간과 같으면 초록 체크, 다르면 주의 색 + 느낌표
 const Hint = styled.p`
   display: flex;
   align-items: flex-start;
@@ -91,7 +91,7 @@ const getBandHint = (creditBand, diagBand) => {
     - 신용 구간은 처음에 비어 있음. 안 골랐을 때만 알려진 진단 구간을 미리 골라 둠 (이미 고른 구간은 덮어쓰지 않음)
       알려진 진단 구간 = 이 탭의 진단 구간(diagBand), 없으면 회원이 저장한 진단 구간(API-25 myApi.getCreditReport)
     - 구간 아래 안내는 알려진 진단 구간과 비교
-    - 저장한 진단 구간은 창 열 때 1번, 회원일 때만 부름 (비회원이 부르면 401 안내 창이 뜸). 못 불러오면 기본 안내 그대로 (따로 안내 안 함) (CHORONG-43에서 연결)
+    - 저장한 진단 구간은 창 열 때 1번, 회원일 때만 부름 (비회원이 부르면 401 안내 창이 뜸). 못 불러오면 기본 안내 그대로 (따로 안내 안 함)
     - 가장 중요한 것은 3개까지 (4번째를 고르면 ChipGroup이 알림), 하나도 안 고르면 실행 안 됨 (검사는 RecommendStepper)
     - 정확한 점수는 받지 않음 (구간만), 입력값 console 출력 금지 (E6)
 */
