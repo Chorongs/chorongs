@@ -1,4 +1,5 @@
 """요청/응답 스키마 (EXT-05, Spring common/dto의 FastApi*DTO와 칸 이름을 맞춤)"""
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -6,12 +7,12 @@ from pydantic import BaseModel, Field
 Source = Literal["KINFA", "FSS"]     # Literal: 정해진 값만 허용 (다른 값이면 422)
 
 
-# ---------- 상품 불러오기 (ADMIN-04, Spring FastApiImportResponseDTO) ----------
+# ---------- 상품 갱신 (ADMIN-04, Spring FastApiImportResponseDTO) ----------
 
 class ImportStartRequest(BaseModel):
     sources: list[Source] = Field(..., min_length=1, max_length=2,
                                   description="불러올 출처 (KINFA 서민금융진흥원, FSS 금융감독원)")
-    admin_id: int = Field(..., ge=1, description="불러오기를 누른 관리자 번호")
+    admin_id: int = Field(..., ge=1, description="갱신을 누른 관리자 번호")
 
 
 class ImportStartResponse(BaseModel):
@@ -42,6 +43,8 @@ class ImportStatusResponse(BaseModel):
     job_id: int
     job_status: Literal["RUNNING", "DONE", "FAILED", "PUBLISHED", "EXPIRED"]
     base_version: int | None    # 비교할 때의 마지막 반영 이력 번호 (반영 요청에 그대로 보냄)
+    created_at: datetime | None = None      # 작업 시작 시각
+    finished_at: datetime | None = None     # DONE, FAILED가 된 시각 = 반영 대기 테이블 적재 시각 (화면 '마지막 갱신'. RUNNING이면 None)
     source_results: list[SourceResult]
     items: list[ImportItem]
 
