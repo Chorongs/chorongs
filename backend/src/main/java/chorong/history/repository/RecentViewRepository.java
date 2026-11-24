@@ -11,5 +11,5 @@ public interface RecentViewRepository extends JpaRepository<RecentView,Long> {
     long countByMemberId(Long memberId);
     Optional<RecentView> findFirstByMemberIdOrderByViewedAtAsc(Long memberId);
     List<RecentView> findByMemberIdOrderByViewedAtDesc(Long memberId);
-    void deleteByMemberId(Long memberId);
+        void deleteByMemberId(Long memberId);
 }

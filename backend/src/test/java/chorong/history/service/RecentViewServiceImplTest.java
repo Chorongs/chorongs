@@ -204,7 +204,7 @@ class RecentViewServiceImplTest {
         givenNoExistingRecord();
         when(recentViewRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
         RecentView oldest = recentViewOf(MEMBER_ID, 99L, NEWEST.minusDays(30));
-        when(recentViewRepository.findFirstByMemberIdOrderByViewIdAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
+        when(recentViewRepository.findFirstByMemberIdOrderByViewedAtAsc(MEMBER_ID)).thenReturn(Optional.of(oldest));
 
         // When
         recentViewService.saveRecentView(MEMBER_ID, PRODUCT_ID);
@@ -220,7 +220,7 @@ class RecentViewServiceImplTest {
         givenOnProduct();
         givenNoExistingRecord();
         when(recentViewRepository.countByMemberId(MEMBER_ID)).thenReturn(10L);
-        when(recentViewRepository.findFirstByMemberIdOrderByViewIdAsc(MEMBER_ID))
+        when(recentViewRepository.findFirstByMemberIdOrderByViewedAtAsc(MEMBER_ID))
                 .thenReturn(Optional.of(recentViewOf(MEMBER_ID, 99L, NEWEST.minusDays(30))));
 
         // When
@@ -504,7 +504,7 @@ class RecentViewServiceImplTest {
     void deleteRecentViewsDeletesAll() {
         // Given
         List<RecentView> mine = List.of(recentViewOf(MEMBER_ID, 101L, NEWEST), recentViewOf(MEMBER_ID, 102L, NEWEST));
-        when(recentViewRepository.findByMemberIdOrderByViewIdDesc(MEMBER_ID)).thenReturn(mine);
+        when(recentViewRepository.findByMemberIdOrderByViewedAtDesc(MEMBER_ID)).thenReturn(mine);
 
         // When
         recentViewService.deleteRecentViews(MEMBER_ID);
@@ -517,7 +517,7 @@ class RecentViewServiceImplTest {
     @DisplayName("기록이 하나도 없어도 전체 삭제는 오류가 없다")
     void deleteRecentViewsEmptyNoError() {
         // Given
-        when(recentViewRepository.findByMemberIdOrderByViewIdDesc(MEMBER_ID)).thenReturn(new ArrayList<>());
+        when(recentViewRepository.findByMemberIdOrderByViewedAtDesc(MEMBER_ID)).thenReturn(new ArrayList<>());
 
         // When, Then
         assertThatCode(() -> recentViewService.deleteRecentViews(MEMBER_ID)).doesNotThrowAnyException();
@@ -527,13 +527,13 @@ class RecentViewServiceImplTest {
     @DisplayName("전체 삭제는 요청한 회원 번호로 기록을 찾는다 (남의 기록은 건드리지 않음)")
     void deleteRecentViewsQueriesWithCallersMemberId() {
         // Given
-        when(recentViewRepository.findByMemberIdOrderByViewIdDesc(MEMBER_ID)).thenReturn(new ArrayList<>());
+        when(recentViewRepository.findByMemberIdOrderByViewedAtDesc(MEMBER_ID)).thenReturn(new ArrayList<>());
 
         // When
         recentViewService.deleteRecentViews(MEMBER_ID);
 
         // Then
-        verify(recentViewRepository).findByMemberIdOrderByViewIdDesc(MEMBER_ID);
+        verify(recentViewRepository).findByMemberIdOrderByViewedAtDesc(MEMBER_ID);
     }
 
     // ---------- 도우미 ----------
@@ -554,7 +554,7 @@ class RecentViewServiceImplTest {
         for (int i = 0; i < count; i++) {
             recentViews.add(recentViewOf(MEMBER_ID, 101L + i, NEWEST.minusMinutes(i)));
         }
-        when(recentViewRepository.findByMemberIdOrderByViewIdDesc(MEMBER_ID)).thenReturn(recentViews);
+        when(recentViewRepository.findByMemberIdOrderByViewedAtDesc(MEMBER_ID)).thenReturn(recentViews);
     }
 
     // 기록 count개에 맞는 상품(ON)이 모두 있는 것으로 가정

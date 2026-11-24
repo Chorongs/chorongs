@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/layout/Layout'
 import LoanCalculator from './components/calculator/LoanCalculator'
 import CreditCheck from './components/credit/CreditCheck'
+import DetailSearch from './components/search/DetailSearch'
+import SimpleSearch from './components/search/SimpleSearch'
 import CalculatorPage from './pages/CalculatorPage'
 import ComparePage from './pages/ComparePage'
 import DiagnosisPage from './pages/DiagnosisPage'
@@ -11,14 +13,14 @@ import NotFoundPage from './pages/NotFoundPage'
 import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import HomePage from './pages/HomePage'
 import RecommendPage from './pages/RecommendPage'
+import SearchPage from './pages/SearchPage'
 import RequireAdmin from './components/admin/RequireAdmin'
 import AdminJoinPage from './pages/admin/AdminJoinPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminPage from './pages/admin/AdminPage'
 
 // LY-01 주소 규칙표: Routes > Route element={<Layout />} > 하위 Route (주소 목록은 '화면 목록')
-// TODO(LY-01, CHORONG-51 김진석, 56 김진석, 59 조빌립, 60 김채희, 63 김채희, 64 조빌립): 아래 페이지들은 각 이슈에서 올라온 뒤 이 자리에 Route로 추가한다.
-//   /search SearchPage(CHORONG-64), /search/simple SearchPage(CHORONG-64),
+// TODO(LY-01, CHORONG-51 김진석, 56 김진석, 59 조빌립, 60 김채희, 63 김채희): 아래 페이지들은 각 이슈에서 올라온 뒤 이 자리에 Route로 추가한다.
 //   /ranking RankingPage(CHORONG-60), /calc/change, /calc/dsr, /calc/home, /calc/reverse (CalculatorPage 하위, CHORONG-56),
 //   /diagnosis/habit DiagnosisPage(CHORONG-59), /help/* HelpPage(CHORONG-63),
 //   (/login, /oauth/callback, /my, /my/:section 은 CHORONG-43에서 연결함)
@@ -29,6 +31,10 @@ function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/recommend" element={<RecommendPage />} />
+        <Route path="/search" element={<SearchPage />}>
+          <Route index element={<DetailSearch />} />
+          <Route path="simple" element={<SimpleSearch />} />
+        </Route>
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/calc" element={<CalculatorPage />}>
           <Route index element={<LoanCalculator />} />
