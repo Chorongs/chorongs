@@ -83,15 +83,13 @@ export const CREDIT_QUESTIONS = [
 ]
 
 // 상환 기간 선택지 (개월): 전월세, 주택 구입은 60/120/180, 그 밖 용도는 12/36/60
-export const LONG_TERM_PURPOSES = ['전월세', '주택 구입']
-export const SHORT_TERM_MONTHS = [12, 36, 60]
-export const LONG_TERM_MONTHS = [60, 120, 180]
+// 장기 용도와 기간 값은 아래 추천 입력 선택지의 HOUSING_PURPOSES, MONTHS_OPTIONS_HOUSING, MONTHS_OPTIONS_DEFAULT를 같이 씀 (같은 값을 두 벌 두지 않으려고)
 
 // 용도 목록(두 상품이 겹치는 용도)이 전부 장기 용도일 때만 장기 선택지
 export function getTermOptions(purposes) {
   const list = purposes ?? []
-  const isLong = list.length > 0 && list.every((purpose) => LONG_TERM_PURPOSES.includes(purpose))
-  return isLong ? LONG_TERM_MONTHS : SHORT_TERM_MONTHS
+  const isLong = list.length > 0 && list.every((purpose) => HOUSING_PURPOSES.includes(purpose))
+  return isLong ? MONTHS_OPTIONS_HOUSING : MONTHS_OPTIONS_DEFAULT
 }
 
 // 추천 입력 선택지 (RC-03~06)
@@ -237,7 +235,7 @@ export const KEYWORD_MAX = 5
 export const KEYWORD_LABEL = {
   대학생: '대학생/취준생',
   '신용점수 낮음': '신용점수가 낮아요',
-  비대면: '비대면·모바일',
+  비대면: '비대면/모바일',
   '생활비 급함': '생활비가 급해요',
   갈아타기: '기존 대출 갈아타기',
   전월세: '전월세 보증금',
@@ -246,11 +244,11 @@ export const getKeywordLabel = (keyword) => KEYWORD_LABEL[keyword] ?? keyword
 
 // 자주 쓰는 조합 5개 (SR-08): 키워드는 위 14개 안에서만
 export const KEYWORD_PRESETS = [
-  { name: '사회초년생 첫 대출', summary: '낮은 금리 · 수수료 없음', keywords: ['사회초년생', '낮은 금리', '중도상환수수료 없음'] },
-  { name: '급한 생활비', summary: '생활비 · 비대면', keywords: ['생활비 급함', '비대면'] },
-  { name: '고금리 대출 갈아타기', summary: '낮은 금리 · 긴 기간', keywords: ['갈아타기', '낮은 금리', '긴 상환기간'] },
-  { name: '프리랜서 자금 공백', summary: '프리랜서 · 비대면', keywords: ['프리랜서', '비대면'] },
-  { name: '청년 전월세', summary: '보증금 · 낮은 금리', keywords: ['사회초년생', '전월세', '낮은 금리'] },
+  { name: '사회초년생 첫 대출', summary: '낮은 금리 / 수수료 없음', keywords: ['사회초년생', '낮은 금리', '중도상환수수료 없음'] },
+  { name: '급한 생활비', summary: '생활비 / 비대면', keywords: ['생활비 급함', '비대면'] },
+  { name: '고금리 대출 갈아타기', summary: '낮은 금리 / 긴 기간', keywords: ['갈아타기', '낮은 금리', '긴 상환기간'] },
+  { name: '프리랜서 자금 공백', summary: '프리랜서 / 비대면', keywords: ['프리랜서', '비대면'] },
+  { name: '청년 전월세', summary: '보증금 / 낮은 금리', keywords: ['사회초년생', '전월세', '낮은 금리'] },
 ]
 
 // 관리자 화면 글자표 (AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
