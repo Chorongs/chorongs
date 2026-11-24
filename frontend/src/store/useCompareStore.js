@@ -29,16 +29,6 @@ export function getTraySlot(tray, swapSlot, productId) {
   return (swapSlot === 'A' ? 1 - index : index) === 1 ? 'B' : 'A'
 }
 
-// 첫 상품을 담았을 때 알림: 자금 용도와 (방식 정보가 있으면) 상환 방식이 겹치는 상품만 비교할 수 있다고 알림
-// 예: 'A에 담았어요. 자금 용도(생활비)와 상환 방식(만기일시)이 겹치는 상품만 비교할 수 있어요'
-function getFirstTrayMessage(item) {
-  const methodLabels = REPAY_METHODS.filter((method) => item.methods.includes(method.code)).map((method) => method.label)
-  const purposeText = `자금 용도(${item.purposes.join('·')})`
-  // 세 방식 모두이면(방식 정보가 없는 상품) 방식 이름은 생략
-  const methodText = methodLabels.length < REPAY_METHODS.length ? `상환 방식(${methodLabels.join('·')})` : '상환 방식'
-  return `A에 담았어요. ${purposeText}와 ${methodText}이 겹치는 상품만 비교할 수 있어요`
-}
-
 // 상품의 자금 용도 목록 (tray 상품은 purposes, 상품 요약/상세는 tags의 PURPOSE)
 export function getPurposes(product) {
   if (!product) return []
@@ -70,6 +60,28 @@ export function getCompareBlock(productA, productB) {
   if (!hasSamePurpose(productA, productB)) return 'purpose'
   if (!hasSameMethod(productA, productB)) return 'method'
   return null
+}
+
+// 상품이 지원하는 상환 방식 이름 목록 (예: ['원리금균등', '원금균등']). tray 상품, 상품 요약/상세 모두.
+// 세 방식 모두이면(방식 정보가 없는 상품) 거르는 조건이 안 되므로 빈 목록
+export function getMethodLabels(product) {
+  const methods = getMethods(product)
+  const labels = REPAY_METHODS.filter((method) => methods.includes(method.code)).map((method) => method.label)
+  return labels.length < REPAY_METHODS.length ? labels : []
+}
+
+// 그 상품과 비교하려면 겹쳐야 하는 조건 글 (tray 상품, 상품 요약/상세 모두). 뒤에 '이 겹치는 상품…'을 붙여 쓴다.
+// 예: '자금 용도(생활비)와 상환 방식(만기일시)' / 세 방식 모두이면(방식 정보가 없는 상품) 방식 이름은 생략: '자금 용도(생활비)와 상환 방식'
+export function getCompareConditionText(product) {
+  const methodLabels = getMethodLabels(product)
+  const methodText = methodLabels.length > 0 ? `상환 방식(${methodLabels.join('·')})` : '상환 방식'
+  return `자금 용도(${getPurposes(product).join('·')})와 ${methodText}`
+}
+
+// 첫 상품을 담았을 때 알림: 자금 용도와 (방식 정보가 있으면) 상환 방식이 겹치는 상품만 비교할 수 있다고 알림
+// 예: 'A에 담았어요. 자금 용도(생활비)와 상환 방식(만기일시)이 겹치는 상품만 비교할 수 있어요'
+function getFirstTrayMessage(item) {
+  return `A에 담았어요. ${getCompareConditionText(item)}이 겹치는 상품만 비교할 수 있어요`
 }
 
 // ProductSummaryDTO (또는 상세)에서 비교함에 담을 값만 뽑음
@@ -167,7 +179,7 @@ const useCompareStore = create(
       },
 
       // 남길 상품(상세 또는 요약, 없으면 null)만 비교함에 두고 바꿀 칸을 기억. 상품 찾기로 가서 새 상품을 고름
-      // (명세서 startSwap('A' 또는 'B')에 남길 상품을 받는 두 번째 값을 더함: 용도 필터에 그 상품의 용도가 필요해서)
+      // (남길 상품을 받는 두 번째 값은 용도, 상환 방식 필터에 그 상품의 용도와 방식이 필요해서, ST-04)
       startSwap: (slot, keepProduct = null) =>
         set({
           tray: keepProduct ? [toTrayItem(keepProduct)] : [],
