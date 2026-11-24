@@ -24,4 +24,6 @@ public interface ProductTagRepository extends JpaRepository<ProductTag, Long> {
 			where p.productId = pt.productId and p.productStatus = :status
 			""")
 	List<Object[]> findTagPairsByProductStatus(@Param("status") ProductStatus status);
+
+	List<ProductTag> findByTagIdIn(List<Long>  tagIds);
 }

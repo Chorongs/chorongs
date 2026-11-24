@@ -14,6 +14,9 @@ import org.springframework.data.repository.query.Param;
 import chorong.product.entity.LoanProduct;
 import chorong.product.entity.ProductStatus;
 import chorong.product.entity.Source;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface LoanProductRepository extends JpaRepository<LoanProduct, Long> {
 
@@ -63,4 +66,8 @@ public interface LoanProductRepository extends JpaRepository<LoanProduct, Long> 
 
 	// 공시 종료일이 기준 시각 전인 상품 (자동 내림 = 게시 + 종료일이 어제 이전, BAT-02)
 	List<LoanProduct> findByProductStatusAndDiscloseEndBefore(ProductStatus productStatus, LocalDateTime time);
+
+	@Modifying
+	@Query("update LoanProduct set viewCount = viewCount+1 where productId = :productId")
+	int increaseViewCount(@Param("productId") Long productId);
 }
