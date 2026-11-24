@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useCompareStore from '../../store/useCompareStore'
-import { Button, Tag } from '../../styles/common'
+import { Button } from '../../styles/common'
 import { formatDate } from '../../utils/format'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
 // MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / 지우기
 // 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / 지우기 → API-23 DELETE (전체) / 알림은 MySection (MY-03)
@@ -58,8 +58,7 @@ function ProductName({ product }) {
   return (
     <>
       {product.companyName} {product.productName}
-      {product.productStatus === 'CLOSED' && <Tag $variant="warn">판매 종료</Tag>}
-      {product.productStatus === 'HIDDEN' && <Tag>지금은 볼 수 없는 상품</Tag>}
+      <ProductStatusTag product={product} />
     </>
   )
 }
@@ -83,8 +82,8 @@ function CompareHistoryList() {
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true

@@ -1,11 +1,13 @@
+import * as adminApi from '../api/adminApi'
+import * as authApi from '../api/authApi'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
 
 // CM-22 회원 전용 확인: 회원이면 action 실행, 아니면 로그인 안내 창을 상황 글(CM-17 문구)과 함께 엶
 // 화면 숨김용. 권한 확인은 서버가 함 (401이 오면 같은 안내 창, E4)
-// 로그인 화면(/login)에서는 로그인 버튼이 이미 보이므로 창을 한 번 더 띄우지 않고 '로그인해 주세요' 알림만 (2026-11-17 사용자 결정)
-// 가입 단계 화면(/oauth/callback)에서는 창에서 로그인을 누르면 가입을 하다 말고 나가게 되므로 '가입을 마치면 이용할 수 있어요' 알림만 (같은 날 사용자 결정)
+// 로그인 화면(/login)에서는 로그인 버튼이 이미 보이므로 창을 한 번 더 띄우지 않고 '로그인해 주세요' 알림만
+// 가입 단계 화면(/oauth/callback)에서는 창에서 로그인을 누르면 가입을 하다 말고 나가게 되므로 '가입을 마치면 이용할 수 있어요' 알림만
 const NOTICE_INSTEAD_OF_DIALOG = {
   '/login': '로그인해 주세요',
   '/oauth/callback': '가입을 마치면 이용할 수 있어요',
@@ -30,3 +32,30 @@ function requireLogin(action, text) {
 }
 
 export default requireLogin
+
+// 여러 화면이 같이 쓰는 로그인 안내 글 (CM-17, AU-01, AU-03)
+export const LIKE_LOGIN_TEXT = '찜하기는 회원 전용이에요.'
+export const ALREADY_LOGGED_IN_TEXT = '이미 로그인되어 있어요'
+export const LOGIN_OFFLINE_TEXT = '로그인하지 못했어요. 다시 시도해 주세요'
+// 회원 로그인을 시작하려는데 관리자 세션이 있을 때 (화면 글은 두 줄, 알림에서는 한 줄로 보임)
+export const ADMIN_SESSION_TEXT = '관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요'
+
+// 소셜 로그인으로 보내기 전 확인 (로그인 화면 AU-01, 로그인 안내 창 CM-17이 같이 씀)
+// 서버(API-17)에 한 번 더 물어 이미 로그인 중이면 보내지 않음 (다시 로그인, 다른 계정 가입 막음) → 로그인 상태를 다시 채움
+// 서버 응답이 아예 없으면(서버 꺼짐, 네트워크 오류) 소셜 로그인으로 보내도 오류 화면만 뜨므로 보내지 않음 (E3)
+// 관리자 세션(API-30)이 있으면 보내지 않음 (서버도 막지만 소셜 화면까지 갔다 오지 않게)
+// 돌려주는 값: 'offline' 서버 응답 없음 / 'member' 이미 로그인 중 / 'admin' 관리자로 로그인 중 / 'ok' 보내도 됨
+export async function checkSocialLogin() {
+  try {
+    const me = await authApi.getMe()
+    if (me?.memberNickname) {
+      useAuthStore.getState().fetchMe()
+      return 'member'
+    }
+  } catch (error) {
+    // 401 등 서버 응답이 있으면 비회원 → 아래 관리자 확인으로
+    if (!error.response) return 'offline'
+  }
+  const admin = await adminApi.getAdminSession().catch(() => null)
+  return admin ? 'admin' : 'ok'
+}

@@ -49,6 +49,7 @@ const GlobalStyle = createGlobalStyle`
     --warn-soft: #FFF3D6;
     --bad: #D23B3B;
     --bad-soft: #FDECEC;
+    --on-bad: #FFFFFF;
 
     /* 그래프 */
     --viz-1: #3B78C2;

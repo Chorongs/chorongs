@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { HISTORY_ACTION_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Tag } from '../../styles/common'
+import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
 import { formatDateTime } from '../../utils/format'
 import ChipGroup from '../ui/ChipGroup'
 import Modal from '../ui/Modal'
@@ -168,12 +168,6 @@ const Warn = styled.p`
   color: var(--warn);
   font-weight: 600;
   line-height: 1.6;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 // 누가: adminId 없으면 '자동', 이름 없으면 '탈퇴한 관리자'

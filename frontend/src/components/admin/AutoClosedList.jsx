@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { AUTO_CLOSED_STATUS_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Tag } from '../../styles/common'
+import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
 import { formatDate, formatDateTime } from '../../utils/format'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
@@ -197,12 +197,6 @@ const Mine = styled.p`
   color: var(--ink-2);
   font-size: var(--fs-md);
   line-height: 1.6;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 const statusOf = (item) => item.checkResult ?? 'UNCHECKED'

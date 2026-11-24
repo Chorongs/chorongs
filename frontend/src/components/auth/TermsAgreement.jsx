@@ -4,11 +4,12 @@ import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
-import { getTodayText } from '../../utils/format'
+import { ADMIN_SESSION_TEXT } from '../../utils/requireLogin'
 import { BIRTH_ERROR, isValidBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
 import AuthLayout from '../layout/AuthLayout'
 import Checkbox from '../ui/Checkbox'
+import BirthDateField from './BirthDateField'
 
 // AU-03 약관 동의, 생년월일 입력: 가입 단계 (OAuthCallbackPage의 result=SIGNUP)
 // needBirth: true면 생년월일 입력칸 (카카오는 항상, 네이버는 비어 왔을 때만) / false면 생년월일은 안 보냄 (API-50)
@@ -20,8 +21,8 @@ import Checkbox from '../ui/Checkbox'
 //   - 생년월일 안내는 칸 바로 아래에 입력하는 동안 바로 바뀜: 비어 있음 '생년월일을 입력해 주세요'(6-1)
 //     / 덜 입력, 범위 밖, [시작하기]를 눌렀는데 비어 있음, 서버 400 INVALID_INPUT '입력한 생년월일을 확인해주세요'(6-2)
 //     / 정상 '생년월일 입력 완료'(6-3)
-//   - 덜 입력한 날짜는 브라우저가 값을 빈 글자로 넘기므로 validity.badInput으로 따로 구분
-//   - 오류 문구 BIRTH_ERROR, 오늘 날짜 getTodayText는 MY 회원 정보와 같이 씀 (utils/validate.js, utils/format.js)
+//   - 생년월일 칸은 숫자 8자리 입력 (BirthDateField). 덜 친 날짜는 칸을 떠났거나 [시작하기]를 눌렀을 때 오류로 보임
+//   - 생년월일 칸, 오류 문구 BIRTH_ERROR는 MY 회원 정보와 같이 씀 (BirthDateField, utils/validate.js)
 
 const AgreeList = styled.div`
   display: flex;
@@ -50,23 +51,6 @@ const ViewButton = styled.button.attrs({ type: 'button' })`
   cursor: pointer;
 `
 
-const BirthField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  input {
-    height: 52px;
-    padding: 0 16px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--paper);
-    color: var(--ink);
-    font-size: var(--fs-lg);
-  }
-`
-
 // $tone: info 안내 / bad 오류 / good 입력 완료
 const HINT_COLOR = { info: 'var(--cocoa)', bad: 'var(--bad)', good: 'var(--good)' }
 
@@ -76,7 +60,7 @@ const BirthHint = styled.span`
   font-weight: 600;
 `
 
-// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line)
 const ErrorText = styled(InlineError)`
   white-space: pre-line;
 `
@@ -96,23 +80,22 @@ function TermsAgreement({ needBirth, onDone }) {
   const [termsKind, setTermsKind] = useState(null)
   const [error, setError] = useState('')
   const [isPending, setIsPending] = useState(false)
-  // 덜 입력한 날짜인지 (validity.badInput) / [시작하기]를 눌러 봤는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
-  const [isBirthBadInput, setIsBirthBadInput] = useState(false)
+  // 생년월일 칸을 떠난 적 있는지 / [시작하기]를 눌러 봤는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
+  const [isBirthTouched, setIsBirthTouched] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isServerBirthError, setIsServerBirthError] = useState(false)
 
   const isAllAgreed = agreeService && agreePrivacy
-  const isBirthDone = isValidBirthDate(birth) && !isBirthBadInput && !isServerBirthError
-  // 칸 아래 안내: 정상 → 6-3 / 덜 입력, 형식·범위 오류, 눌렀는데 비어 있음, 서버 거절 → 6-2 / 그 밖(아직 안 씀) → 6-1
-  const isBirthError = !isBirthDone && (isBirthBadInput || birth !== '' || isSubmitted || isServerBirthError)
+  const isBirthDone = isValidBirthDate(birth) && !isServerBirthError
+  // 칸 아래 안내: 정상 → 6-3 / 8자리를 다 쳤는데 틀림, 덜 친 채 칸을 떠남, 눌렀는데 비어 있거나 덜 침, 서버 거절 → 6-2 / 그 밖(아직 안 씀, 치는 중) → 6-1
+  const isBirthComplete = birth.length === 10
+  const isBirthError = !isBirthDone && ((birth !== '' && (isBirthComplete || isBirthTouched)) || isSubmitted || isServerBirthError)
   let birthHint = { tone: 'info', text: '생년월일을 입력해 주세요' }
   if (isBirthDone) birthHint = { tone: 'good', text: '생년월일 입력 완료' }
   else if (isBirthError) birthHint = { tone: 'bad', text: BIRTH_ERROR }
 
-  // 달력 값이 바뀌거나 칸을 떠날 때 덜 입력했는지 다시 봄
-  const handleBirthInput = (event) => {
-    setBirth(event.target.value)
-    setIsBirthBadInput(event.target.validity.badInput)
+  const handleBirthChange = (text) => {
+    setBirth(text)
     setIsServerBirthError(false)
   }
 
@@ -159,15 +142,14 @@ function TermsAgreement({ needBirth, onDone }) {
       if (code === 'INVALID_INPUT') {
         setError('')
         setIsServerBirthError(true)
-      } else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요')
+      } else if (code === 'ADMIN_LOGGED_IN') setError(ADMIN_SESSION_TEXT)
       else setError('가입하지 못했어요.\n다시 시도해 주세요')
       setIsPending(false)
     }
   }
 
   return (
-    <AuthLayout mark="logo" tagline="대출, 더 쉽게 연결되다" title="캐링 가입하기">
-
+    <AuthLayout mark="logo" title="캐링 가입하기">
       <Checkbox checked={isAllAgreed} onChange={handleAll} label="전체 동의" />
       <AgreeList>
         <AgreeRow>
@@ -185,21 +167,16 @@ function TermsAgreement({ needBirth, onDone }) {
       </AgreeList>
 
       {needBirth && (
-        <BirthField>
-          생년월일
-          <input
-            type="date"
-            value={birth}
-            min="1900-01-01"
-            max={getTodayText()}
-            aria-invalid={birthHint.tone === 'bad'}
-            onChange={handleBirthInput}
-            onBlur={handleBirthInput}
-          />
+        <BirthDateField
+          value={birth}
+          onChange={handleBirthChange}
+          onBlur={() => setIsBirthTouched(true)}
+          isInvalid={birthHint.tone === 'bad'}
+        >
           <BirthHint $tone={birthHint.tone} role={birthHint.tone === 'bad' ? 'alert' : undefined}>
             {birthHint.text}
           </BirthHint>
-        </BirthField>
+        </BirthDateField>
       )}
 
       <ErrorText>{error}</ErrorText>

@@ -5,7 +5,7 @@ import * as adminApi from '../../api/adminApi'
 import { ADMIN_ROLE_LABEL, ADMIN_STATUS_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Tag } from '../../styles/common'
+import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
 import { approvedByText, formatDateTime } from '../../utils/format'
 import ChipGroup from '../ui/ChipGroup'
 import Modal from '../ui/Modal'
@@ -168,12 +168,6 @@ const Mine = styled.p`
   border-radius: var(--r-sm);
   background: var(--brand-soft);
   line-height: 1.6;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 // 승인한 사람: 이름 / 승인한 번호는 있는데 이름이 없으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자

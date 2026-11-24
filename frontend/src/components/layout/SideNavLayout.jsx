@@ -93,7 +93,7 @@ const Count = styled.span`
   padding: 0 7px;
   border-radius: var(--r-sm);
   background: var(--bad);
-  color: #fff;
+  color: var(--on-bad);
   font-family: var(--f-num);
   font-size: var(--fs-xs);
   font-weight: 900;

@@ -4,7 +4,7 @@ import * as myApi from '../../api/myApi'
 import { Button, Tag } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import ProductRow from '../common/ProductRow'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
 // MY-08 저장한 추천 결과 (10개): 저장 시점, 조건 라벨, 상품 / '결과 다시 보기' / 삭제
 // '결과 다시 보기' → 그때 상품을 최신 정보로 펼쳐 보임 (서버가 지금 상품 정보를 줌, API-38 GET)
@@ -47,12 +47,6 @@ const StatusLine = styled.div`
   gap: 6px;
   padding-top: 8px;
 `
-
-function ProductStatusTag({ product }) {
-  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
-  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
-  return null
-}
 
 function SavedRecList() {
   const [attempt, setAttempt] = useState(0)

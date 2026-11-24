@@ -1,5 +1,4 @@
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
-import styled from 'styled-components'
 import PageHeader from '../components/common/PageHeader'
 import SideNavLayout from '../components/layout/SideNavLayout'
 import CalcRecords from '../components/my/CalcRecords'
@@ -14,6 +13,7 @@ import SearchHistoryList from '../components/my/SearchHistoryList'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
+import { StatusText } from '../styles/common'
 
 // MY-01 MY 화면 (/my, /my/:section, 회원 전용): 왼쪽 메뉴 9개 / 오른쪽 고른 항목 하나 (useParams)
 // checking 동안은 로딩만 (로그인 안내가 번쩍 보이지 않게) / 비회원 → 로그인 안내만, 항목 숨김 / 없는 section → /my
@@ -53,18 +53,12 @@ const NAV_GROUPS = MENU_GROUPS.map((group) => ({
 
 const PAGE_DESC = '찜한 대출과 최근 기록, 진단 결과를 한곳에 모았어요.'
 
-const Status = styled.p`
-  padding: 36px 0;
-  color: var(--cocoa);
-  text-align: center;
-`
-
 function MyPage() {
   const status = useAuthStore((state) => state.status)
   const { section } = useParams()
   const navigate = useNavigate()
 
-  if (status === 'checking') return <Status role="status">확인하는 중이에요</Status>
+  if (status === 'checking') return <StatusText role="status">확인하는 중이에요</StatusText>
 
   // 비회원 [로그인]: 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
   //   아니면 로그인 뒤 보던 /my 주소로 돌아오게 지금 주소를 로그인 화면에 넘김 (기획서 3-7, 7-1 9번)

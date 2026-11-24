@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import useAuthStore from '../../store/useAuthStore'
 import useMyStore from '../../store/useMyStore'
-import requireLogin from '../../utils/requireLogin'
+import requireLogin, { LIKE_LOGIN_TEXT } from '../../utils/requireLogin'
 import Icon from '../ui/Icon'
 
 // LY-07 찜 바로가기: 하트 + 개수 딱지 (useMyStore likedIds 개수)
@@ -66,7 +66,7 @@ function LikeLink() {
   }
 
   return (
-    <ButtonBox aria-label="찜한 대출" onClick={() => requireLogin(() => {}, '찜하기는 회원 전용이에요.')}>
+    <ButtonBox aria-label="찜한 대출" onClick={() => requireLogin(() => {}, LIKE_LOGIN_TEXT)}>
       <Icon name="heart" />
     </ButtonBox>
   )

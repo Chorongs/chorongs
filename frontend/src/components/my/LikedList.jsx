@@ -4,14 +4,14 @@ import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Tag } from '../../styles/common'
+import { Button } from '../../styles/common'
 import ProductRow from '../common/ProductRow'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
 // MY-04 찜한 대출 (최대 30개): 상품 목록, 쪽 나눔 (E7) / 빈 상태 '맞춤 추천 받기'
 // 찜 취소는 줄의 하트(LikeButton)로 함 (X, 지우기 없음)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
-// 찜 목록 응답은 공통 PageInfo { list, total, page, size } (2026-11-17 백엔드 담당 결정)
+// 찜 목록 응답은 공통 PageInfo { list, total, page, size }
 // '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음: 추천받기 전이면 추천 창, 받은 뒤면 /recommend (hasResult = useRecommendStore result 유무)
 const PAGE_SIZE = 20
 
@@ -19,12 +19,6 @@ const StatusLine = styled.div`
   display: flex;
   gap: 6px;
 `
-
-function ProductStatusTag({ product }) {
-  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
-  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
-  return null
-}
 
 function LikedList() {
   const openRecommend = useUiStore((state) => state.openRecommend)
@@ -47,9 +41,9 @@ function LikedList() {
           total: data?.total ?? 0,
         }))
       })
-      .catch((error) => {
+      .catch(() => {
         // 더 보기 실패는 받은 목록을 그대로 두고 [더 보기]만 다시 누를 수 있게
-        if (!isCancelled) setResult((prev) => (page === 1 ? { status: error.isPreparing ? 'preparing' : 'error', items: [], total: 0 } : prev))
+        if (!isCancelled) setResult((prev) => (page === 1 ? { status: 'error', items: [], total: 0 } : prev))
       })
       .finally(() => {
         if (!isCancelled) setIsMoreLoading(false)

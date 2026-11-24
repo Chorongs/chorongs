@@ -107,3 +107,10 @@ export function approvedByText(admin) {
   if (admin.approvedBy !== null && admin.approvedBy !== undefined) return '탈퇴한 관리자'
   return '첫 관리자 자동 승인'
 }
+
+// 생년월일 입력칸 글: 숫자만 8자리까지 남겨 'YYYY-MM-DD' 모양으로 이음 (예: '199001' → '1990-01', '19900101' → '1990-01-01')
+// 붙여 넣은 '1990.01.01', '1990-01-01'도 숫자만 남겨 같은 모양으로 (맞는 날짜인지는 validate.js isValidBirthDate)
+export function formatBirthInput(text) {
+  const digits = String(text ?? '').replace(/\D/g, '').slice(0, 8)
+  return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-')
+}

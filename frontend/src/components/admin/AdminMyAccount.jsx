@@ -5,7 +5,7 @@ import * as adminApi from '../../api/adminApi'
 import { ADMIN_ROLE_LABEL } from '../../constants/options'
 import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError } from '../../styles/common'
+import { Button, DialogActions, InlineError } from '../../styles/common'
 import { approvedByText, formatDateTime, formatTime } from '../../utils/format'
 import Modal from '../ui/Modal'
 
@@ -148,12 +148,6 @@ const Field = styled.label`
       height: 48px;
     }
   }
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 const LAST_APPROVER_TEXT = '마지막 승인권자라 탈퇴할 수 없어요. 관리자 계정에서 다른 승인권자를 먼저 지정해 주세요'

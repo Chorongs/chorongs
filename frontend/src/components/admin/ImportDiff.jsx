@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { CHECK_REASON_LABEL, IMPORT_CHANGE_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Tag } from '../../styles/common'
+import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
@@ -351,12 +351,6 @@ const Mine = styled.p`
   color: var(--ink-2);
   font-size: var(--fs-md);
   line-height: 1.6;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 // 구분별 수 글: '신규 a · 변경 b · 다시 게시 c · 판매 중단 d'

@@ -5,7 +5,10 @@ import Icon from '../ui/Icon'
 // 로그인류 화면 틀 (회원 로그인, 가입 단계, 관리자 로그인, 관리자 가입 신청이 같이 씀)
 // 가운데 440px / 머리(표시, 한 줄 소개, 제목, 설명) + 내용(children, 세로 20px 간격)
 // mark: 'logo'면 캐링 로고, 그 밖의 값은 아이콘 이름 (검은 네모 안, 관리자는 'shield')
+// tagline: 로고 위 한 줄 소개. 'logo'이고 안 넘기면 LOGO_TAGLINE (회원 로그인, 가입 단계가 같은 글)
 // isError: 설명을 빨간 오류 글로 / 설명 안의 \n은 줄바꿈
+const LOGO_TAGLINE = '대출, 더 쉽게 연결되다'
+
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -56,6 +59,7 @@ const Description = styled.p`
 `
 
 function AuthLayout({ mark, tagline, title, description, isError = false, children }) {
+  const taglineText = tagline ?? (mark === 'logo' ? LOGO_TAGLINE : null)
   return (
     <Wrap>
       <Head>
@@ -66,7 +70,7 @@ function AuthLayout({ mark, tagline, title, description, isError = false, childr
             <Icon name={mark} size={30} />
           </Mark>
         )}
-        {tagline && <Tagline>{tagline}</Tagline>}
+        {taglineText && <Tagline>{taglineText}</Tagline>}
         <Title>{title}</Title>
         {description && (
           <Description $isError={isError} role={isError ? 'alert' : undefined}>

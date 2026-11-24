@@ -5,10 +5,18 @@ import * as myApi from '../../api/myApi'
 import { CREDIT_BAND_LABEL } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox } from '../../styles/common'
+import { Button, DialogActions, DialogText, EmptyBox, StatusText } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import SectionHeader from '../common/SectionHeader'
 import Modal from '../ui/Modal'
+
+// MY-09 내 진단 리포트: 저장한 신용 구간 + 진단 시각 / [이 구간으로 추천받기] / [삭제]
+// 삭제 → 확인 후 API-25 DELETE / 없으면(204) 빈 상태 + '신용 셀프 진단 하기' (E11)
+// [이 구간으로 추천받기]는 CR-03과 같음: 추천 입력의 신용 구간을 이 구간으로 채움 →
+//   추천받기 전이면 추천 창을 '잠깐' 창 없이 1단계부터 열고 '{구간} 구간을 3단계에 골라 뒀어요' 알림 (나머지 입력은 이용자가 채움)
+//   / 받은 뒤면 그 구간으로 다시 추천 실행 → /recommend + '{구간} 구간으로 추천했어요' 알림. 실행 중 버튼 잠금 (E5), 실패하면 알림 (E3)
+// TODO(MY-09, CR-03): 진단 결과 카드(CreditResultCard.jsx)에 같은 동작이 따로 있음.
+//   나중에 공통 함수로 묶는다 (명세서 '폴더 구조'에 둘 파일을 먼저 추가한 뒤, 두 화면이 그 함수를 부르게)
 
 // 리포트 판: 회색 바탕 / 작은 이름, 큰 구간, 진단 날짜, 버튼
 const ReportBox = styled.div`
@@ -49,24 +57,6 @@ const Meta = styled.p`
 const Actions = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-`
-
-const Status = styled.p`
-  padding: 36px 0;
-  color: var(--cocoa);
-  text-align: center;
-`
-
-const DialogText = styled.p`
-  margin-bottom: 20px;
-  font-size: var(--fs-lg);
-  font-weight: 700;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
   gap: 8px;
 `
 
@@ -141,7 +131,7 @@ function DiagnosisReport() {
 
   let body
   if (result.status === 'loading') {
-    body = <Status role="status">불러오는 중이에요</Status>
+    body = <StatusText role="status">불러오는 중이에요</StatusText>
   } else if (result.status === 'error') {
     body = (
       <EmptyBox>

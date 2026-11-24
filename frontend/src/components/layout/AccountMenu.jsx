@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
 import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
-import { Button } from '../../styles/common'
+import { Button, DialogActions, DialogText } from '../../styles/common'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import Popover from '../ui/Popover'
@@ -14,9 +14,8 @@ import Popover from '../ui/Popover'
 // 로그아웃: 메뉴는 창 열기(openLogout)만. 창은 아래 LogoutDialog를 Layout이 한 번만 그림
 //   (상단바(z-index 50) 안에서 그리면 하단 탭바(55), 비교함 띠(58) 아래에 깔려서. UI-15 'createPortal 안 쓰고 Layout에서 그림')
 // LogoutDialog: 확인 창 '로그아웃할까요?' → API-16 + sessionStorage 비우기 → 안내 창 → 닫으면 새로고침하며 메인(/)으로
-// (명세서는 메인 이동 뒤 알림이지만, 새로고침하면 메모리의 알림이 지워져서 안내 창을 먼저 띄움. 2026-11-17 Tong B 결정)
-// (안내 문구도 명세서 '…이 탭에 있던 입력값도 지웠어요' 대신 이동 안내로 바꿈. 2026-11-17 Tong B 결정)
-// TODO(LY-08, CHORONG-43 Tong B): 모바일(900px 미만) 동작은 웹 화면 확인 뒤 사용자 화면 테스트 때 다시 정함
+// (새로고침하면 메모리의 알림이 지워지므로 알림 대신 안내 창을 먼저 띄움)
+// TODO(LY-08): 모바일(900px 미만) 동작은 웹 화면 확인 뒤 사용자 화면 테스트 때 다시 정함
 const MOBILE_QUERY = '(max-width: 899px)'
 
 const NameButton = styled.button.attrs({ type: 'button' })`
@@ -62,18 +61,6 @@ const MenuList = styled.div`
   button:hover {
     color: var(--brand-text);
   }
-`
-
-const DialogText = styled.p`
-  margin-bottom: 20px;
-  font-size: var(--fs-lg);
-  font-weight: 700;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 // 로그아웃 창 (LY-08, MY-02 같이 씀). Layout이 한 번만 그림
@@ -131,7 +118,7 @@ function AccountMenu() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
-  // 확인하는 동안(checking)에도 [로그인]을 보여 줌: 서버 응답이 늦거나 없어도 버튼이 사라지지 않게 (2026-11-17 사용자 결정)
+  // 확인하는 동안(checking)에도 [로그인]을 보여 줌: 서버 응답이 늦거나 없어도 버튼이 사라지지 않게
   // 누르면 /login으로 가고, 로그인 화면이 버튼을 누르는 순간 서버에 다시 확인함. 회원이면 응답이 오자마자 닉네임 버튼으로 바뀜
   // 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
   if (status !== 'member') {

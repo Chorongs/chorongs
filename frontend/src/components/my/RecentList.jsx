@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
-import { Tag } from '../../styles/common'
 import ProductRow from '../common/ProductRow'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
 // MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / 지우기
 // 줄 X → API-21 DELETE /{productId} / 지우기 → API-21 DELETE (전체) / 알림은 MySection (MY-03)
@@ -12,12 +11,6 @@ const StatusLine = styled.div`
   display: flex;
   gap: 6px;
 `
-
-function ProductStatusTag({ product }) {
-  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
-  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
-  return null
-}
 
 function RecentList() {
   const [attempt, setAttempt] = useState(0)
@@ -30,8 +23,8 @@ function RecentList() {
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true

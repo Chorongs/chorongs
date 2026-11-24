@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   approvedByText,
+  formatBirthInput,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -334,5 +335,52 @@ describe('approvedByText', () => {
     const text = approvedByText(admin)
     // Then
     expect(text).toBe('첫 관리자 자동 승인')
+  })
+})
+
+describe('formatBirthInput', () => {
+  it('숫자 8자리를 YYYY-MM-DD로 잇는다', () => {
+    // Given
+    const text = '19900101'
+    // When
+    const result = formatBirthInput(text)
+    // Then
+    expect(result).toBe('1990-01-01')
+  })
+
+  it('덜 친 숫자는 친 만큼만 잇는다', () => {
+    // Given
+    const text = '199001'
+    // When
+    const result = formatBirthInput(text)
+    // Then
+    expect(result).toBe('1990-01')
+  })
+
+  it('점이나 붙임표로 붙여 넣어도 숫자만 남겨 잇는다', () => {
+    // Given
+    const text = '1990.01.01'
+    // When
+    const result = formatBirthInput(text)
+    // Then
+    expect(result).toBe('1990-01-01')
+  })
+
+  it('8자리를 넘는 숫자는 버린다', () => {
+    // Given
+    const text = '199001012'
+    // When
+    const result = formatBirthInput(text)
+    // Then
+    expect(result).toBe('1990-01-01')
+  })
+
+  it('숫자가 없으면 빈 글자', () => {
+    // Given
+    const text = 'abc'
+    // When
+    const result = formatBirthInput(text)
+    // Then
+    expect(result).toBe('')
   })
 })
