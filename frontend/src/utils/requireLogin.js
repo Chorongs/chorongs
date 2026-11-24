@@ -1,3 +1,4 @@
+import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
 
@@ -10,9 +11,14 @@ const NOTICE_INSTEAD_OF_DIALOG = {
   '/oauth/callback': '가입을 마치면 이용할 수 있어요',
 }
 
+// 관리자로 로그인 중이면 로그인 안내 창을 띄우지 않고 알림만 (SCR-16 비고: 회원 로그인 막음)
 function requireLogin(action, text) {
   if (useAuthStore.getState().status === 'member') {
     action()
+    return
+  }
+  if (useAdminStore.getState().status === 'authed') {
+    useUiStore.getState().showToast(ADMIN_LOGGED_IN_TEXT)
     return
   }
   const notice = NOTICE_INSTEAD_OF_DIALOG[window.location.pathname]

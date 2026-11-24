@@ -1,5 +1,6 @@
 package chorong.common.dto;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 import chorong.admin.entity.AdminRole;
@@ -14,7 +15,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LoginAdminDTO {
+public class LoginAdminDTO implements Serializable {	// 세션에 넣는 값이라 Serializable (세션을 저장, 복원할 때 필요)
+	private static final long serialVersionUID = 1L;
 	private Long adminId;			// 관리자 번호
 	private String adminName;		// 이름
 	private AdminRole adminRole;	// APPROVER 승인권자 / MANAGER 관리자

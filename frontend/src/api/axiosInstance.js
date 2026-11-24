@@ -1,4 +1,5 @@
 import axios from 'axios'
+import useAdminStore from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useMyStore from '../store/useMyStore'
 import useUiStore from '../store/useUiStore'
@@ -16,7 +17,6 @@ const PREPARING_APIS = [
   /^\/api\/me\/recent-views(\/|$)/, // API-21 최근 본 (CHORONG-42)
   /^\/api\/me\/searches(\/|$)/, // API-22 최근 검색 (CHORONG-42)
   /^\/api\/me\/compares(\/|$)/, // API-23 비교 내역 (CHORONG-42)
-  /^\/api\/me\/calcs(\/|$)/, // API-24 계산 기록 (CHORONG-48)
   /^\/api\/me$/, // API-28 회원 정보 수정, 탈퇴 (CHORONG-42)
   /^\/api\/me\/summary$/, // API-51 MY 요약 (CHORONG-42)
   /^\/api\/products\/[^/]+\/views$/, // API-05 상품 조회 기록 (실패해도 안내 안 함)
@@ -41,7 +41,14 @@ api.interceptors.response.use(
       const url = error.config?.url ?? ''
 
       if (url.startsWith('/api/admin/')) {
-        // TODO(ST-06, CHORONG-55): 서버 문구 안내 + /admin/login 이동
+        // 관리자 (AD-02, ST-06): 화면 상태 guest로 → RequireAdmin이 /admin/login으로 보냄 + 서버 문구 안내 (알림)
+        //   (서버 문구: '2시간이 지나 자동으로 로그아웃했어요' / '관리자 권한이 없어졌어요' / 세션 없음 '로그인이 필요합니다.')
+        // 로그인, 가입 흐름(/api/admin/auth*, /api/admin/join*)의 401은 아직 로그인 전이거나 토큰이 틀린 것이므로 부르는 쪽이 처리
+        const isAuthFlow = /^\/api\/admin\/(auth|join)(\/|$)/.test(url)
+        if (!isAuthFlow) {
+          useAdminStore.setState({ admin: null, status: 'guest', expiresAt: null })
+          useUiStore.getState().showToast(error.response.data?.message ?? '로그인이 풀렸어요. 다시 로그인해 주세요')
+        }
       } else if (url !== '/api/auth/me') {
         // 회원 기능: 화면 상태 guest로, 찜 번호 비움 (회원 관리 기획서 3-5) + 로그인 안내 창 (입력 중인 값은 지우지 않음)
         // 앱 시작 확인(/api/auth/me)은 안내 안 함
