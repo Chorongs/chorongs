@@ -3,6 +3,7 @@ package chorong.product.repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,7 @@ public interface LoanProductRepository extends JpaRepository<LoanProduct, Long> 
 
 	// 상태별 상품 목록 (추천 후보 = 게시 ON, LOAN-01)
 	List<LoanProduct> findByProductStatus(ProductStatus productStatus);
+	Optional<LoanProduct> findByProductIdAndProductStatus(Long productId, ProductStatus productStatus);
 
 	/*
 	 * 상세 검색 (SEARCH-01): 게시 상품 중 금리 탭, 검색어, 필터에 맞는 상품을 쪽 나눠 조회

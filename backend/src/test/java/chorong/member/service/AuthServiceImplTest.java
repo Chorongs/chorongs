@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpSession;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -324,7 +325,131 @@ class AuthServiceImplTest {
         verify(memberRepository, never()).save(any(Member.class));
     }
 
+    // ---------- 만 19세 미만 가입 불가 (명세서에 없는 규칙, 사용자 결정: 400 INVALID_INPUT, 막히면 가입 대기 삭제) ----------
+
+    @Test
+    @DisplayName("만 19세 생일 당일에는 가입할 수 있다")
+    void signupOnNineteenthBirthday() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(19);
+        when(memberRepository.findByLoginTypeAndSocialId("KAKAO", "social-1")).thenReturn(Optional.empty());
+        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth)));
+
+        // Then
+        verify(memberRepository).save(any(Member.class));
+    }
+
+    @Test
+    @DisplayName("만 19세 생일 하루 전이면 INVALID_INPUT(400)")
+    void signupOneDayBeforeNineteenthBirthday() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(19).plusDays(1);
+
+        // When, Then
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth))))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
+    @Test
+    @DisplayName("미성년(만 10세)이면 INVALID_INPUT(400)")
+    void signupMinor() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(10);
+
+        // When, Then
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth))))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
+    @Test
+    @DisplayName("미성년이면 member를 저장하지 않는다")
+    void signupMinorNotSaved() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(10);
+
+        // When
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth))))
+                .isInstanceOf(BusinessException.class);
+
+        // Then
+        verify(memberRepository, never()).save(any(Member.class));
+    }
+
+    @Test
+    @DisplayName("미성년이라 막히면 가입 대기가 지워진다")
+    void signupMinorClearsPending() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(10);
+
+        // When
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth))))
+                .isInstanceOf(BusinessException.class);
+
+        // Then
+        assertThat(session.getAttribute(SessionConst.PENDING_SIGNUP)).isNull();
+    }
+
+    @Test
+    @DisplayName("미성년이라 막혀도 로그인 정보는 저장되지 않는다")
+    void signupMinorNotLoggedIn() {
+        // Given
+        MockHttpSession session = pendingSession(social());
+        LocalDate birth = LocalDate.now().minusYears(10);
+
+        // When
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, year(birth), monthDay(birth))))
+                .isInstanceOf(BusinessException.class);
+
+        // Then
+        assertThat(session.getAttribute(SessionConst.LOGIN_MEMBER)).isNull();
+    }
+
+    @Test
+    @DisplayName("네이버가 준 생년월일이 미성년이면 INVALID_INPUT(400)")
+    void signupNaverMinor() {
+        // Given
+        LocalDate birth = LocalDate.now().minusYears(15);
+        SocialUserDTO naver = new SocialUserDTO("NAVER", "naver-1", "재영", year(birth), monthDay(birth), null);
+        MockHttpSession session = pendingSession(naver);
+
+        // When, Then
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, null, null)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
+    @Test
+    @DisplayName("네이버가 준 생년월일이 없는 날짜(02-30)면 INVALID_INPUT(400)")
+    void signupNaverNotExistingDate() {
+        // Given
+        SocialUserDTO naver = new SocialUserDTO("NAVER", "naver-1", "재영", "1990", "02-30", null);
+        MockHttpSession session = pendingSession(naver);
+
+        // When, Then
+        assertThatThrownBy(() -> authService.signup(session, new SignupRequestDTO(true, null, null)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
+    }
+
     // ---------- 도우미 ----------
+
+    private String year(LocalDate date) {
+        return String.valueOf(date.getYear());
+    }
+
+    private String monthDay(LocalDate date) {
+        return String.format("%02d-%02d", date.getMonthValue(), date.getDayOfMonth());
+    }
 
     private SocialUserDTO social() {
         return new SocialUserDTO("KAKAO", "social-1", "재영", null, null, null);
