@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
 import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
@@ -125,14 +126,21 @@ function AccountMenu() {
   const status = useAuthStore((state) => state.status)
   const user = useAuthStore((state) => state.user)
   const openLogout = useUiStore((state) => state.openLogout)
+  const showToast = useUiStore((state) => state.showToast)
+  const isAdminAuthed = useAdminStore((state) => state.status) === 'authed'
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
   // 확인하는 동안(checking)에도 [로그인]을 보여 줌: 서버 응답이 늦거나 없어도 버튼이 사라지지 않게 (2026-11-17 사용자 결정)
   // 누르면 /login으로 가고, 로그인 화면이 버튼을 누르는 순간 서버에 다시 확인함. 회원이면 응답이 오자마자 닉네임 버튼으로 바뀜
+  // 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
   if (status !== 'member') {
     return (
-      <Button $size="sm" $variant="outline" onClick={() => navigate('/login')}>
+      <Button
+        $size="sm"
+        $variant="outline"
+        onClick={() => (isAdminAuthed ? showToast(ADMIN_LOGGED_IN_TEXT) : navigate('/login'))}
+      >
         로그인
       </Button>
     )

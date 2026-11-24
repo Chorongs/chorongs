@@ -32,7 +32,7 @@ export const LOGIN_TYPE_LABEL = {
 
 // 신용 셀프 진단 문항 10개 (CR-02). 보기 번호 = 보기 순서 1, 2, ... / 0은 '잘 모르겠어요' (hasUnknown인 문항만)
 // 보기 순서와 허용 문항은 ml/app/credit.py OPTIONS, API-09와 같게. label은 결과 카드 항목 이름.
-// 문항 5(이용 금융권)는 여러 개 고르는 선택 문항 (대출이 있을 때만)
+// 문항 5(이용 금융권)는 여러 개 고르는 필수 문항. '없음' 보기는 CreditCheck가 화면에서만 붙임 (서버에는 빈 목록)
 export const CREDIT_QUESTIONS = [
   { no: 1, label: '1년 내 연체', title: '최근 1년 안에 30일 이상 연체한 적이 있나요?', options: ['없음', '1회', '2회 이상'] },
   { no: 2, label: '3개월 내 연체', title: '최근 3개월 안에 가장 길었던 연체 기간은 얼마인가요?', options: ['없음', '10일 미만', '10~29일', '30일 이상'] },
@@ -42,7 +42,6 @@ export const CREDIT_QUESTIONS = [
     no: 5,
     label: '이용 금융권',
     title: '이용 중인 금융권을 모두 골라 주세요.',
-    hint: '대출이 있을 때만 골라 주세요.',
     options: ['은행', '카드/캐피탈', '저축은행(상호금융 포함)', '대부업'],
     isMultiple: true,
   },
@@ -189,3 +188,56 @@ export const PRIORITY_OPTIONS = [
   { value: 'NO_PREPAY_FEE', label: '중도상환수수료 없음' },
 ]
 export const PRIORITY_MAX = 3
+
+// 관리자 화면 글자표 (AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
+export const ADMIN_ROLE_LABEL = {
+  APPROVER: '승인권자',
+  MANAGER: '관리자',
+}
+
+export const ADMIN_STATUS_LABEL = {
+  PENDING: '승인 대기',
+  ACTIVE: '정상',
+}
+
+// 갱신 출처 (API-32 sources)
+export const IMPORT_SOURCE_OPTIONS = [
+  { value: 'KINFA', label: '서민금융진흥원' },
+  { value: 'FSS', label: '금융감독원' },
+]
+// 출처 코드 → 이름 (관리자 바뀐 상품 표, 반영 이력)
+export const IMPORT_SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
+
+// 바뀐 상품 구분 (API-33 items[].diffType, FastAPI 값 그대로)
+export const IMPORT_CHANGE_TYPE_LABEL = {
+  NEW: '신규',
+  CHANGE: '변경',
+  REMOVE: '판매 중단',
+  REOPEN: '다시 게시',
+  CHECK: '확인 필요',
+}
+
+// 확인 필요 사유 (API-33 items[].checkReasons)
+export const CHECK_REASON_LABEL = {
+  NO_NAME: '상품명이나 기관 정보가 비어 있어요',
+  RATE_REVERSED: '최저 금리가 최고 금리보다 높아요',
+  RATE_OVER_20: '최고 금리가 연 20%를 넘어요',
+  NEW_PHRASE: '칩에 넣지 못한 새 문구가 있어요',
+}
+
+// 반영 이력 종류 (API-35 actionType)
+export const HISTORY_ACTION_TYPE_LABEL = {
+  INIT: '초기 적재',
+  PUBLISH: '반영',
+  AUTO_CLOSE: '자동 내림',
+  HIDE: '숨기기',
+  SHOW: '다시 보이기',
+  ROLLBACK: '되돌리기',
+}
+
+// 자동 내림 상태 (API-48 filter와 같은 코드)
+export const AUTO_CLOSED_STATUS_LABEL = {
+  UNCHECKED: '확인 전',
+  KEEP: '확인함',
+  REOPEN: '다시 게시함',
+}

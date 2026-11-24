@@ -1,4 +1,6 @@
 ------------------------------------------------------------------------------------
+--DROP TABLE import_item            CASCADE CONSTRAINTS PURGE;
+--DROP TABLE import_job             CASCADE CONSTRAINTS PURGE;
 --DROP TABLE term_request           CASCADE CONSTRAINTS PURGE;
 --DROP TABLE help_question          CASCADE CONSTRAINTS PURGE;
 --DROP TABLE help_stat              CASCADE CONSTRAINTS PURGE;
@@ -6,8 +8,13 @@
 --DROP TABLE product_snapshot       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE product_update_history CASCADE CONSTRAINTS PURGE;
 --DROP TABLE loan_report            CASCADE CONSTRAINTS PURGE;
---DROP TABLE recommend_result  CASCADE CONSTRAINTS PURGE;
+--DROP TABLE recommend_result       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE diagnosis_report       CASCADE CONSTRAINTS PURGE;
+--DROP TABLE home_limit_calc_history CASCADE CONSTRAINTS PURGE;
+--DROP TABLE reverse_calc_history   CASCADE CONSTRAINTS PURGE;
+--DROP TABLE dsr_loan               CASCADE CONSTRAINTS PURGE;
+--DROP TABLE dsr_calc_history       CASCADE CONSTRAINTS PURGE;
+--DROP TABLE change_calc_history    CASCADE CONSTRAINTS PURGE;
 --DROP TABLE calc_history           CASCADE CONSTRAINTS PURGE;
 --DROP TABLE compare_history        CASCADE CONSTRAINTS PURGE;
 --DROP TABLE search_history         CASCADE CONSTRAINTS PURGE;
@@ -18,7 +25,7 @@
 --DROP TABLE product_tag            CASCADE CONSTRAINTS PURGE;
 --DROP TABLE tag                    CASCADE CONSTRAINTS PURGE;
 --DROP TABLE loan_product           CASCADE CONSTRAINTS PURGE;
---DROP TABLE admin_token                  CASCADE CONSTRAINTS PURGE;
+--DROP TABLE admin_token            CASCADE CONSTRAINTS PURGE;
 --DROP TABLE admin                  CASCADE CONSTRAINTS PURGE;
 --DROP TABLE member                 CASCADE CONSTRAINTS PURGE;
 --DROP SEQUENCE seq_recommend_save;
@@ -389,7 +396,7 @@ COMMENT ON TABLE  compare_history IS '상품 비교 이력 (회원당 최근 10�
 COMMENT ON COLUMN compare_history.compare_id   IS '자동 증가(IDENTITY)';
 COMMENT ON COLUMN compare_history.member_id    IS '누가 비교했는지';
 COMMENT ON COLUMN compare_history.product_a_id IS '두 상품 중 번호가 작은 쪽. 서비스에서 작은 번호를 A에 넣어서 저장';
-COMMENT ON COLUMN compare_history.product_b_id IS '두 상품 중 번호가 큰 쪽. A와 같은 상품 불가. 순서를 바꿔 비교해도 한 건으로 취급 (시각만 갱신)';
+COMMENT ON COLUMN compare_history.product_b_id IS '두 상품 중 번호가 큰 쪽. A와 같은 상품 불가. 같은 두 상품 조합은 한 건만 저장. 다시 저장하면 409 이미 저장한 조합 (순서를 바꿔도 같은 조합)';
 COMMENT ON COLUMN compare_history.compared_at  IS '비교일시 (SYSDATE)';
 
 CREATE TABLE calc_history (
@@ -402,12 +409,26 @@ CREATE TABLE calc_history (
     grace_months    NUMBER(4)      DEFAULT 0 NOT NULL,
     total_interest  NUMBER(15)     NOT NULL,
     first_payment   NUMBER(15)     NOT NULL,
+    growth_rate     NUMBER(5,2),
+    prepay_round    NUMBER(4),
+    prepay_amount   NUMBER(10),
+    prepay_fee_rate NUMBER(5,2),
+    prepay_mode     VARCHAR2(20),
+    change_round    NUMBER(4),
+    change_rate     NUMBER(5,2),
     calc_at         DATE           DEFAULT SYSDATE NOT NULL,
     CONSTRAINT pk_calc_history  PRIMARY KEY (calc_id),
     CONSTRAINT ck_calc_repay    CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET','GRADUATED')),
     CONSTRAINT ck_calc_positive CHECK (loan_amount > 0 AND loan_months > 0 AND interest_rate >= 0 AND grace_months >= 0),
+    CONSTRAINT ck_calc_extra    CHECK (growth_rate >= 0 AND prepay_round > 0 AND prepay_amount > 0 AND prepay_fee_rate >= 0 AND change_round > 0 AND change_rate >= 0),
+    CONSTRAINT ck_calc_prepay_mode CHECK (prepay_mode IN ('REDUCE_PAYMENT','SHORTEN_TERM')),
+    CONSTRAINT ck_calc_prepay_set  CHECK ((prepay_round IS NULL AND prepay_amount IS NULL AND prepay_fee_rate IS NULL AND prepay_mode IS NULL)
+                                       OR (prepay_round IS NOT NULL AND prepay_amount IS NOT NULL AND prepay_fee_rate IS NOT NULL AND prepay_mode IS NOT NULL)),
+    CONSTRAINT ck_calc_change_set  CHECK ((change_round IS NULL AND change_rate IS NULL)
+                                       OR (change_round IS NOT NULL AND change_rate IS NOT NULL)),
     CONSTRAINT fk_calc_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
 );
+CREATE INDEX ix_calc_history_member ON calc_history (member_id);
 
 COMMENT ON TABLE  calc_history IS '이자 계산 이력 (회원당 최근 10개)';
 COMMENT ON COLUMN calc_history.calc_id        IS '자동 증가(IDENTITY)';
@@ -419,7 +440,173 @@ COMMENT ON COLUMN calc_history.repay_method   IS 'EQUAL_PI 원리금균등 / EQU
 COMMENT ON COLUMN calc_history.grace_months   IS '기본 0. 거치기간 (이자만 내는 기간). 개월';
 COMMENT ON COLUMN calc_history.total_interest IS '총 이자. 원';
 COMMENT ON COLUMN calc_history.first_payment  IS '첫 달 납부액. 원';
+COMMENT ON COLUMN calc_history.growth_rate    IS '체증식 연 증가율. %. 체증식이 아니면 NULL';
+COMMENT ON COLUMN calc_history.prepay_round   IS '중도상환 회차. 중도상환 없으면 중도상환 4칸 모두 NULL';
+COMMENT ON COLUMN calc_history.prepay_amount  IS '중도상환액. 원';
+COMMENT ON COLUMN calc_history.prepay_fee_rate IS '중도상환수수료율. %';
+COMMENT ON COLUMN calc_history.prepay_mode    IS 'REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN calc_history.change_round   IS '금리 변동 회차. 금리 변동 없으면 금리 변동 2칸 모두 NULL';
+COMMENT ON COLUMN calc_history.change_rate    IS '변동 후 연 금리. %';
 COMMENT ON COLUMN calc_history.calc_at        IS '계산일시 (SYSDATE)';
+
+CREATE TABLE change_calc_history (
+    change_id             NUMBER GENERATED ALWAYS AS IDENTITY,
+    member_id             NUMBER        NOT NULL,
+    current_repay_method  VARCHAR2(20)  NOT NULL,
+    current_balance       NUMBER(10)    NOT NULL,
+    current_rate          NUMBER(5,2)   NOT NULL,
+    current_months        NUMBER(4)     NOT NULL,
+    new_repay_method      VARCHAR2(20)  NOT NULL,
+    new_rate              NUMBER(5,2)   NOT NULL,
+    new_months            NUMBER(4)     NOT NULL,
+    fee_rate              NUMBER(5,2)   NOT NULL,
+    etc_cost              NUMBER(10)    DEFAULT 0 NOT NULL,
+    saving_amount         NUMBER(15)    NOT NULL,
+    new_first_payment     NUMBER(15)    NOT NULL,
+    new_total_interest    NUMBER(15)    NOT NULL,
+    calc_at               DATE          DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT pk_change_calc     PRIMARY KEY (change_id),
+    CONSTRAINT ck_change_repay    CHECK (current_repay_method IN ('EQUAL_PI','EQUAL_P','BULLET')
+                                     AND new_repay_method IN ('EQUAL_PI','EQUAL_P','BULLET')),
+    CONSTRAINT ck_change_positive CHECK (current_balance > 0 AND current_rate >= 0 AND current_months > 0
+                                     AND new_rate >= 0 AND new_months > 0 AND fee_rate >= 0 AND etc_cost >= 0),
+    CONSTRAINT fk_change_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
+);
+CREATE INDEX ix_change_calc_member ON change_calc_history (member_id);
+
+COMMENT ON TABLE  change_calc_history IS '갈아타기 계산 이력 (회원당 최근 10개)';
+COMMENT ON COLUMN change_calc_history.change_id            IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN change_calc_history.member_id            IS '누가 계산했는지';
+COMMENT ON COLUMN change_calc_history.current_repay_method IS '지금 대출의 상환 방식. EQUAL_PI 원리금균등 / EQUAL_P 원금균등 / BULLET 만기일시 (화면 글자는 서비스에서 바꿈)';
+COMMENT ON COLUMN change_calc_history.current_balance      IS '지금 대출의 남은 금액. 원';
+COMMENT ON COLUMN change_calc_history.current_rate         IS '지금 대출의 연 %';
+COMMENT ON COLUMN change_calc_history.current_months       IS '지금 대출의 남은 기간. 개월';
+COMMENT ON COLUMN change_calc_history.new_repay_method     IS '갈아탈 대출의 상환 방식. 코드는 current_repay_method와 같음';
+COMMENT ON COLUMN change_calc_history.new_rate             IS '갈아탈 대출의 연 %';
+COMMENT ON COLUMN change_calc_history.new_months           IS '갈아탈 대출의 기간. 개월';
+COMMENT ON COLUMN change_calc_history.fee_rate             IS '중도상환수수료율. %';
+COMMENT ON COLUMN change_calc_history.etc_cost             IS '기타 비용 (인지세, 설정비 등). 원. 기본 0';
+COMMENT ON COLUMN change_calc_history.saving_amount        IS '갈아타면 아끼는 돈. 원. 더 내는 경우 음수. 화면이 계산한 값을 그대로 저장';
+COMMENT ON COLUMN change_calc_history.new_first_payment    IS '갈아탈 대출의 첫 달 납부액. 원';
+COMMENT ON COLUMN change_calc_history.new_total_interest   IS '갈아탈 대출의 총 이자. 원';
+COMMENT ON COLUMN change_calc_history.calc_at              IS '계산일시 (SYSDATE)';
+
+CREATE TABLE dsr_calc_history (
+    dsr_id          NUMBER GENERATED ALWAYS AS IDENTITY,
+    member_id       NUMBER        NOT NULL,
+    annual_income   NUMBER(10)    NOT NULL,
+    dsr_rate        NUMBER(13,2)  NOT NULL,
+    yearly_payment  NUMBER(15)    NOT NULL,
+    calc_at         DATE          DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT pk_dsr_calc     PRIMARY KEY (dsr_id),
+    CONSTRAINT ck_dsr_positive CHECK (annual_income > 0 AND dsr_rate >= 0 AND yearly_payment >= 0),
+    CONSTRAINT fk_dsr_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
+);
+CREATE INDEX ix_dsr_calc_member ON dsr_calc_history (member_id);
+
+COMMENT ON TABLE  dsr_calc_history IS 'DSR 계산 이력 (회원당 최근 10개). 계산 1번 = 1행. 넣은 대출 목록은 dsr_loan. 지울 때 dsr_loan을 먼저 지울 것';
+COMMENT ON COLUMN dsr_calc_history.dsr_id         IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN dsr_calc_history.member_id      IS '누가 계산했는지';
+COMMENT ON COLUMN dsr_calc_history.annual_income  IS '연소득. 원';
+COMMENT ON COLUMN dsr_calc_history.dsr_rate       IS 'DSR 결과. %. 화면이 계산한 값을 그대로 저장';
+COMMENT ON COLUMN dsr_calc_history.yearly_payment IS '1년간 갚는 원리금 합계. 원';
+COMMENT ON COLUMN dsr_calc_history.calc_at        IS '계산일시 (SYSDATE)';
+
+CREATE TABLE dsr_loan (
+    dsr_loan_id    NUMBER GENERATED ALWAYS AS IDENTITY,
+    dsr_id         NUMBER        NOT NULL,
+    sort_no        NUMBER(2)     NOT NULL,
+    loan_kind      VARCHAR2(20)  NOT NULL,
+    repay_method   VARCHAR2(20)  NOT NULL,
+    loan_amount    NUMBER(10)    NOT NULL,
+    interest_rate  NUMBER(5,2)   NOT NULL,
+    loan_months    NUMBER(4)     NOT NULL,
+    CONSTRAINT pk_dsr_loan         PRIMARY KEY (dsr_loan_id),
+    CONSTRAINT uq_dsr_loan_sort    UNIQUE (dsr_id, sort_no),
+    CONSTRAINT ck_dsr_loan_sort    CHECK (sort_no BETWEEN 1 AND 10),
+    CONSTRAINT ck_dsr_loan_kind    CHECK (loan_kind IN ('CREDIT','MORTGAGE','OTHER')),
+    CONSTRAINT ck_dsr_loan_repay   CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET')),
+    CONSTRAINT ck_dsr_loan_positive CHECK (loan_amount > 0 AND interest_rate >= 0 AND loan_months > 0),
+    CONSTRAINT fk_dsr_loan_calc    FOREIGN KEY (dsr_id) REFERENCES dsr_calc_history (dsr_id)
+);
+
+COMMENT ON TABLE  dsr_loan IS 'DSR 계산에 넣은 대출 목록. 대출 1건 = 1행, 계산 1번에 1건부터 10건. ON DELETE CASCADE를 쓰지 않으므로 dsr_calc_history보다 먼저 지울 것';
+COMMENT ON COLUMN dsr_loan.dsr_loan_id   IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN dsr_loan.dsr_id        IS '어느 DSR 계산의 대출인지 (dsr_calc_history.dsr_id)';
+COMMENT ON COLUMN dsr_loan.sort_no       IS '입력한 순서 1부터 10. unique(dsr_id, sort_no)';
+COMMENT ON COLUMN dsr_loan.loan_kind     IS 'CREDIT 신용대출 / MORTGAGE 주택담보대출 / OTHER 그 밖 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN dsr_loan.repay_method  IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등 / BULLET 만기일시';
+COMMENT ON COLUMN dsr_loan.loan_amount   IS '대출금액. 원';
+COMMENT ON COLUMN dsr_loan.interest_rate IS '연 %';
+COMMENT ON COLUMN dsr_loan.loan_months   IS '대출기간. 개월';
+
+CREATE TABLE reverse_calc_history (
+    reverse_id       NUMBER GENERATED ALWAYS AS IDENTITY,
+    member_id        NUMBER        NOT NULL,
+    repay_method     VARCHAR2(20)  NOT NULL,
+    monthly_payment  NUMBER(10)    NOT NULL,
+    interest_rate    NUMBER(5,2)   NOT NULL,
+    loan_months      NUMBER(4)     NOT NULL,
+    max_loan         NUMBER(15)    NOT NULL,
+    calc_at          DATE          DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT pk_reverse_calc     PRIMARY KEY (reverse_id),
+    CONSTRAINT ck_reverse_repay    CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET')),
+    CONSTRAINT ck_reverse_positive CHECK (monthly_payment > 0 AND interest_rate >= 0 AND loan_months > 0 AND max_loan >= 0),
+    CONSTRAINT fk_reverse_member   FOREIGN KEY (member_id) REFERENCES member (member_id)
+);
+CREATE INDEX ix_reverse_calc_member ON reverse_calc_history (member_id);
+
+COMMENT ON TABLE  reverse_calc_history IS '상환능력 기반 대출 계산 이력 (회원당 최근 10개)';
+COMMENT ON COLUMN reverse_calc_history.reverse_id      IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN reverse_calc_history.member_id       IS '누가 계산했는지';
+COMMENT ON COLUMN reverse_calc_history.repay_method    IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등 / BULLET 만기일시 (화면 글자는 서비스에서 바꿈)';
+COMMENT ON COLUMN reverse_calc_history.monthly_payment IS '매달 갚을 수 있는 돈. 원';
+COMMENT ON COLUMN reverse_calc_history.interest_rate   IS '연 %';
+COMMENT ON COLUMN reverse_calc_history.loan_months     IS '대출기간. 개월';
+COMMENT ON COLUMN reverse_calc_history.max_loan        IS '빌릴 수 있는 최대 금액. 원. 화면이 계산한 값을 그대로 저장 (기간별 금액 표는 입력으로 다시 계산되므로 저장하지 않음)';
+COMMENT ON COLUMN reverse_calc_history.calc_at         IS '계산일시 (SYSDATE)';
+
+CREATE TABLE home_limit_calc_history (
+    home_id         NUMBER GENERATED ALWAYS AS IDENTITY,
+    member_id       NUMBER        NOT NULL,
+    house_price     NUMBER(10)    NOT NULL,
+    home_region     VARCHAR2(20)  NOT NULL,
+    first_home      CHAR(1)       DEFAULT 'N' NOT NULL,
+    annual_income   NUMBER(10)    NOT NULL,
+    other_interest  NUMBER(10)    DEFAULT 0 NOT NULL,
+    interest_rate   NUMBER(5,2)   NOT NULL,
+    loan_years      NUMBER(2)     NOT NULL,
+    repay_method    VARCHAR2(20)  NOT NULL,
+    max_loan        NUMBER(15)    NOT NULL,
+    ltv_limit       NUMBER(15)    NOT NULL,
+    dti_limit       NUMBER(15)    NOT NULL,
+    calc_at         DATE          DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT pk_home_calc      PRIMARY KEY (home_id),
+    CONSTRAINT ck_home_region    CHECK (home_region IN ('OTHER','REGULATED')),
+    CONSTRAINT ck_home_first     CHECK (first_home IN ('Y','N')),
+    CONSTRAINT ck_home_repay     CHECK (repay_method IN ('EQUAL_PI','EQUAL_P')),
+    CONSTRAINT ck_home_positive  CHECK (house_price > 0 AND annual_income > 0 AND other_interest >= 0
+                                    AND interest_rate >= 0 AND loan_years > 0
+                                    AND max_loan >= 0 AND ltv_limit >= 0 AND dti_limit >= 0),
+    CONSTRAINT fk_home_member    FOREIGN KEY (member_id) REFERENCES member (member_id)
+);
+CREATE INDEX ix_home_calc_member ON home_limit_calc_history (member_id);
+
+COMMENT ON TABLE  home_limit_calc_history IS '내 집 대출한도 계산 이력 (회원당 최근 10개)';
+COMMENT ON COLUMN home_limit_calc_history.home_id        IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN home_limit_calc_history.member_id      IS '누가 계산했는지';
+COMMENT ON COLUMN home_limit_calc_history.house_price    IS '집값. 원';
+COMMENT ON COLUMN home_limit_calc_history.home_region    IS 'OTHER 그 외 지역 / REGULATED 규제 지역 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN home_limit_calc_history.first_home     IS 'Y 생애 최초 주택 구입 / N 아님. 기본 N';
+COMMENT ON COLUMN home_limit_calc_history.annual_income  IS '연소득. 원';
+COMMENT ON COLUMN home_limit_calc_history.other_interest IS '다른 대출의 1년 이자. 원. 기본 0';
+COMMENT ON COLUMN home_limit_calc_history.interest_rate  IS '연 %';
+COMMENT ON COLUMN home_limit_calc_history.loan_years     IS '대출기간. 년';
+COMMENT ON COLUMN home_limit_calc_history.repay_method   IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등';
+COMMENT ON COLUMN home_limit_calc_history.max_loan       IS '최대 대출 한도. 원. 화면이 계산한 값을 그대로 저장';
+COMMENT ON COLUMN home_limit_calc_history.ltv_limit      IS 'LTV 기준 한도. 원';
+COMMENT ON COLUMN home_limit_calc_history.dti_limit      IS 'DTI 기준 한도. 원. LTV, DTI 비율은 화면이 정한 예시 값이라 저장하지 않음';
+COMMENT ON COLUMN home_limit_calc_history.calc_at        IS '계산일시 (SYSDATE)';
 
 CREATE TABLE diagnosis_report (
     report_id    NUMBER GENERATED ALWAYS AS IDENTITY,
@@ -601,11 +788,16 @@ CREATE TABLE help_content (
     help_type   VARCHAR2(10)        NOT NULL,
     help_no     NUMBER(6)           NOT NULL,
     category    VARCHAR2(30 CHAR),
-    keyword     VARCHAR2(100 CHAR),
+    keyword1    VARCHAR2(30 CHAR),
+    keyword2    VARCHAR2(30 CHAR),
+    keyword3    VARCHAR2(30 CHAR),
+    keyword4    VARCHAR2(30 CHAR),
+    keyword5    VARCHAR2(30 CHAR),
     title       VARCHAR2(200 CHAR)  NOT NULL,
     content     CLOB                NOT NULL,
-    sort_order  NUMBER(4)           DEFAULT 0 NOT NULL,
+    summary     VARCHAR2(200 CHAR),
     CONSTRAINT pk_help_content PRIMARY KEY (help_id),
+    CONSTRAINT uq_help_content UNIQUE (help_type, help_no),
     CONSTRAINT ck_help_type    CHECK (help_type IN ('FAQ','TERM','TIP'))
 );
 
@@ -613,9 +805,14 @@ COMMENT ON TABLE  help_content IS '도움말 콘텐츠 (FAQ / 용어 / TIP). 원
 COMMENT ON COLUMN help_content.help_type  IS 'FAQ 자주 묻는 질문 / TERM 용어 / TIP 대출 TIP';
 COMMENT ON COLUMN help_content.help_no    IS '엑셀 원본의 고정 번호. 종류(help_type)별로 1부터. 제목을 고쳐도 같은 행으로 인식하기 위한 적재 키(unique(help_type, help_no)). 한 번 부여하면 바꾸거나 재사용하지 않음';
 COMMENT ON COLUMN help_content.category   IS '분류 칩. 용어 사전의 분류(예: 금리, 심사·한도). FAQ에 분류가 있으면 함께 사용. 표기를 통일할 것(표기가 다르면 칩이 갈라짐)';
-COMMENT ON COLUMN help_content.keyword    IS 'TIP 키워드 (예: 금리, 신용점수)';
+COMMENT ON COLUMN help_content.keyword1   IS '키워드 1. TERM 연관 용어 / TIP 키워드 / FAQ 안 씀. keyword1부터 빈칸 없이 채움 (keyword2~5 같음)';
+COMMENT ON COLUMN help_content.keyword2   IS '키워드 2';
+COMMENT ON COLUMN help_content.keyword3   IS '키워드 3';
+COMMENT ON COLUMN help_content.keyword4   IS '키워드 4';
+COMMENT ON COLUMN help_content.keyword5   IS '키워드 5';
 COMMENT ON COLUMN help_content.title      IS 'FAQ 질문 / 용어 이름 / TIP 제목. 엑셀 기준 200자 이내';
 COMMENT ON COLUMN help_content.content    IS 'FAQ 답변 / 용어 설명 / TIP 내용';
+COMMENT ON COLUMN help_content.summary    IS 'TIP 한 줄 짧은 설명. FAQ, TERM은 NULL';
 
 CREATE TABLE help_stat (
     stat_id          NUMBER GENERATED ALWAYS AS IDENTITY,
@@ -673,4 +870,72 @@ COMMENT ON COLUMN term_request.term_word         IS '요청한 단어. 30자까�
 COMMENT ON COLUMN term_request.request_count     IS '요청 횟수. 기본 1';
 COMMENT ON COLUMN term_request.created_at        IS '처음 요청한 일시 (SYSDATE)';
 COMMENT ON COLUMN term_request.last_requested_at IS '가장 최근 요청 일시';
+-- ============================================================
+
+-- ============================================================
+-- 8. 상품 불러오기 반영 대기 (관리자 [최신 상품 불러오기] → 바뀐 상품 확인 → 반영)
+--    쓰는 쪽: FastAPI(ml/app)만 읽고 씀. Spring 엔티티 없음
+--    불러오기는 1.5~5분 걸려서, 작업 번호를 먼저 돌려주고 결과는 이 표에 24시간 보관
+-- ============================================================
+CREATE TABLE import_job (
+    job_id         NUMBER GENERATED ALWAYS AS IDENTITY,
+    job_status     VARCHAR2(10)        DEFAULT 'RUNNING' NOT NULL,
+    sources        VARCHAR2(20)        NOT NULL,
+    base_version   NUMBER,
+    source_result  CLOB,
+    error_msg      VARCHAR2(500 CHAR),
+    requested_by   NUMBER              NOT NULL,
+    created_at     DATE                DEFAULT SYSDATE NOT NULL,
+    finished_at    DATE,
+    CONSTRAINT pk_import_job     PRIMARY KEY (job_id),
+    CONSTRAINT ck_ijob_status    CHECK (job_status IN ('RUNNING','DONE','FAILED','PUBLISHED','EXPIRED')),
+    CONSTRAINT ck_ijob_sources   CHECK (sources IN ('KINFA','FSS','KINFA,FSS')),
+    CONSTRAINT fk_ijob_admin     FOREIGN KEY (requested_by) REFERENCES admin (admin_id)
+);
+
+COMMENT ON TABLE  import_job IS '상품 불러오기 작업 (불러오기 1번 = 1행). 외부 API 수집, 정제, 비교 결과를 관리자가 고를 때까지 24시간 보관. 서버를 다시 켜도 결과가 남고, 누가 언제 불러왔고 어떻게 끝났는지 확인 가능. FastAPI만 읽고 씀 (기능명세서 ADMIN-04, EXT-05). 행은 지우지 않음';
+COMMENT ON COLUMN import_job.job_id        IS '자동 증가(IDENTITY). 작업 번호';
+COMMENT ON COLUMN import_job.job_status    IS 'RUNNING 진행 중 / DONE 비교 끝 / FAILED 실패 / PUBLISHED 반영함 / EXPIRED 24시간 지남. 시작할 때 RUNNING';
+COMMENT ON COLUMN import_job.sources       IS '불러온 출처. KINFA / FSS / KINFA,FSS (product_update_history.source와 같은 값)';
+COMMENT ON COLUMN import_job.base_version  IS '비교할 때의 마지막 반영 이력 번호 (product_update_history.history_id). 이력이 없으면 NULL. FK는 걸지 않음';
+COMMENT ON COLUMN import_job.source_result IS '출처별 성공 여부, 상품 수, 실패 사유 (JSON)';
+COMMENT ON COLUMN import_job.error_msg     IS 'FAILED일 때 사유';
+COMMENT ON COLUMN import_job.requested_by  IS '불러온 관리자 (admin.admin_id)';
+COMMENT ON COLUMN import_job.created_at    IS '시작 시각 (SYSDATE)';
+COMMENT ON COLUMN import_job.finished_at   IS 'DONE 또는 FAILED가 된 시각. 24시간 보관은 이 시각부터 셈';
+
+CREATE TABLE import_item (
+    item_id        NUMBER GENERATED ALWAYS AS IDENTITY,
+    job_id         NUMBER              NOT NULL,
+    diff_type      VARCHAR2(10)        NOT NULL,
+    product_id     NUMBER,
+    source         VARCHAR2(10)        NOT NULL,
+    product_name   VARCHAR2(200 CHAR),
+    company_name   VARCHAR2(100 CHAR),
+    changed_fields VARCHAR2(1000 CHAR),
+    check_reasons  VARCHAR2(500 CHAR),
+    hidden_yn      CHAR(1)             DEFAULT 'N' NOT NULL,
+    after_data     CLOB,
+    CONSTRAINT pk_import_item     PRIMARY KEY (item_id),
+    CONSTRAINT ck_iitem_diff      CHECK (diff_type IN ('NEW','CHANGE','REMOVE','REOPEN','CHECK')),
+    CONSTRAINT ck_iitem_source    CHECK (source IN ('KINFA','FSS')),
+    CONSTRAINT ck_iitem_hidden    CHECK (hidden_yn IN ('Y','N')),
+    CONSTRAINT fk_iitem_job       FOREIGN KEY (job_id)     REFERENCES import_job (job_id),
+    CONSTRAINT fk_iitem_product   FOREIGN KEY (product_id) REFERENCES loan_product (product_id)
+);
+
+CREATE INDEX idx_import_item_job ON import_item (job_id);
+
+COMMENT ON TABLE  import_item IS '불러오기로 바뀐 상품 (바뀐 상품 1개 = 1행). 관리자가 화면에서 골라 반영. 새 불러오기를 시작할 때 이전 작업의 행을 FastAPI가 삭제 (import_job 행은 남김). job_id FK에 ON DELETE 옵션 없음 (import_job 행은 지우지 않으므로)';
+COMMENT ON COLUMN import_item.item_id        IS '자동 증가(IDENTITY). 항목 번호 (화면에서 고르는 번호)';
+COMMENT ON COLUMN import_item.job_id         IS '어느 불러오기 작업의 항목인지 (import_job.job_id). idx_import_item_job 사용';
+COMMENT ON COLUMN import_item.diff_type      IS 'NEW 신규 / CHANGE 변경 / REMOVE 판매 중단 / REOPEN 다시 게시 / CHECK 확인 필요';
+COMMENT ON COLUMN import_item.product_id     IS '지금 상품 번호 (loan_product.product_id). 신규(NEW)는 NULL';
+COMMENT ON COLUMN import_item.source         IS 'KINFA / FSS (loan_product.source와 같음)';
+COMMENT ON COLUMN import_item.product_name   IS '화면 표시용 상품명 (loan_product.product_name과 같은 길이). 확인 필요의 ''상품명 없음''은 NULL';
+COMMENT ON COLUMN import_item.company_name   IS '화면 표시용 회사명 (loan_product.company_name과 같은 길이)';
+COMMENT ON COLUMN import_item.changed_fields IS '바뀐 칸 이름 목록 (쉼표로 구분). 화면 ''바뀐 내용''에 사용';
+COMMENT ON COLUMN import_item.check_reasons  IS '확인 필요 사유. CHECK일 때만 사용';
+COMMENT ON COLUMN import_item.hidden_yn      IS 'Y/N. 기본 N. 지금 숨김(HIDDEN) 중인 상품이면 Y';
+COMMENT ON COLUMN import_item.after_data     IS '반영할 정제 결과 1개 (JSON: 상품 칸 + 태그 + 금리). REMOVE는 NULL';
 -- ============================================================
