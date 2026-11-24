@@ -47,6 +47,14 @@ public class RecommendResultController {
 		return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(new RecommendSaveResponseDTO(saveId)));
 	}
 
+	// 같은 결과를 이미 저장했는지 -> 200 + true/false (읽기만). 결과 화면이 추천받은 뒤 로그인했거나, 다른 탭에서 저장한 뒤 다시 열렸을 때 씀
+	@PostMapping("/check")
+	public ResponseEntity<ApiResponse<Boolean>> checkRecommendResult(
+			@Valid @RequestBody RecommendSaveRequestDTO request, HttpSession session) {
+		Long memberId = LoginUtil.getMemberId(session);
+		return ResponseEntity.ok(ApiResponse.success(recommendResultService.hasSavedResult(memberId, request)));
+	}
+
 	// 저장 1개 삭제 -> 204 (남의 저장, 없는 저장 404)
 	@DeleteMapping("/{saveId}")
 	public ResponseEntity<Void> deleteRecommendResult(@PathVariable Long saveId, HttpSession session) {

@@ -94,6 +94,14 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 		return saveId;
 	}
 
+	// 읽기만 하므로 잠그지 않음 (저장은 saveRecommendResult가 잠근 뒤 다시 확인)
+	@Override
+	@Transactional(readOnly = true)
+	public boolean hasSavedResult(Long memberId, RecommendSaveRequestDTO request) {
+		return hasSameResult(recommendResultRepository.findByMemberIdOrderBySaveIdDescRankNoAsc(memberId),
+				conditionLabel(request), request.getProductIds());
+	}
+
 	@Override
 	@Transactional(readOnly = true)
 	public SavedRecommendResponseDTO getRecommendResults(Long memberId) {

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class RecommendResultControllerTest {
 	void setUp() {
 		RecommendResultService recommendResultService = mock(RecommendResultService.class);
 		when(recommendResultService.saveRecommendResult(eq(MEMBER_ID), any())).thenReturn(7L);
+		when(recommendResultService.hasSavedResult(eq(MEMBER_ID), any())).thenReturn(true);
 		mockMvc = MockMvcBuilders.standaloneSetup(new RecommendResultController(recommendResultService))
 				.addMappedInterceptors(new String[] { "/api/me/**" }, new LoginInterceptor())
 				.setControllerAdvice(new GlobalExceptionHandler())
@@ -72,6 +74,26 @@ class RecommendResultControllerTest {
 		// When, Then
 		mockMvc.perform(post(URL).session(memberSession()).contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void 비회원이_저장_여부를_물으면_401() throws Exception {
+		// Given
+		String body = body("[11, 12]");
+
+		// When, Then
+		mockMvc.perform(post(URL + "/check").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void 회원이_저장_여부를_물으면_결과를_돌려줌() throws Exception {
+		// Given: 서비스가 이미 저장했다고 답함
+		String body = body("[11, 12]");
+
+		// When, Then
+		mockMvc.perform(post(URL + "/check").session(memberSession()).contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(jsonPath("$.data").value(true));
 	}
 
 	@Test

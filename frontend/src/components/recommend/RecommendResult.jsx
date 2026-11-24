@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { postSavedRecommend } from '../../api/myApi'
+import { checkSavedRecommend, postSavedRecommend } from '../../api/myApi'
 import {
   CREDIT_BAND_LABEL,
   HOUSING_PURPOSES,
@@ -11,6 +11,7 @@ import {
   MONTHS_UNKNOWN,
   PRIORITY_OPTIONS,
 } from '../../constants/options'
+import useAuthStore from '../../store/useAuthStore'
 import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
@@ -221,7 +222,9 @@ const getConditionLabels = (input) => {
     - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
     - 같은 내용은 중복 저장하지 않음: 저장에 성공하면 그 내용(조건 + 순위대로 상품 번호, getSaveKey)을 useRecommendStore.savedKey에 기억하고,
       지금 결과가 같은 내용이면 버튼을 '저장했어요'로 잠금 (새로 추천받아 내용이 달라지면 다시 풀림, 새로고침 뒤에도 유지, 로그아웃과 탈퇴 때 clear()로 지움)
-    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 다른 탭이나 다른 단말기에서 같은 결과를 이미 저장했으면 409 → 오류 알림 대신 안내 + 버튼을 '저장했어요'로 잠금
+    - 회원이 이미 저장한 결과면 서버가 추천 응답에 saved: true를 줌 (API-06) → 처음부터 '저장했어요'로 잠금 (다른 탭, 다른 단말기에서 저장한 결과도)
+    - 회원인데 saved를 모르는 결과(추천받은 뒤 로그인함, 다른 탭에서 저장한 뒤 이 화면을 다시 엶)는 서버에 한 번 물어봄 (API-38 check) → true면 잠금
+    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 결과 화면을 보는 동안 다른 탭이나 다른 단말기에서 같은 결과를 저장했으면 409 → 오류 알림 대신 안내 + 버튼을 '저장했어요'로 잠금
     - 비교함 필터 (CM-10): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
       (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
@@ -231,6 +234,28 @@ function RecommendResult() {
   const savedKey = useRecommendStore((state) => state.savedKey)
   const markSaved = useRecommendStore((state) => state.markSaved)
   const showToast = useUiStore((state) => state.showToast)
+  const isMember = useAuthStore((state) => state.status === 'member')
+
+  // 지금 결과의 저장 지문 (조건 + 순위대로 상품 번호, 결과가 없거나 0건이면 null)
+  const saveKey = result && lastInput && result.items?.length > 0 ? getSaveKey(buildSavePayload(lastInput, result.items)) : null
+  // 이미 저장한 결과: 이 탭에서 저장한 내용(savedKey)과 같거나, 추천받을 때 서버가 이미 저장했다고 알려 줌(API-06 saved)
+  const isSaved = saveKey !== null && (saveKey === savedKey || result.saved === true)
+
+  // 회원인데 아직 저장했는지 모르면 서버에 한 번 물어봄 (API-38 check): 화면이 열릴 때, 로그인했을 때, 새 결과가 왔을 때
+  // saveKey는 저장 값을 JSON 글로 만든 것이라 다시 객체로 바꿔 보냄 (글자를 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  // 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || saveKey === null || isSaved) return undefined
+    let isCancelled = false
+    checkSavedRecommend(JSON.parse(saveKey))
+      .then((saved) => {
+        if (!isCancelled && saved) markSaved(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, saveKey, isSaved, markSaved])
 
   const tray = useCompareStore((state) => state.tray)
   const [restPage, setRestPage] = useState(0)
@@ -264,9 +289,6 @@ function RecommendResult() {
   const visibleRest = restItems.slice(currentRestPage * PAGE_SIZE, (currentRestPage + 1) * PAGE_SIZE)
   const canSave = lastInput !== null && items.length > 0
   const excludedTotal = excluded.reduce((sum, entry) => sum + entry.count, 0)
-  // 지금 결과와 같은 내용을 이미 저장했으면 다시 저장하지 않음 (조건 + 순위대로 상품 번호가 같을 때)
-  const saveKey = canSave ? getSaveKey(buildSavePayload(lastInput, items)) : null
-  const isSaved = saveKey !== null && saveKey === savedKey
 
   const saveResult = async () => {
     if (isSaving || isSaved) return

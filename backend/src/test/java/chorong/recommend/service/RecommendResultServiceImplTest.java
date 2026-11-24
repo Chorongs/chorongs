@@ -1,6 +1,7 @@
 package chorong.recommend.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -246,6 +247,30 @@ class RecommendResultServiceImplTest {
 		order.verify(memberRepository).findLockedByMemberId(MEMBER_ID);
 		order.verify(recommendResultRepository).findByMemberIdOrderBySaveIdDescRankNoAsc(MEMBER_ID);
 		order.verify(recommendResultRepository).saveAll(anyList());
+	}
+
+	@Test
+	void 같은_결과를_저장했으면_hasSavedResult는_true() {
+		// Given
+		givenSavedResult();
+
+		// When
+		boolean saved = recommendResultService.hasSavedResult(MEMBER_ID, request(List.of(11L, 12L)));
+
+		// Then
+		assertTrue(saved);
+	}
+
+	@Test
+	void 순위가_다르면_hasSavedResult는_false() {
+		// Given
+		givenSavedResult();
+
+		// When
+		boolean saved = recommendResultService.hasSavedResult(MEMBER_ID, request(List.of(12L, 11L)));
+
+		// Then
+		assertFalse(saved);
 	}
 
 	@Test
