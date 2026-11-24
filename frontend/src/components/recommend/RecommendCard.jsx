@@ -154,14 +154,18 @@ const Tags = styled.div`
   gap: 6px;
 `
 
-// 버튼 줄: [이자 계산] [+ 비교]를 같은 폭으로 (금리가 없어 [이자 계산]이 숨으면 [+ 비교]가 한 줄 전체). 899px 이하는 글자를 줄이고 아이콘은 숨김
-// 상세 창은 카드 아무 곳을 눌러서 열기 때문에 [상세 보기] 버튼은 없음 (CHORONG-81)
-// [+ 비교]는 [상세 보기]에 쓰던 주황 (primary 버튼)으로 항상 보임. 담긴 상품 ('A 담음')과 '비교 불가'는 각자 모양 (outline 바탕)을 유지
+// 버튼 줄: [이자 계산] [+ 비교]를 같은 폭, 같은 글자로 (금리가 없어 [이자 계산]이 숨으면 [+ 비교]가 한 줄 전체). 899px 이하는 글자를 줄이고 아이콘은 숨김
+// [+ 비교]는 주황 (primary 버튼), 담긴 상품 ('A 담음')과 '비교 불가'는 outline 바탕으로 각자 모양을 유지. 글자는 primary의 큰 글자를 쓰지 않고 [이자 계산]과 같게 맞춤
 const Actions = styled.div`
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
+
+  & > button {
+    font-size: var(--fs-base);
+    font-weight: 700;
+  }
 
   @media (max-width: 899px) {
     gap: 6px;
@@ -186,13 +190,13 @@ const Note = styled.p`
 /*
     RC-08 추천 카드: 추천 상품 1개 요약
     - props: item (RecommendItemDTO: rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote, judgeTags)
-    - 카드 아무 곳 클릭 (Enter) → 상품 상세 창 openProduct(id, 'recommend')
-    - [상세 보기] 버튼은 없음 (가안에는 있지만 카드 클릭과 같은 동작이라 뺌, CHORONG-81. 4위 이하 줄 ProductRow에도 없음) / [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
+    - 카드 아무 곳 클릭 (Enter) → 상품 상세 창 openProduct(id, 'recommend'). 별도 [상세 보기] 버튼은 없음 (4위 이하 줄 ProductRow도 같음)
+    - [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
     - TODO(LY-01, CHORONG-49 김진석): /calc 계산기 화면은 계산기 이슈가 라우트를 추가해야 생김. 그 전에는 [이자 계산]이 '찾을 수 없음' 화면으로 감 (넘기는 값은 utils/recommend.js getCalcState)
     - 판단 태그는 서버가 보낸 글 그대로, 순서도 그대로 (서버가 주의 먼저 정렬). 서버 글은 글자로만 출력 (E1)
     - 하트: LikeButton (CM-06. 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 LikeButton이 stopPropagation, CHORONG-43에서 연결)
     - [+ 비교] (ST-04, CHORONG-47): 누르면 상세 창이 아니라 바로 비교함에 담음 (useCompareStore.addTray, 클릭이 카드까지 안 퍼지게 stopPropagation). 담긴 상품은 'A 담음', 비교함 첫 상품과 용도나 상환 방식이 안 맞으면 '비교 불가'. 안 맞는 상품은 눌러도 안 담기고 알림 (addTray)
-    - 모양은 가안(cashlink_21.html .rec.rc): 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 [이자 계산] [+ 비교] 1:1 (가안의 2:1:1에서 [상세 보기]를 뺌)
+    - 모양은 가안(cashlink_21.html .rec.rc): 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 [이자 계산] [+ 비교] 1:1
     - 금리가 없으면 [이자 계산] 숨김, 월 상환이 없으면 '계산 불가', 만기일시만 있는 상품은 '월 이자' (서버 월 상환이 매달 이자만이므로)
     - 판단 태그: 서버가 글자 배열(List<String>)로 줌 (RecommendItemDTO 확인함). WARN_TAGS에 있는 글은 주의(노랑), 나머지는 좋은 점(초록)으로 색만 나눔
 */

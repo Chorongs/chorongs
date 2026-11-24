@@ -15,8 +15,7 @@ import { MONTHS_DEFAULT } from '../constants/options'
 */
 
 // 처음 골라 두는 값은 가안 기준 (직장인, 청년, 생활비, 36개월, 연체 없음, 낮은 금리). 칸은 모두 바꿀 수 있음
-// 소득, 기존 대출, 지역, 필요 금액, 신용 구간은 비워 둠
-// 신용 구간은 진단한 구간이 있거나 회원이 저장한 진단 구간(API-25)이 있을 때만 StepCredit이 미리 골라 둠
+// 소득, 기존 대출, 지역, 필요 금액, 신용 구간은 비워 둠 (신용 구간은 StepCredit이 진단 구간이 있을 때 미리 고름)
 const initialInput = {
   job: 'OFFICE',
   ageGroup: 'YOUTH',
