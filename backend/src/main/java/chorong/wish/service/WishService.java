@@ -10,7 +10,6 @@ import chorong.wish.dto.WishResponseDTO;
 public interface WishService {
 
     // 찜 목록 (최신순, 쪽 나눔)
-    // 찜 목록 (최신순, 쪽 나눔)
     PageInfo<WishResponseDTO> getWishes(Long memberId, int page, int size);
 
     // 찜하기 (상품 확인 → 30개면 LIKE_FULL → 저장)
