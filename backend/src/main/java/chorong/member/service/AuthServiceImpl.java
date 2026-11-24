@@ -15,11 +15,9 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
 
 @Service
 @RequiredArgsConstructor
@@ -73,6 +71,12 @@ public class AuthServiceImpl implements AuthService {
             validateBirth(request.getBirthYear(), request.getBirthDay());
             birthYear = request.getBirthYear();
             birthDay = request.getBirthDay();
+        }
+        //성인인지 나이 확인
+        LocalDate today =  LocalDate.now();
+        if(!isAdult(birthYear, birthDay,today)){
+            session.removeAttribute(SessionConst.PENDING_SIGNUP);
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
         // member 만들기 (이미 있으면 새로 만들지 않고 그 회원으로 로그인, B9)
@@ -143,5 +147,21 @@ public class AuthServiceImpl implements AuthService {
     private void saveLoginMember(HttpSession session, Member member) {
         session.setAttribute(SessionConst.LOGIN_MEMBER, new LoginMemberDTO(
                 member.getMemberId(), member.getMemberNickname(), member.getBirthYear(), member.getBirthDay()));
+    }
+
+    private boolean isAdult(String birthYear, String birthDay, LocalDate today) {
+
+        try {
+            String birthDate = birthYear + "-" + birthDay;
+            LocalDate a =  LocalDate.parse(birthDate);
+            int age = today.getYear() - a.getYear();
+            if(today.isBefore(a.withYear(today.getYear()))) {
+                age --;
+            }
+            return age >= 19;
+
+        }catch  (DateTimeException e) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
     }
 }

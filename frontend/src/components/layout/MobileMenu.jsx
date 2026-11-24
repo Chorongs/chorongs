@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import logoImg from '../../assets/images/logo_main.png'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import { FULL_MENU, RESULT_MENU_LABEL } from '../../constants/menu'
+import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
 import useAuthStore from '../../store/useAuthStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
@@ -120,7 +121,17 @@ function MobileMenu() {
           <span>{LOGIN_TYPE_LABEL[user.loginType] ?? '소셜'} 로그인</span>
         </Account>
       ) : (
-        <Account to="/login" onClick={closeMenu}>
+        <Account
+          to="/login"
+          onClick={(event) => {
+            // 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
+            if (useAdminStore.getState().status === 'authed') {
+              event.preventDefault()
+              useUiStore.getState().showToast(ADMIN_LOGGED_IN_TEXT)
+            }
+            closeMenu()
+          }}
+        >
           <b>카카오, 네이버로 로그인</b>
           <span>찜과 기록은 회원만 저장돼요</span>
         </Account>

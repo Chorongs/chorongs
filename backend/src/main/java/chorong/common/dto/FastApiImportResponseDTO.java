@@ -1,5 +1,6 @@
 package chorong.common.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -9,7 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /*
- * FastAPI 불러오기 응답 (EXT-05, ADMIN-04)
+ * FastAPI 갱신 작업 응답 (EXT-05, ADMIN-04)
  * POST /imports 응답은 jobId만 채워짐 / GET /imports/{job_id} 응답은 전부 채워짐
  * FastAPI JSON은 snake_case라 칸마다 @JsonProperty로 맞춤
  * 반영할 상품 값(after_data)은 FastAPI DB(import_item)에만 있고 Spring은 받지 않음
@@ -25,6 +26,10 @@ public class FastApiImportResponseDTO {
 	private String jobStatus;					// RUNNING 진행 중, DONE 비교 끝, FAILED 실패, PUBLISHED 반영함, EXPIRED 24시간 지남
 	@JsonProperty("base_version")
 	private Long baseVersion;					// 비교할 때의 마지막 반영 이력 번호 (반영 요청에 그대로 보냄)
+	@JsonProperty("created_at")
+	private LocalDateTime createdAt;			// 작업 시작 시각
+	@JsonProperty("finished_at")
+	private LocalDateTime finishedAt;			// DONE, FAILED가 된 시각 = 반영 대기 테이블 적재 시각 (RUNNING이면 null)
 	@JsonProperty("source_results")
 	private List<SourceResultItem> sourceResults;	// 출처별 결과
 	private List<Item> items;					// 바뀐 상품 (단수 'item' + Item이 겹쳐 Item으로 함)
