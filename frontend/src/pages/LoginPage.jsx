@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
+import * as adminApi from '../api/adminApi'
 import * as authApi from '../api/authApi'
 import kakaoSymbol from '../assets/images/kakao_symbol.svg'
 import naverSymbol from '../assets/images/naver_symbol.png'
+import useAdminStore from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
 import { Button, Panel } from '../styles/common'
@@ -50,7 +52,10 @@ function LoginPage() {
   const returnPath = useLocation().state?.returnPath ?? null
   // 로그인 여부를 다시 확인하는 동안 버튼 잠금 (E5)
   const [isChecking, setIsChecking] = useState(false)
-  const errorText = ERROR_TEXT[searchParams.get('error')]
+  // 관리자로 로그인 중 (SCR-16 비고: 회원 로그인 막음): 화면 상태가 authed면 바로, 아니면 버튼을 누를 때 서버(API-30)에 확인
+  const isAdminAuthed = useAdminStore((state) => state.status) === 'authed'
+  const [isAdminBlocked, setIsAdminBlocked] = useState(false)
+  const errorText = isAdminAuthed || isAdminBlocked ? ERROR_TEXT.ADMIN_LOGGED_IN : ERROR_TEXT[searchParams.get('error')]
 
   // 확인하는 동안(checking)에도 로그인 버튼을 보여 줌 (서버 응답이 늦어도 화면이 멈춰 보이지 않게, 2026-11-17 사용자 결정)
   // 누르는 순간 아래 handleLogin이 서버에 다시 확인하므로 이미 로그인 중이면 소셜 로그인으로 보내지 않음
@@ -73,10 +78,17 @@ function LoginPage() {
       }
       // 401 등 서버 응답이 있으면 비회원 → 아래에서 소셜 로그인으로 보냄
     }
-    setIsChecking(false)
     if (me?.memberNickname) {
+      setIsChecking(false)
       showToast('이미 로그인되어 있어요')
       useAuthStore.getState().fetchMe()
+      return
+    }
+    // 관리자 세션이 있으면 소셜 로그인으로 보내지 않음 (서버도 막지만, 소셜 화면까지 갔다 오지 않게 미리 확인)
+    const admin = await adminApi.getAdminSession().catch(() => null)
+    setIsChecking(false)
+    if (admin) {
+      setIsAdminBlocked(true)
       return
     }
     authApi.getLoginUrl(provider, returnPath)
