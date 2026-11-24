@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<!--/*
+    관리자 메일 3종 (로그인 토큰, 가입 인증, 승인 안내)이 같이 쓰는 틀 (EXT-06, AdminMailServiceImpl)
+    subject 제목 / introLines 첫 문장 줄들 / codeLabel + codeDigits 번호 칸 (codeDigits가 없으면 숨김)
+    notice 굵은 안내 / loginUrl 로그인 버튼 (없으면 숨김) / warning 노란 안내 (없으면 숨김)
+    로고 cid:logo = 메일에 붙인 그림 (resources/mail/logo.png)
+*/-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title th:text="${subject}">[캐링 관리자]</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F6F4F2;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F6F4F2;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:480px;background-color:#FFFFFF;border:1px solid #EAE5E0;border-radius:16px;">
+        <tr>
+          <td align="center" style="padding:28px 32px 0 32px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;text-align:center;">
+            <img src="cid:logo" width="88" height="44" alt="캐링" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;">
+            <span style="font-size:13px;font-weight:700;color:#75685F;padding-left:4px;vertical-align:middle;">관리자</span>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:20px 32px 0 32px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:#4F453E;text-align:center;">
+            <th:block th:each="line, stat : ${introLines}"><th:block th:text="${line}">첫 문장</th:block><br th:unless="${stat.last}"></th:block>
+          </td>
+        </tr>
+        <tr th:if="${codeDigits != null}">
+          <td align="center" style="padding:20px 32px 0 32px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;font-weight:700;color:#75685F;text-align:center;" th:text="${codeLabel}">
+            인증 번호
+          </td>
+        </tr>
+        <tr th:if="${codeDigits != null}">
+          <td style="padding:8px 32px 0 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background-color:#FFF0E5;border-radius:12px;padding:20px 8px;">
+                  <div style="font-size:0;line-height:0;-webkit-user-select:all;user-select:all;"><span th:each="digit : ${codeDigits}" th:text="${digit}" style="display:inline-block;width:40px;height:52px;line-height:52px;margin:0 3px;background-color:#FFFFFF;border:1px solid #FF7417;border-radius:8px;font-family:Nunito,Pretendard,'Malgun Gothic',sans-serif;font-size:28px;font-weight:800;color:#C24A06;text-align:center;">0</span></div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:20px 32px 0 32px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:14px;line-height:1.7;color:#211C18;font-weight:700;text-align:center;" th:text="${notice}">
+            안내
+          </td>
+        </tr>
+        <tr th:if="${loginUrl != null}">
+          <td align="center" style="padding:24px 32px 0 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" bgcolor="#EC5E0C" style="background-color:#EC5E0C;border-radius:12px;">
+                  <a th:href="${loginUrl}" href="#" target="_blank" style="display:inline-block;padding:14px 32px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:15px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:12px;">관리자 로그인 바로가기</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr th:if="${warning != null}">
+          <td style="padding:16px 32px 0 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td align="center" style="background-color:#FFF3D6;border-radius:12px;padding:14px 16px;font-family:Pretendard,'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:13px;line-height:1.6;color:#9A6400;text-align:center;" th:text="${warning}">
+                  노란 안내
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <!--/* 카드 아래 여백 (안내 칸을 숨겨도 남게 따로 둠) */-->
+        <tr>
+          <td style="height:32px;line-height:32px;font-size:0;">&nbsp;</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

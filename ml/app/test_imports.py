@@ -3,8 +3,8 @@ import json
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.imports import (changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
-                         source_results, split_list)
+from app.imports import (JobConflict, changed_fields, compare, db_bank_names, item_row, match_products, norm, read_job,
+                         read_latest_job, source_results, split_list, start_job)
 from app.load import PRODUCT_COLS
 
 RAW_FSS = json.dumps({"base": {"dcls_month": "202611", "fin_co_subm_day": "202611101200", "top_fin_grp_no": "020000"},
@@ -327,12 +327,14 @@ class _Row:
 
 
 class _FakeConn:
-    """SELECT_JOB, SELECT_ITEMS 순서로 호출된다고 보고 정해진 행을 돌려줌"""
+    """호출 순서대로 정해진 행을 돌려줌 (read_job: SELECT_JOB, SELECT_ITEMS / read_latest_job: 그 앞에 LATEST_JOB_ID)"""
 
-    def __init__(self, job, items):
-        self.results = [job, items]
+    def __init__(self, *results):
+        self.results = list(results)
+        self.params = []        # 호출마다 받은 값 (어느 작업 번호로 읽었는지 확인용)
 
     def execute(self, sql, params=None):
+        self.params.append(params)
         result = self.results.pop(0)
         return _FakeResult(result)
 
@@ -344,13 +346,16 @@ class _FakeResult:
     def first(self):
         return self.rows
 
+    def scalar(self):
+        return self.rows
+
     def __iter__(self):
         return iter(self.rows)
 
 
 def test_read_job_DONE_뒤_24시간_지났으면_EXPIRED로_보여_준다():
     # Given
-    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result='[{"source":"FSS"}]', expired=1)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result='[{"source":"FSS"}]', expired=1, created_at=None, finished_at=None)
     conn = _FakeConn(job, [])
     # When
     result = read_job(conn, 3)
@@ -360,7 +365,7 @@ def test_read_job_DONE_뒤_24시간_지났으면_EXPIRED로_보여_준다():
 
 def test_read_job_항목의_쉼표_칸은_목록으로():
     # Given
-    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0, created_at=None, finished_at=None)
     item = _Row(item_id=1, diff_type="CHANGE", product_id=5, product_name="가대출", company_name="가은행",
                 source="FSS", changed_fields="rate_max,tags", check_reasons=None, hidden_yn="N")
     conn = _FakeConn(job, [item])
@@ -368,3 +373,62 @@ def test_read_job_항목의_쉼표_칸은_목록으로():
     result = read_job(conn, 3)
     # Then
     assert (result["items"][0]["changed_fields"], result["items"][0]["check_reasons"]) == (["rate_max", "tags"], [])
+
+
+def test_read_latest_job_작업이_하나도_없으면_None():
+    # Given
+    conn = _FakeConn(None)
+    # When
+    result = read_latest_job(conn)
+    # Then
+    assert result is None
+
+
+def test_read_latest_job_가장_최근_작업_번호로_읽는다():
+    # Given: 가장 최근 작업 7
+    job = _Row(job_id=7, job_status="RUNNING", base_version=1, source_result=None, expired=0, created_at=None, finished_at=None)
+    conn = _FakeConn(7, job, [])
+    # When
+    read_latest_job(conn)
+    # Then
+    assert conn.params[1]["job_id"] == 7
+
+
+def test_read_job_시작_시각과_끝난_시각을_담는다():
+    # Given
+    created, finished = datetime(2026, 11, 21, 13, 0), datetime(2026, 11, 21, 13, 2)
+    job = _Row(job_id=3, job_status="DONE", base_version=1, source_result=None, expired=0,
+               created_at=created, finished_at=finished)
+    conn = _FakeConn(job, [])
+    # When
+    result = read_job(conn, 3)
+    # Then
+    assert (result["created_at"], result["finished_at"]) == (created, finished)
+
+
+# ---------- start_job (가짜 conn: LOCK, FAIL_STALE, COUNT_RUNNING, LAST_VERSION 순서) ----------
+
+def test_start_job_첫_적재_전이면_NOT_INITIALIZED():
+    # Given: 진행 중 0개, 이력 없음
+    conn = _FakeConn(None, None, 0, None)
+    # When
+    try:
+        start_job(conn, ["KINFA"], 1)
+        detail = None
+    except JobConflict as e:
+        detail = e.detail
+    # Then
+    assert detail == "NOT_INITIALIZED"
+
+
+def test_start_job_진행_중_작업이_있으면_IMPORT_RUNNING():
+    # Given
+    conn = _FakeConn(None, None, 1)
+    # When
+    try:
+        start_job(conn, ["KINFA"], 1)
+        detail = None
+    except JobConflict as e:
+        detail = e.detail
+    # Then
+    assert detail == "IMPORT_RUNNING"

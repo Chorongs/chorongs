@@ -135,4 +135,15 @@ public class LoanProduct {
 	@Enumerated(EnumType.STRING)
 	@Column(name = "product_status")
 	private ProductStatus productStatus;	// ON, CLOSED, HIDDEN
+
+	/** 판매 종료: 공시 종료일이 지나 자동 내림 (BAT-02) */
+	public void close() {
+		this.productStatus = ProductStatus.CLOSED;
+	}
+
+	/** 다시 게시: 종료일 비우고 게시 (ADMIN-10, 다음 불러오기에서 출처 종료일로 다시 채워짐) */
+	public void reopen() {
+		this.discloseEnd = null;
+		this.productStatus = ProductStatus.ON;
+	}
 }

@@ -2,13 +2,14 @@
     캐링 데이터 처리 FastAPI 앱 (EXT-05)
 
     - GET  /health                    : 인증 없음
-    - POST /imports                   : 불러오기 시작 → 작업 번호 바로 응답, 수집·정제·비교는 응답 뒤 이어서 (ADMIN-04, EXT-01, 02)
+    - POST /imports                   : 갱신 시작 ([최신 상품 갱신하기], 외부 API는 이때만) → 작업 번호 바로 응답, 수집·정제·비교는 응답 뒤 이어서 (ADMIN-04, EXT-01, 02)
+    - GET  /imports/latest            : 가장 최근 작업의 진행 상태 (화면을 다시 열었을 때 이어서 보기, 없으면 404)
     - GET  /imports/{job_id}          : 진행 상태, 기준 버전, 출처별 결과, 바뀐 상품 목록
     - POST /imports/{job_id}/publish  : 고른 항목 반영 → 새 버전 (ADMIN-04)
     - POST /catalog/rollback          : 되돌리기 → 새 버전 (ADMIN-05)
     - POST /credit/score              : 진단 문항 답 → 점수, 문항별 점수 (CREDIT-01). 답과 점수는 로그 금지 (B8)
     /health 말고는 모두 Bearer 토큰 (B14)
-    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT / NOTHING_TO_ROLLBACK, 422 detail: NOT_PUBLISHABLE,
+    409 detail: IMPORT_RUNNING / IMPORT_EXPIRED / VERSION_CONFLICT / NOTHING_TO_ROLLBACK / NOT_INITIALIZED (첫 적재 전), 422 detail: NOT_PUBLISHABLE,
     404 detail: JOB_NOT_FOUND / HISTORY_NOT_FOUND (Spring FastApiClient가 ErrorCode로 바꿈)
 
     실행: ml 폴더에서  fastapi dev app/main.py
@@ -19,7 +20,8 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from app.credit import load_score_table, score_answers
-from app.imports import JobConflict, NotFound, NotPublishable, SOURCE_ORDER, read_job, run_import, start_job
+from app.imports import (JobConflict, NotFound, NotPublishable, SOURCE_ORDER, read_job, read_latest_job, run_import,
+                         start_job)
 from app.load import make_engine
 from app.publish import publish, rollback
 from app.schemas import (ImportStartRequest, ImportStartResponse, ImportStatusResponse, ItemScore, PublishRequest,
@@ -57,20 +59,31 @@ def health():
     return {"status": "ok"}
 
 
-# ---------- 상품 불러오기, 반영, 되돌리기 ----------
+# ---------- 상품 갱신, 최근 작업, 반영, 되돌리기 ----------
 
 @app.post("/imports", response_model=ImportStartResponse, dependencies=[Depends(verify_token)])
 def start_import(body: ImportStartRequest, background_tasks: BackgroundTasks):
     """
-        작업 1행(RUNNING)을 만들고 번호를 바로 돌려줌. 진행 중 작업이 있으면 409 IMPORT_RUNNING
+        작업 1행(RUNNING)을 만들고 번호를 바로 돌려줌. 진행 중 작업이 있으면 409 IMPORT_RUNNING, 첫 적재 전이면 409 NOT_INITIALIZED
         수집, 정제, 비교(run_import)는 응답을 보낸 뒤 같은 서버에서 이어서 함 (BackgroundTasks)
     """
     sources = [s for s in SOURCE_ORDER if s in body.sources]    # 같은 출처 중복 제거 + 'KINFA,FSS' 순서
     with ENGINE.begin() as conn:
         job_id = start_job(conn, sources, body.admin_id)
     background_tasks.add_task(run_import, ENGINE, job_id, sources)
-    logger.info("불러오기 작업 %d 시작: %s", job_id, ",".join(sources))
+    logger.info("갱신 작업 %d 시작: %s", job_id, ",".join(sources))
     return ImportStartResponse(job_id=job_id)
+
+
+# /imports/{job_id}보다 위에 둠 (아래에 두면 'latest'를 작업 번호로 읽어 422)
+@app.get("/imports/latest", response_model=ImportStatusResponse, dependencies=[Depends(verify_token)])
+def get_latest_import():
+    """가장 최근 작업의 진행 상태 (로그아웃, 새로 고침 뒤에도 진행 확인이나 반영을 이어서 함). 작업이 없으면 404"""
+    with ENGINE.connect() as conn:
+        job = read_latest_job(conn)
+    if job is None:
+        raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+    return job
 
 
 @app.get("/imports/{job_id}", response_model=ImportStatusResponse, dependencies=[Depends(verify_token)])

@@ -23,15 +23,14 @@ import lombok.RequiredArgsConstructor;
 /*
  * 관리자 확인 (B4, 등록 주소는 WebConfig)
  * 1. 관리자 세션 없음: 회원 세션이면 403, 아니면 401
- * 2. 로그인 시각 + 2시간 지나면 401 (활동해도 연장 없음)
- * 3. 요청마다 DB에서 상태 ACTIVE 다시 확인 (해제되면 바로 401)
+ * 2. 로그인 시각 + 2시간 지나면 401 '2시간이 지나 자동으로 로그아웃했어요' (활동해도 연장 없음)
+ * 3. 요청마다 DB에서 상태 ACTIVE 다시 확인 (해제되면 바로 401 '관리자 권한이 없어졌어요')
  * 4. 승인권자 전용 주소(/api/admin/admins/**)는 DB 역할이 승인권자 아니면 403
  */
 @Component
 @RequiredArgsConstructor
 public class AdminInterceptor implements HandlerInterceptor {
 
-	private static final long LOGIN_HOURS = 2;
 	private static final String APPROVER_ONLY_PATH = "/api/admin/admins";
 
 	private final AdminRepository adminRepository;
@@ -53,14 +52,14 @@ public class AdminInterceptor implements HandlerInterceptor {
 		}
 
 		// 2. 로그인 2시간 지남
-		if (loginAdmin.getLoginAt().plusHours(LOGIN_HOURS).isBefore(LocalDateTime.now())) {
-			throw new BusinessException(ErrorCode.LOGIN_REQUIRED);
+		if (loginAdmin.getLoginAt().plusHours(AdminUtil.LOGIN_HOURS).isBefore(LocalDateTime.now())) {
+			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, AdminUtil.MSG_SESSION_EXPIRED);
 		}
 
 		// 3. DB 상태 다시 확인
 		Admin admin = adminRepository.findById(loginAdmin.getAdminId()).orElse(null);
 		if (admin == null || admin.getAdminStatus() != AdminStatus.ACTIVE) {
-			throw new BusinessException(ErrorCode.LOGIN_REQUIRED);
+			throw new BusinessException(ErrorCode.LOGIN_REQUIRED, AdminUtil.MSG_NO_PERMISSION);
 		}
 
 		// 4. 승인권자 전용 주소

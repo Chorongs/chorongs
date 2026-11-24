@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
+import * as adminApi from '../../api/adminApi'
 import * as authApi from '../../api/authApi'
 import kakaoSymbol from '../../assets/images/kakao_symbol.svg'
 import naverSymbol from '../../assets/images/naver_symbol.png'
@@ -72,11 +73,19 @@ function LoginRequiredDialog() {
       }
       // 401 등 서버 응답이 있으면 비회원 → 아래에서 소셜 로그인으로 보냄
     }
-    setIsChecking(false)
     if (me?.memberNickname) {
+      setIsChecking(false)
       handleClose()
       showToast('이미 로그인되어 있어요')
       useAuthStore.getState().fetchMe()
+      return
+    }
+    // 관리자로 로그인 중이면 소셜 로그인으로 보내지 않음 (SCR-16 비고, 서버도 막지만 소셜 화면까지 갔다 오지 않게)
+    const admin = await adminApi.getAdminSession().catch(() => null)
+    setIsChecking(false)
+    if (admin) {
+      handleClose()
+      showToast('관리자로 로그인 중이에요. 관리자에서 로그아웃한 뒤 로그인해 주세요')
       return
     }
     authApi.getLoginUrl(provider, `${pathname}${search}`)

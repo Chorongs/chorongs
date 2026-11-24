@@ -34,7 +34,7 @@ class FastApiClientTest {
 	}
 
 	@Test
-	void 진행_중_작업이_있으면_CONFLICT와_불러오는_중_문구() {
+	void 진행_중_작업이_있으면_CONFLICT와_갱신하는_중_문구() {
 		// Given
 		RestClientResponseException e = fastApiError(409, "{\"detail\":\"IMPORT_RUNNING\"}");
 		// When
@@ -52,6 +52,17 @@ class FastApiClientTest {
 		BusinessException result = FastApiClient.toBusinessException(e);
 		// Then
 		assertEquals(ErrorCode.CONFLICT + FastApiClient.MSG_IMPORT_EXPIRED,
+				result.getErrorCode() + result.getMessage());
+	}
+
+	@Test
+	void 첫_적재_전이면_CONFLICT와_첫_적재_문구() {
+		// Given
+		RestClientResponseException e = fastApiError(409, "{\"detail\":\"NOT_INITIALIZED\"}");
+		// When
+		BusinessException result = FastApiClient.toBusinessException(e);
+		// Then
+		assertEquals(ErrorCode.CONFLICT + FastApiClient.MSG_NOT_INITIALIZED,
 				result.getErrorCode() + result.getMessage());
 	}
 
