@@ -31,7 +31,7 @@ public class RecentViewServiceImpl implements RecentViewService {
     @Override
     @Transactional(readOnly = true)
     public List<RecentViewResponseDTO> getRecentViews(Long memberId) {
-        List<RecentView> recentList = recentViewRepository.findByMemberIdOrderByViewAtDesc(memberId);
+        List<RecentView> recentList = recentViewRepository.findByMemberIdOrderByViewedAtDesc(memberId);
         List<Long> productIds = recentList.stream().map(RecentView::getProductId).toList();                  // 상품 번호 모으기
 
         Map<Long, LoanProduct> productById = new HashMap<>();                                                 // 상품 번호 -> 상품
@@ -63,7 +63,7 @@ public class RecentViewServiceImpl implements RecentViewService {
             long recentViewCount = recentViewRepository.countByMemberId(memberId);
             if (recentViewCount >= 10) {
                 Optional<RecentView> firstSavedRecent = recentViewRepository
-                        .findFirstByMemberIdOrderByViewAtAsc(memberId);
+                        .findFirstByMemberIdOrderByViewedAtAsc(memberId);
                 recentViewRepository.delete(firstSavedRecent.get());
             }
 
@@ -94,7 +94,7 @@ public class RecentViewServiceImpl implements RecentViewService {
     @Override
     @Transactional
     public void deleteRecentViews(Long memberId) {
-        List<RecentView> recentViewList = recentViewRepository.findByMemberIdOrderByViewAtDesc(memberId);
+        List<RecentView> recentViewList = recentViewRepository.findByMemberIdOrderByViewedAtDesc(memberId);
 
             recentViewRepository.deleteAll(recentViewList);
     }
