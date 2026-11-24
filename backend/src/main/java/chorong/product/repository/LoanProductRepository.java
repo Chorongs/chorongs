@@ -2,6 +2,7 @@ package chorong.product.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,6 +14,7 @@ public interface LoanProductRepository extends JpaRepository<LoanProduct, Long> 
 
 	// 상태별 상품 목록 (추천 후보 = 게시 ON, LOAN-01)
 	List<LoanProduct> findByProductStatus(ProductStatus productStatus);
+	Optional<LoanProduct> findByProductIdAndProductStatus(Long productId, ProductStatus productStatus);
 
 	// 출처별 상품 수 (게시 상품 현황, ADMIN-04)
 	long countBySourceAndProductStatus(Source source, ProductStatus productStatus);
