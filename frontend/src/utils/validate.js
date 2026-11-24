@@ -103,3 +103,6 @@ export const getMonthsOptions = (purpose) =>
 // 갚을 기간 검사: '잘 모르겠어요'(0)이거나 그 용도의 선택지 안에 있는 값
 export const isValidMonths = (purpose, months) =>
   months === MONTHS_UNKNOWN || getMonthsOptions(purpose).includes(months)
+
+// 관리자 이름 (AD-12 화면에 보일 이름): 앞뒤 공백을 뺀 2~20자
+export const isValidAdminName = (name) => isLengthInRange(name, 2, 20)

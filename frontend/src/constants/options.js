@@ -188,3 +188,56 @@ export const PRIORITY_OPTIONS = [
   { value: 'NO_PREPAY_FEE', label: '중도상환수수료 없음' },
 ]
 export const PRIORITY_MAX = 3
+
+// 관리자 화면 글자표 (AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
+export const ADMIN_ROLE_LABEL = {
+  APPROVER: '승인권자',
+  MANAGER: '관리자',
+}
+
+export const ADMIN_STATUS_LABEL = {
+  PENDING: '승인 대기',
+  ACTIVE: '정상',
+}
+
+// 갱신 출처 (API-32 sources)
+export const IMPORT_SOURCE_OPTIONS = [
+  { value: 'KINFA', label: '서민금융진흥원' },
+  { value: 'FSS', label: '금융감독원' },
+]
+// 출처 코드 → 이름 (관리자 바뀐 상품 표, 반영 이력)
+export const IMPORT_SOURCE_LABEL = Object.fromEntries(IMPORT_SOURCE_OPTIONS.map((option) => [option.value, option.label]))
+
+// 바뀐 상품 구분 (API-33 items[].diffType, FastAPI 값 그대로)
+export const IMPORT_CHANGE_TYPE_LABEL = {
+  NEW: '신규',
+  CHANGE: '변경',
+  REMOVE: '판매 중단',
+  REOPEN: '다시 게시',
+  CHECK: '확인 필요',
+}
+
+// 확인 필요 사유 (API-33 items[].checkReasons)
+export const CHECK_REASON_LABEL = {
+  NO_NAME: '상품명이나 기관 정보가 비어 있어요',
+  RATE_REVERSED: '최저 금리가 최고 금리보다 높아요',
+  RATE_OVER_20: '최고 금리가 연 20%를 넘어요',
+  NEW_PHRASE: '칩에 넣지 못한 새 문구가 있어요',
+}
+
+// 반영 이력 종류 (API-35 actionType)
+export const HISTORY_ACTION_TYPE_LABEL = {
+  INIT: '초기 적재',
+  PUBLISH: '반영',
+  AUTO_CLOSE: '자동 내림',
+  HIDE: '숨기기',
+  SHOW: '다시 보이기',
+  ROLLBACK: '되돌리기',
+}
+
+// 자동 내림 상태 (API-48 filter와 같은 코드)
+export const AUTO_CLOSED_STATUS_LABEL = {
+  UNCHECKED: '확인 전',
+  KEEP: '확인함',
+  REOPEN: '다시 게시함',
+}
