@@ -596,7 +596,7 @@ describe('getBirthInputState', () => {
 
   it('치는 중이고 틀린 곳이 없으면 typing', () => {
     // Given
-    const text = '199404'
+    const text = '199001'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -605,7 +605,7 @@ describe('getBirthInputState', () => {
 
   it('맞는 날짜 8자리는 ok', () => {
     // Given
-    const text = '19940429'
+    const text = '19900101'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -614,7 +614,7 @@ describe('getBirthInputState', () => {
 
   it('붙임표가 있어도 숫자만 보고 ok', () => {
     // Given
-    const text = '1994-04-29'
+    const text = '1990-01-01'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -650,7 +650,7 @@ describe('getBirthInputState', () => {
 
   it('월 첫 자리가 2 이상이면 bad', () => {
     // Given
-    const text = '19942'
+    const text = '19902'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -659,7 +659,7 @@ describe('getBirthInputState', () => {
 
   it('13월은 bad', () => {
     // Given
-    const text = '199413'
+    const text = '199013'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -677,7 +677,7 @@ describe('getBirthInputState', () => {
 
   it('일 첫 자리가 4 이상이면 bad', () => {
     // Given
-    const text = '1994044'
+    const text = '1990014'
     // When
     const result = getBirthInputState(text, today)
     // Then

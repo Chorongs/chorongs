@@ -46,7 +46,7 @@ export const isValidBirthDate = (text, today = new Date()) => {
 export const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
 
 // 생년월일 칸 안내 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 비었거나 치는 중이고 틀린 곳이 없을 때 회색)
-export const BIRTH_GUIDE = "생년월일을 '-' 없이 다음과 같이 입력해 주세요 (예: 19940429)"
+export const BIRTH_GUIDE = "생년월일을 '-' 없이 다음과 같이 입력해 주세요 (예: 19900101)"
 
 // 생년월일 칸을 치는 동안의 상태 (숫자만 봄): 'empty' 안 침 / 'typing' 치는 중, 아직 틀린 곳 없음 / 'bad' 틀림 / 'ok' 맞는 날짜
 // 다 치기 전이라도 이미 틀린 것이 보이면 'bad': 연도가 1900년 전이나 올해 뒤, 월 13 이상, 올해의 지나지 않은 달, 일 첫 자리 4 이상
