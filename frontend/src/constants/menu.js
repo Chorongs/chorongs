@@ -22,11 +22,11 @@ export const NAV_MENU = [
   { label: '캐링 추천', to: '/recommend', isRecommend: true },
   {
     label: '상품 찾기',
-    to: '/search/simple',
+    to: '/search',
     match: '/search',
     children: [
-      { label: '간편 검색', to: '/search/simple' },
       { label: '상세 검색', to: '/search', end: true },
+      { label: '간편 검색', to: '/search/simple' },
     ],
   },
   { label: '대출 비교', to: '/compare' },
@@ -65,7 +65,7 @@ export const NAV_MENU = [
 // 모바일 하단 탭바 (마지막 '전체' 버튼은 전체 메뉴를 여는 버튼이라 목록에 없음)
 export const TAB_MENU = [
   { label: '추천', to: '/recommend', isRecommend: true, icon: 'home' },
-  { label: '상품 찾기', to: '/search/simple', match: '/search', icon: 'search' },
+  { label: '상품 찾기', to: '/search', match: '/search', icon: 'search' },
   { label: '비교', to: '/compare', icon: 'compare' },
   { label: '계산기', to: '/calc', icon: 'calc' },
 ]
@@ -76,8 +76,8 @@ export const FULL_MENU = [
     title: '대출 찾기',
     items: [
       { label: '캐링 추천', to: '/recommend', isRecommend: true, icon: 'home' },
-      { label: '간편 검색', to: '/search/simple', icon: 'spark' },
       { label: '상세 검색', to: '/search', end: true, icon: 'search' },
+      { label: '간편 검색', to: '/search/simple', icon: 'spark' },
       { label: '대출 비교', to: '/compare', icon: 'compare' },
       { label: '대출 랭킹', to: '/ranking', icon: 'trophy' },
     ],
