@@ -396,19 +396,6 @@ export const ShortcutPanel = styled.div`
   }
 `
 
-// 확인 창 (지우기, 로그아웃, 탈퇴 등): 질문 글 / 오른쪽 끝 버튼 줄 ([취소] [확인할 동작])
-export const DialogText = styled.p`
-  margin-bottom: 20px;
-  font-size: var(--fs-lg);
-  font-weight: 700;
-`
-
-export const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-`
-
 // 구역 자리에 띄우는 한 줄 상태 글 ('불러오는 중이에요', '확인하는 중이에요' 등, role="status"와 같이 씀)
 export const StatusText = styled.p`
   padding: 36px 0;
