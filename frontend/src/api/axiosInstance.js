@@ -9,7 +9,7 @@ const api = axios.create({
   withCredentials: true, // 로그인 세션 쿠키를 서버 요청에 같이 보냄 (E14)
 })
 
-// '준비 중' (문서_반영_목록 Q5, 시연 전 일괄 처리, CHORONG-43): 아직 서버에 없는 API는 보내지 않고 바로 실패로 돌려줌
+// '준비 중': 아직 서버에 없는 API는 보내지 않고 바로 실패로 돌려줌
 // 쓰는 쪽은 error.isPreparing이면 실패 문구 대신 PREPARING_TEXT를 보여 줌. API가 서버에 올라오면 그 줄만 지운다
 export const PREPARING_TEXT = '아직 준비 중인 서비스예요'
 // 지금은 비어 있음 (서버에 아직 없는 API가 생기면 주소 정규식을 한 줄씩 넣음)
