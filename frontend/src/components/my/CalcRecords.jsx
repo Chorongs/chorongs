@@ -2,19 +2,20 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import { Chip } from '../../styles/common'
 import CalcHistoryList from '../calculator/CalcHistoryList'
-import MySection from './MySection'
+import ChangeHistoryList from '../calculator/ChangeHistoryList'
+import DsrHistoryList from '../calculator/DsrHistoryList'
+import HomeLimitHistoryList from '../calculator/HomeLimitHistoryList'
+import ReverseHistoryList from '../calculator/ReverseHistoryList'
 
 // MY-10 계산 기록: 맨 위 계산기 종류 칩 5개 (계산기 탭 순서, 처음은 대출 이자) / 칩을 누르면 그 종류 목록만
-// 대출 이자는 CalcHistoryList(API-24)를 다시 씀. [불러오기]는 계산기(/calc)로 이동하며 값을 넘김
-// 목록 부품이 없는 종류는 MySection의 준비 중 안내 (구역 이름 '{칩 이름} 계산 기록', MY-03)
-// TODO(MY-10): 나머지 4종 목록 부품(ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList,
-//   ReverseHistoryList, API-56부터 59까지)이 올라오면 KINDS의 list에 연결 (그 부품도 title을 받아 구역 이름으로 씀)
+// 목록: 대출 이자 CalcHistoryList(API-24), 나머지는 ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList, ReverseHistoryList (API-56부터 59까지)
+//   다섯 목록 모두 CalcRecordList 한 틀을 씀. [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
 const KINDS = [
   { key: 'interest', label: '대출 이자', list: CalcHistoryList },
-  { key: 'change', label: '대출 갈아타기', list: null },
-  { key: 'dsr', label: 'DSR', list: null },
-  { key: 'home', label: '내 집 대출한도', list: null },
-  { key: 'reverse', label: '상환능력 기반 대출', list: null },
+  { key: 'change', label: '대출 갈아타기', list: ChangeHistoryList },
+  { key: 'dsr', label: 'DSR', list: DsrHistoryList },
+  { key: 'home', label: '내 집 대출한도', list: HomeLimitHistoryList },
+  { key: 'reverse', label: '상환능력 기반 대출', list: ReverseHistoryList },
 ]
 
 const Chips = styled.div`
@@ -40,11 +41,7 @@ function CalcRecords() {
           </Chip>
         ))}
       </Chips>
-      {List ? (
-        <List title={title} />
-      ) : (
-        <MySection title={title} description="[결과 저장]을 누른 기록이에요." status="preparing" />
-      )}
+      <List title={title} />
     </section>
   )
 }
