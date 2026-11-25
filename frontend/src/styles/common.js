@@ -253,6 +253,76 @@ export const FormLabelNote = styled.small`
   font-weight: 500;
 `
 
+// 계산기 5종(CA-02, 08–11)이 같이 쓰는 모양 (가안 .calc-grid, .calc-form)
+// CalcLayout: 왼쪽 입력 판 + 오른쪽 결과 (좁은 화면은 세로) / CalcPanel: 입력 판 / CalcFormStack: 입력칸을 세로로 (간격 16)
+export const CalcLayout = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 392px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+  @media (max-width: 1100px) {
+    grid-template-columns: minmax(0, 356px) minmax(0, 1fr);
+    gap: 20px;
+  }
+  @media (max-width: 899px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+`
+
+export const CalcPanel = styled(Panel)`
+  @media (max-width: 1100px) {
+    padding: 22px;
+  }
+  @media (max-width: 899px) {
+    padding: 20px;
+  }
+`
+
+export const CalcFormStack = styled(FormStack)`
+  gap: 16px;
+`
+
+// CalcLinkButton: 글자만 있는 주황 링크 모양 버튼 (가안 .link): 대출 줄의 [삭제]
+export const CalcLinkButton = styled.button.attrs((props) => ({
+  type: props.type || 'button',
+}))`
+  flex: none;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-text);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  cursor: pointer;
+  &:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+`
+
+// CalcKv: 결과 상세 목록 (가안 .kv): <CalcKv><dt>제목</dt><dd>값</dd> ... </CalcKv>, 줄마다 아래 선
+export const CalcKv = styled.dl`
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  margin: 0;
+  & > dt,
+  & > dd {
+    margin: 0;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--fs-md);
+  }
+  & > dt {
+    color: var(--cocoa);
+    font-weight: 600;
+  }
+  & > dd {
+    color: var(--ink);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+`
+
 // ChipGrid: 칩 묶음(ChipGroup)을 격자로 (기본 3칸, $columns로 바꿈), 칩 글자는 작게
 export const ChipGrid = styled.div`
   & > [role='group'] {

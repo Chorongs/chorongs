@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, EmptyBox, FormField, FormLabel, FormStack, Panel, SegmentedFull } from '../../styles/common'
+import { Button, CalcFormStack, CalcKv, CalcLayout, CalcLinkButton, CalcPanel, EmptyBox, FormLabel } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import {
   DSR_BASELINES,
@@ -17,13 +17,11 @@ import {
 } from '../../utils/finance'
 import { REPAY_METHODS, isNumber } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
-import HBar from '../chart/HBar'
 import Disclaimer from '../common/Disclaimer'
-import SectionHeader from '../common/SectionHeader'
 import SummaryCards from '../common/SummaryCards'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
-import Segmented from '../ui/Segmented'
+import SelectField from '../ui/SelectField'
 
 // CA-09 DSR 계산기 (SCR-08, /calc/dsr): 내 DSR 계산. 계산은 프론트에서 (utils/finance.js)
 // 왼쪽 입력: 연소득 → 대출 목록 (최대 10건: 종류, 상환 방식, 대출금, 금리, 기간, [+ 대출 추가], [삭제]) → [계산하기] [결과 저장]
@@ -35,31 +33,13 @@ import Segmented from '../ui/Segmented'
 // 화면이 길어지지 않게 대출 줄은 접을 수 있다: 줄마다 제목 줄을 누르거나 줄 아래 [완료]를 누르면 접힘 (제목 줄로 접을 때도 [완료]와 같게, 그 줄에 입력 오류가 있으면 접지 않고 오류 문구를 보임. 접힌 줄은 한 줄 요약만, 제목 줄을 누르면 다시 펼침). [+ 대출 추가]는 앞 줄의 상태를 그대로 두고 새 줄을 펼쳐서 추가
 //   [계산하기]가 입력 오류로 막히면 오류가 있는 줄은 펼쳐서 오류 문구를 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-57, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-const Layout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
-const GroupTitle = styled.h3`
-  font-size: var(--fs-xl);
-  font-weight: 800;
-  &:not(:first-child) {
-    padding-top: 20px;
-    border-top: 1px solid var(--line-2);
-  }
-`
-
 // 대출 한 줄 상자
 const LoanBox = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 18px;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--paper);
 `
@@ -82,7 +62,7 @@ const LoanToggle = styled.button.attrs({ type: 'button' })`
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: var(--fs-base);
+  font-size: var(--fs-md);
   font-weight: 800;
   text-align: left;
   cursor: pointer;
@@ -107,11 +87,32 @@ const LoanArrow = styled.span`
   transform: rotate(${({ $isOpen }) => ($isOpen ? '180deg' : '0deg')});
 `
 
+// 종류, 상환 방식 드롭다운 두 칸 (가안 .ds-g)
+const Pair = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+`
+
+// 줄 아래 [완료]: 오른쪽 끝
+const Done = styled.div`
+  display: flex;
+  justify-content: flex-end;
+`
+
+// [+ 대출 추가]와 가득 찼을 때 안내
+const AddRow = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+`
+
 // 접어도 입력칸은 그대로 두려고 hidden으로만 숨김 (입력한 값이 사라지지 않게)
 const LoanFields = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   &[hidden] {
     display: none;
   }
@@ -149,33 +150,53 @@ const StaleNotice = styled.p.attrs({ role: 'status' })`
   font-weight: 600;
 `
 
-const Bars = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+// DSR 막대 (가안 .ds-track): 내 DSR만큼 채우고 은행, 2금융권 기준선 두 줄, 아래에 눈금 글자
+const Track = styled.div`
+  position: relative;
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--mist-2);
 `
 
-const Rows = styled.dl`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
+const Fill = styled.span`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: ${({ $percent }) => $percent}%;
+  border-radius: var(--r-pill);
+  background: var(--${({ $tone }) => $tone});
 `
 
-const Row = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-base);
-  & > dt {
-    color: var(--cocoa);
-  }
-  & > dd {
-    margin: 0;
-    font-family: var(--f-num);
-    font-weight: 700;
-    text-align: right;
-  }
+const Mark = styled.i`
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: ${({ $left }) => $left}%;
+  width: 2px;
+  background: var(--ink-2);
+`
+
+const Scale = styled.div`
+  position: relative;
+  height: 20px;
+  margin-top: 8px;
+  color: var(--cocoa);
+  font-size: var(--fs-xs);
+`
+
+// $align: start(왼쪽 끝) / end(오른쪽 끝) / before(기준선 왼쪽) / after(기준선 오른쪽)
+const ScaleText = styled.span`
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
+  ${({ $align, $left }) =>
+    ({
+      start: 'left: 0;',
+      end: 'right: 0;',
+      before: `left: ${$left}%; transform: translateX(calc(-100% - 6px));`,
+      after: `left: ${$left}%; transform: translateX(6px);`,
+    })[$align]}
 `
 
 const KIND_OPTIONS = DSR_KINDS.map((kind) => ({ value: kind.code, label: kind.label }))
@@ -197,7 +218,7 @@ const withIds = (form) => ({ ...form, loans: form.loans.map((loan, index) => ({ 
 
 // 접힌 줄에 보일 한 줄 요약: 종류 · 상환 방식 · 대출금 (대출금이 비어 있으면 안내)
 const getLoanSummary = (loan) => {
-  const amountText = isNumber(loan.amount) ? formatMoney(loan.amount, '만원') : '대출금 입력 전'
+  const amountText = isNumber(loan.amount) ? formatMoney(loan.amount, '원') : '대출금 입력 전'
   return `${KIND_LABEL[loan.kind]} · ${METHOD_LABEL[loan.method]} · ${amountText}`
 }
 
@@ -286,7 +307,7 @@ function DsrCalculator() {
     }
   }
 
-  // [결과 저장] (API-57): 입력과 결과 값을 보냄 (화면은 만원, 서버는 원)
+  // [결과 저장] (API-57): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
     if (isSaving || !result) return
     setIsSaving(true)
@@ -333,33 +354,36 @@ function DsrCalculator() {
             : `1년 기준, 한 달 약 ${money(Math.round(result.extraRoom / 12))}`,
       },
     ]
-    const barMax = Math.max(result.dsrRate, DSR_BASELINES.second)
     resultView = (
       <>
         <SummaryCards items={summaryItems} />
-        <section>
-          <SectionHeader title="기준선과 비교" description="은행은 40%, 2금융권은 50%까지 봐요." />
-          <Bars>
-            <HBar label="내 DSR" value={result.dsrRate} max={barMax} valueText={`${formatRate(result.dsrRate)}%`} isActive />
-            <HBar label="은행" value={DSR_BASELINES.bank} max={barMax} valueText={`${DSR_BASELINES.bank}%`} />
-            <HBar label="2금융권" value={DSR_BASELINES.second} max={barMax} valueText={`${DSR_BASELINES.second}%`} />
-          </Bars>
-        </section>
-        <section>
-          <SectionHeader title="대출별 1년 상환액" description="앞으로 1년 동안 갚는 원금과 이자예요." />
-          <Card>
-            <Rows>
-              {applied.loans.map((loan, index) => (
-                <Row key={loan.id}>
-                  <dt>
-                    {index + 1}. {KIND_LABEL[loan.kind]} · {METHOD_LABEL[loan.method]}
-                  </dt>
-                  <dd>{money(result.loanPayments[index])}</dd>
-                </Row>
-              ))}
-            </Rows>
-          </Card>
-        </section>
+        <div>
+          <Track role="img" aria-label={`DSR ${formatRate(result.dsrRate)}%`}>
+            <Fill $percent={Math.min(100, result.dsrRate)} $tone={level.tone} />
+            <Mark $left={DSR_BASELINES.bank} />
+            <Mark $left={DSR_BASELINES.second} />
+          </Track>
+          <Scale aria-hidden="true">
+            <ScaleText $align="start">0%</ScaleText>
+            <ScaleText $align="before" $left={DSR_BASELINES.bank}>
+              은행 {DSR_BASELINES.bank}%
+            </ScaleText>
+            <ScaleText $align="after" $left={DSR_BASELINES.second}>
+              2금융권 {DSR_BASELINES.second}%
+            </ScaleText>
+            <ScaleText $align="end">100%</ScaleText>
+          </Scale>
+        </div>
+        <CalcKv>
+          {applied.loans.map((loan, index) => (
+            <Fragment key={loan.id}>
+              <dt>
+                대출 {index + 1} · {KIND_LABEL[loan.kind]}
+              </dt>
+              <dd>1년 {money(result.loanPayments[index])}</dd>
+            </Fragment>
+          ))}
+        </CalcKv>
         <Disclaimer>
           실제 규제 기준은 금융당국 정책에 따라 달라요. 기준선 비율은 예시 값이에요. 만기일시는 원금을 대출 기간(신용대출은 5년)에 나눠 갚는다고 보고 계산해요.
         </Disclaimer>
@@ -370,22 +394,23 @@ function DsrCalculator() {
   const isLoanFull = form.loans.length >= DSR_MAX_LOANS
 
   return (
-    <Layout>
-      <Panel>
-        <FormStack>
-          <GroupTitle>소득</GroupTitle>
+    <CalcLayout>
+      <CalcPanel>
+        <CalcFormStack>
           <NumberField
+            isLabelInside
             label="연소득"
-            unit="만원"
+            unit="원"
             value={form.annualIncome}
             onChange={(annualIncome) => handleChange({ annualIncome })}
             hasComma
+            showReadable
             isRequired
-            placeholder="예: 5,000"
+            placeholder="예: 50,000,000"
             error={errors.annualIncome}
           />
 
-          <GroupTitle>가진 대출과 새로 받을 대출</GroupTitle>
+          <FormLabel>가진 대출과 새로 받을 대출</FormLabel>
           {form.loans.map((loan, index) => {
             const loanErrors = (hasTried || checkedIds.includes(loan.id) ? formErrors.loans?.[index] : null) ?? {}
             const isOpen = openIds.includes(loan.id)
@@ -406,45 +431,44 @@ function DsrCalculator() {
                     </LoanArrow>
                   </LoanToggle>
                   {form.loans.length > 1 && (
-                    <Button $variant="ghost" $size="sm" onClick={() => handleRemoveLoan(loan.id)} aria-label={`대출 ${index + 1} 삭제`}>
+                    <CalcLinkButton onClick={() => handleRemoveLoan(loan.id)} aria-label={`대출 ${index + 1} 삭제`}>
                       삭제
-                    </Button>
+                    </CalcLinkButton>
                   )}
                 </LoanHead>
                 <LoanFields id={fieldsId} hidden={!isOpen}>
-                  <FormField>
-                    <FormLabel>종류</FormLabel>
-                    <SegmentedFull>
-                      <Segmented
-                        options={KIND_OPTIONS}
-                        value={loan.kind}
-                        onChange={(kind) => handleLoanChange(loan.id, { kind })}
-                        label={`대출 ${index + 1} 종류`}
-                      />
-                    </SegmentedFull>
-                  </FormField>
-                  <FormField>
-                    <FormLabel>상환 방식</FormLabel>
-                    <SegmentedFull>
-                      <Segmented
-                        options={METHOD_OPTIONS}
-                        value={loan.method}
-                        onChange={(method) => handleLoanChange(loan.id, { method })}
-                        label={`대출 ${index + 1} 상환 방식`}
-                      />
-                    </SegmentedFull>
-                  </FormField>
+                  <Pair>
+                    <SelectField
+                      isLabelHidden
+                      label={`대출 ${index + 1} 종류`}
+                      options={KIND_OPTIONS}
+                      value={loan.kind}
+                      onChange={(kind) => handleLoanChange(loan.id, { kind })}
+                    />
+                    <SelectField
+                      isLabelHidden
+                      label={`대출 ${index + 1} 상환 방식`}
+                      options={METHOD_OPTIONS}
+                      value={loan.method}
+                      onChange={(method) => handleLoanChange(loan.id, { method })}
+                    />
+                  </Pair>
                   <NumberField
+                    isLabelInside
+                    isCompact
                     label="대출금"
-                    unit="만원"
+                    unit="원"
                     value={loan.amount}
                     onChange={(amount) => handleLoanChange(loan.id, { amount })}
                     hasComma
+                    showReadable
                     isRequired
-                    placeholder="예: 20,000"
+                    placeholder="예: 200,000,000"
                     error={loanErrors.amount}
                   />
                   <NumberField
+                    isLabelInside
+                    isCompact
                     label="금리"
                     unit="%"
                     decimals={2}
@@ -455,6 +479,8 @@ function DsrCalculator() {
                     error={loanErrors.rate}
                   />
                   <NumberField
+                    isLabelInside
+                    isCompact
                     label="기간"
                     unit="개월"
                     value={loan.months}
@@ -463,23 +489,21 @@ function DsrCalculator() {
                     placeholder="예: 360"
                     error={loanErrors.months}
                   />
-                  <Button $variant="soft" onClick={() => handleCloseLoan(loan.id)} aria-label={`대출 ${index + 1} 입력 완료`}>
-                    완료
-                  </Button>
+                  <Done>
+                    <Button $variant="soft" $size="sm" onClick={() => handleCloseLoan(loan.id)} aria-label={`대출 ${index + 1} 입력 완료`}>
+                      완료
+                    </Button>
+                  </Done>
                 </LoanFields>
               </LoanBox>
             )
           })}
-          <FormField>
-            <Button $variant="soft" disabled={isLoanFull} onClick={handleAddLoan}>
+          <AddRow>
+            <Button $variant="outline" $size="sm" disabled={isLoanFull} onClick={handleAddLoan}>
               + 대출 추가
             </Button>
-            <Hint>
-              {isLoanFull
-                ? `대출은 최대 ${DSR_MAX_LOANS}건까지 넣을 수 있어요.`
-                : `지금 ${form.loans.length}건 (최대 ${DSR_MAX_LOANS}건)`}
-            </Hint>
-          </FormField>
+            {isLoanFull && <Hint>대출은 최대 {DSR_MAX_LOANS}건까지 넣을 수 있어요.</Hint>}
+          </AddRow>
 
           <Actions>
             <Button onClick={handleCalculate}>
@@ -491,14 +515,14 @@ function DsrCalculator() {
               결과 저장
             </Button>
           </Actions>
-        </FormStack>
-      </Panel>
+        </CalcFormStack>
+      </CalcPanel>
 
       <Result ref={resultRef}>
         {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {resultView}
       </Result>
-    </Layout>
+    </CalcLayout>
   )
 }
 

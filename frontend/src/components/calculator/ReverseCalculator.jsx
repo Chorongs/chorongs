@@ -3,10 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, EmptyBox, FormField, FormLabel, FormStack, Panel, SegmentedFull } from '../../styles/common'
+import { Button, CalcFormStack, CalcLayout, CalcPanel, EmptyBox, FormField, FormLabel, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import {
-  REVERSE_TERMS,
   getInitialReverse,
   getReverseErrors,
   getReverseResult,
@@ -15,31 +14,21 @@ import {
 } from '../../utils/finance'
 import { CALC_LIMITS, REPAY_METHODS } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
+import HBar from '../chart/HBar'
 import Disclaimer from '../common/Disclaimer'
 import SectionHeader from '../common/SectionHeader'
 import SummaryCards from '../common/SummaryCards'
-import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
 
 // CA-10 상환능력 기반 대출 계산기 (SCR-23, /calc/reverse): 매달 갚을 수 있는 돈으로 최대 대출 금액 역산. 계산은 프론트에서 (utils/finance.js)
-// 왼쪽 입력: 상환 방식 3개 → 매달 갚을 돈, 연 이자율, 대출 기간 → [계산하기] [결과 저장]
+// 왼쪽 입력: 상환 방식 3개 → 매달 갚을 돈, 연 이자율, 대출 기간(칩 없이 1-600개월 직접 입력) → [계산하기] [결과 저장]
 // 오른쪽 결과: 요약 3칸 (최대 대출 금액, 총 이자, 총 갚는 돈) → 기간별 빌릴 수 있는 금액 → [대출 이자 계산기로 이동] → 고지 (좁은 화면은 입력 아래)
 // 계산 시점은 CA-02와 같다: 입력칸 값(form)과 결과에 쓰는 값(applied)을 나눠 들고, [계산하기]를 눌렀을 때만 form을 applied로 옮긴다.
 //   입력을 바꾸고 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장], [대출 이자 계산기로 이동]은 막음 (화면에 보이는 결과와 저장, 넘기는 값이 다르지 않게)
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-58, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-const Layout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
 const Actions = styled.div`
   display: flex;
   gap: 8px;
@@ -66,28 +55,11 @@ const StaleNotice = styled.p.attrs({ role: 'status' })`
   font-weight: 600;
 `
 
-const Rows = styled.dl`
+// 기간별 막대 줄 묶음 (가안 .mcmp)
+const Bars = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin: 0;
-`
-
-const Row = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-base);
-  & > dt {
-    color: ${({ $isCurrent }) => ($isCurrent ? 'var(--ink)' : 'var(--cocoa)')};
-    font-weight: ${({ $isCurrent }) => ($isCurrent ? 700 : 400)};
-  }
-  & > dd {
-    margin: 0;
-    font-family: var(--f-num);
-    font-weight: 700;
-    text-align: right;
-  }
 `
 
 const Hint = styled.p`
@@ -104,8 +76,7 @@ const MoveBox = styled.div`
 `
 
 const METHOD_OPTIONS = REPAY_METHODS.map((method) => ({ value: method.code, label: method.label }))
-const TERM_OPTIONS = REVERSE_TERMS.map((term) => ({ value: term, label: `${term}개월` }))
-const MAX_MOVE_AMOUNT = CALC_LIMITS.amountMax * 10000
+const MAX_MOVE_AMOUNT = CALC_LIMITS.amountMax
 
 const money = (value) => formatMoney(value, '원')
 
@@ -152,7 +123,7 @@ function ReverseCalculator() {
     }
   }
 
-  // [결과 저장] (API-58): 입력과 결과 값을 보냄 (화면은 만원, 서버는 원)
+  // [결과 저장] (API-58): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
     if (isSaving || !result) return
     setIsSaving(true)
@@ -203,33 +174,34 @@ function ReverseCalculator() {
         label: '최대 대출 금액',
         value: money(result.maxLoan),
         tone: 'hl',
-        sub: getMonthlyText(applied.method, applied.monthly * 10000),
+        sub: getMonthlyText(applied.method, applied.monthly),
       },
       { label: '총 이자', value: money(result.totalInterest), sub: `${applied.months}개월 동안 내는 이자` },
       { label: '총 갚는 돈', value: money(result.totalPayment), sub: '원금과 이자를 합한 금액' },
     ]
     const isCapped = result.maxLoan > MAX_MOVE_AMOUNT
+    const maxByTerm = Math.max(...result.byTerm.map((term) => term.maxLoan))
     resultView = (
       <>
         <SummaryCards items={summaryItems} />
         <section>
           <SectionHeader title="기간별 빌릴 수 있는 금액" description="같은 상환 방식, 이자율로 기간만 바꿔 봤어요." />
-          <Card>
-            {applied.method === 'BULLET' ? (
-              <Hint>만기일시는 매달 이자만 내서, 기간과 관계없이 빌릴 수 있는 금액이 같아요.</Hint>
-            ) : (
-              <Rows>
-                {result.byTerm.map((term) => (
-                  <Row key={term.months} $isCurrent={term.months === applied.months}>
-                    <dt>
-                      {term.months}개월{term.months === applied.months ? ' (선택한 기간)' : ''}
-                    </dt>
-                    <dd>{money(term.maxLoan)}</dd>
-                  </Row>
-                ))}
-              </Rows>
-            )}
-          </Card>
+          {applied.method === 'BULLET' ? (
+            <Hint>만기일시는 매달 이자만 내서, 기간과 관계없이 빌릴 수 있는 금액이 같아요.</Hint>
+          ) : (
+            <Bars>
+              {result.byTerm.map((term) => (
+                <HBar
+                  key={term.months}
+                  label={`${term.months}개월`}
+                  value={term.maxLoan}
+                  max={maxByTerm}
+                  valueText={money(term.maxLoan)}
+                  isActive={term.months === applied.months}
+                />
+              ))}
+            </Bars>
+          )}
         </section>
         <MoveBox>
           <Button $variant="outline" onClick={handleMove}>
@@ -244,9 +216,9 @@ function ReverseCalculator() {
   }
 
   return (
-    <Layout>
-      <Panel>
-        <FormStack>
+    <CalcLayout>
+      <CalcPanel>
+        <CalcFormStack>
           <FormField>
             <FormLabel>상환 방식</FormLabel>
             <SegmentedFull>
@@ -260,16 +232,19 @@ function ReverseCalculator() {
             </SegmentedFull>
           </FormField>
           <NumberField
+            isLabelInside
             label="매달 갚을 돈"
-            unit="만원"
+            unit="원"
             value={form.monthly}
             onChange={(monthly) => handleChange({ monthly })}
             hasComma
+            showReadable
             isRequired
-            placeholder="예: 100"
+            placeholder="예: 1,000,000"
             error={errors.monthly}
           />
           <NumberField
+            isLabelInside
             label="연 이자율"
             unit="%"
             decimals={2}
@@ -279,15 +254,16 @@ function ReverseCalculator() {
             placeholder="예: 5"
             error={errors.rate}
           />
-          <FormField>
-            <FormLabel>대출 기간</FormLabel>
-            <ChipGroup
-              options={TERM_OPTIONS}
-              value={form.months}
-              onChange={(months) => handleChange({ months })}
-              label="대출 기간"
-            />
-          </FormField>
+          <NumberField
+            isLabelInside
+            label="대출 기간"
+            unit="개월"
+            value={form.months}
+            onChange={(months) => handleChange({ months })}
+            isRequired
+            placeholder="예: 36"
+            error={errors.months}
+          />
 
           <Actions>
             <Button onClick={handleCalculate}>
@@ -299,14 +275,14 @@ function ReverseCalculator() {
               결과 저장
             </Button>
           </Actions>
-        </FormStack>
-      </Panel>
+        </CalcFormStack>
+      </CalcPanel>
 
       <Result ref={resultRef}>
         {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {resultView}
       </Result>
-    </Layout>
+    </CalcLayout>
   )
 }
 

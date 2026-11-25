@@ -23,9 +23,9 @@ const CardButton = styled.button.attrs({ type: 'button' })`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 18px 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
   background: var(--paper);
   color: var(--ink);
   text-align: left;
@@ -36,12 +36,13 @@ const CardButton = styled.button.attrs({ type: 'button' })`
   }
   &[aria-pressed='true'] {
     border-color: var(--brand);
-    box-shadow: 0 0 0 1px var(--brand);
+    background: var(--brand-soft);
+    box-shadow: inset 0 0 0 1px var(--brand);
   }
 `
 
 const Title = styled.b`
-  font-size: var(--fs-xl);
+  font-size: var(--fs-md);
   font-weight: 800;
 `
 

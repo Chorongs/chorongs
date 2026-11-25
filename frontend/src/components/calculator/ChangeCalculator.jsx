@@ -3,13 +3,12 @@ import { useLocation } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, EmptyBox, FormField, FormStack, Panel, SegmentedFull } from '../../styles/common'
+import { Button, CalcFormStack, CalcKv, CalcLayout, CalcPanel, EmptyBox, FormField, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import { getChangeErrors, getChangeResult, getInitialChange, toChangeRecord } from '../../utils/finance'
 import { REPAY_METHODS } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
 import Disclaimer from '../common/Disclaimer'
-import SectionHeader from '../common/SectionHeader'
 import SummaryCards from '../common/SummaryCards'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
@@ -22,23 +21,10 @@ import Segmented from '../ui/Segmented'
 //   입력을 바꾸고 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장]은 막음 (화면에 보이는 결과와 저장 값이 다르지 않게)
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-56, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-const Layout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
 const GroupTitle = styled.h3`
-  font-size: var(--fs-xl);
+  color: var(--ink);
+  font-size: var(--fs-base);
   font-weight: 800;
-  &:not(:first-child) {
-    padding-top: 20px;
-    border-top: 1px solid var(--line-2);
-  }
 `
 
 const Hint = styled.p`
@@ -71,40 +57,6 @@ const StaleNotice = styled.p.attrs({ role: 'status' })`
   color: var(--warn);
   font-size: var(--fs-sm);
   font-weight: 600;
-`
-
-const Rows = styled.dl`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-`
-
-const Row = styled.div`
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-base);
-  & > dt {
-    color: var(--cocoa);
-  }
-  & > dd {
-    margin: 0;
-    font-family: var(--f-num);
-    font-weight: 700;
-    text-align: right;
-  }
-`
-
-const Verdict = styled.p`
-  margin-top: 16px;
-  padding: 16px 18px;
-  border-radius: var(--r-sm);
-  background: ${({ $isGain }) => ($isGain ? 'var(--good-soft)' : 'var(--bad-soft)')};
-  color: ${({ $isGain }) => ($isGain ? 'var(--good)' : 'var(--bad)')};
-  font-size: var(--fs-base);
-  font-weight: 700;
-  line-height: 1.6;
 `
 
 const METHOD_OPTIONS = REPAY_METHODS.map((method) => ({ value: method.code, label: method.label }))
@@ -161,7 +113,7 @@ function ChangeCalculator() {
     }
   }
 
-  // [결과 저장] (API-56): 입력과 결과 값을 보냄 (화면은 만원, 서버는 원)
+  // [결과 저장] (API-56): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
     if (isSaving || !result) return
     setIsSaving(true)
@@ -216,30 +168,18 @@ function ChangeCalculator() {
     resultView = (
       <>
         <SummaryCards items={summaryItems} />
-        <section>
-          <SectionHeader title="자세히 보기" description="아끼는 돈은 이렇게 계산했어요." />
-          <Card>
-            <Rows>
-              <Row>
-                <dt>지금 대출 총 이자</dt>
-                <dd>{money(result.currentInterest)}</dd>
-              </Row>
-              <Row>
-                <dt>갈아탈 대출 총 이자</dt>
-                <dd>{money(result.newInterest)}</dd>
-              </Row>
-              <Row>
-                <dt>중도상환수수료</dt>
-                <dd>{money(result.prepayFee)}</dd>
-              </Row>
-              <Row>
-                <dt>기타 비용</dt>
-                <dd>{money(result.etcCost)}</dd>
-              </Row>
-            </Rows>
-            <Verdict $isGain={result.isGain}>{getVerdictText(result)}</Verdict>
-          </Card>
-        </section>
+        <CalcKv>
+          <dt>지금 대출 총 이자</dt>
+          <dd>{money(result.currentInterest)}</dd>
+          <dt>갈아탈 대출 총 이자</dt>
+          <dd>{money(result.newInterest)}</dd>
+          <dt>중도상환수수료</dt>
+          <dd>{money(result.prepayFee)}</dd>
+          <dt>기타 비용</dt>
+          <dd>{money(result.etcCost)}</dd>
+          <dt>결과</dt>
+          <dd>{getVerdictText(result)}</dd>
+        </CalcKv>
         <Disclaimer>
           남은 대출금 전액을 새 대출로 갈아탄다고 보고 계산해요. 실제 금리, 수수료, 비용은 금융기관마다 달라요.
         </Disclaimer>
@@ -248,9 +188,9 @@ function ChangeCalculator() {
   }
 
   return (
-    <Layout>
-      <Panel>
-        <FormStack>
+    <CalcLayout>
+      <CalcPanel>
+        <CalcFormStack>
           <GroupTitle>지금 대출</GroupTitle>
           <FormField>
             <SegmentedFull>
@@ -264,16 +204,19 @@ function ChangeCalculator() {
             </SegmentedFull>
           </FormField>
           <NumberField
+            isLabelInside
             label="남은 대출금"
-            unit="만원"
+            unit="원"
             value={form.balance}
             onChange={(balance) => handleChange({ balance })}
             hasComma
+            showReadable
             isRequired
-            placeholder="예: 5,000"
+            placeholder="예: 50,000,000"
             error={errors.balance}
           />
           <NumberField
+            isLabelInside
             label="지금 금리"
             unit="%"
             decimals={2}
@@ -284,6 +227,7 @@ function ChangeCalculator() {
             error={errors.currentRate}
           />
           <NumberField
+            isLabelInside
             label="남은 기간"
             unit="개월"
             value={form.currentMonths}
@@ -306,6 +250,7 @@ function ChangeCalculator() {
             </SegmentedFull>
           </FormField>
           <NumberField
+            isLabelInside
             label="새 금리"
             unit="%"
             decimals={2}
@@ -316,6 +261,7 @@ function ChangeCalculator() {
             error={errors.newRate}
           />
           <NumberField
+            isLabelInside
             label="새 대출 기간"
             unit="개월"
             value={form.newMonths}
@@ -328,6 +274,7 @@ function ChangeCalculator() {
           <GroupTitle>갈아탈 때 드는 돈</GroupTitle>
           <FormField>
             <NumberField
+              isLabelInside
               label="중도상환수수료"
               unit="%"
               decimals={2}
@@ -340,12 +287,14 @@ function ChangeCalculator() {
           </FormField>
           <FormField>
             <NumberField
+              isLabelInside
               label="기타 비용"
-              unit="만원"
+              unit="원"
               value={form.etcCost}
               onChange={(etcCost) => handleChange({ etcCost })}
               hasComma
-              placeholder="예: 50"
+              showReadable
+              placeholder="예: 500,000"
               error={errors.etcCost}
             />
             <Hint>기타 비용은 인지세, 보증료처럼 새 대출 때 드는 돈이에요.</Hint>
@@ -361,14 +310,14 @@ function ChangeCalculator() {
               결과 저장
             </Button>
           </Actions>
-        </FormStack>
-      </Panel>
+        </CalcFormStack>
+      </CalcPanel>
 
       <Result ref={resultRef}>
         {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {resultView}
       </Result>
-    </Layout>
+    </CalcLayout>
   )
 }
 

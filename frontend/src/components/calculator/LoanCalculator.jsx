@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { PREPARING_TEXT } from '../../api/axiosInstance'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, FormField, FormLabel, FormStack, Panel, SegmentedFull } from '../../styles/common'
+import { Button, CalcFormStack, CalcLayout, CalcPanel, EmptyBox, FormField, FormLabel, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import {
   CALC_METHODS,
@@ -20,7 +20,6 @@ import {
 import requireLogin from '../../utils/requireLogin'
 import Disclaimer from '../common/Disclaimer'
 import SummaryCards from '../common/SummaryCards'
-import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
@@ -32,8 +31,8 @@ import PrepayModeCards from './PrepayModeCards'
 import ScheduleTable from './ScheduleTable'
 
 // CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일, 2026-11-20 사용자 결정)
-// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03) → 금액, 기간 칩 + [직접 입력], 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
-// 기간은 칩에서 고르거나 [직접 입력]으로 1-600개월을 적음 (칩 유지 + 직접 입력 추가는 2026-11-25 사용자 결정, 명세서 CA-02 '기간은 선택지 값만'과 다름)
+// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03, 체크했을 때만 입력칸) → 금액, 상환 기간(직접 입력), 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
+// 기간은 칩 없이 칸에 1-600개월을 직접 적음, 거치 기간도 체크했을 때만 입력 (2026-11-25 사용자 결정, 명세서 CA-02 '상환 기간 칩', CA-03 '거치기간 항상 보임'과 다름)
 // 오른쪽 결과: 요약 3칸 → 중도상환 후 방식 카드(CA-04) → 회차별 표(CA-05) → 그래프, 방식별 총이자(CA-06) (좁은 화면은 입력 아래)
 // 처음 값: CalculatorPage가 navigate state에서 골라 Outlet 값(initial)으로 내려줌. 없으면 기본값
 // 계산 시점 (2026-11-20 사용자 결정, 명세서 CA-02 '숫자 바꾸면 바로 다시 계산'과 다름): 입력할 때마다 결과가 바뀌면 정신없어서 [계산하기]을 눌렀을 때만 결과를 새로 계산한다.
@@ -42,16 +41,6 @@ import ScheduleTable from './ScheduleTable'
 //   [중도상환 후 방식 카드]는 결과 쪽 선택이라 누르면 바로 다시 계산
 // 입력 검사(E2)는 getCalcErrors: [계산하기]을 누르면 검사해서 오류가 있으면 칸마다 문구를 보이고(그 뒤로는 고치는 대로 갱신) 결과는 그대로 둠. 계산이 안 되는 조건(무한대, 음수)이면 결과를 숨기고 문구
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-24, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-const Layout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
 const Actions = styled.div`
   display: flex;
   gap: 8px;
@@ -60,10 +49,12 @@ const Actions = styled.div`
   }
 `
 
-const History = styled.div`
-  margin-top: 28px;
-  padding-top: 28px;
-  border-top: 1px solid var(--line-2);
+// 왼쪽 열: 입력 판 + 그 아래 계산 기록 (가안 .stack.g20)
+const Left = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 `
 
 const Result = styled.div`
@@ -92,9 +83,6 @@ const StaleNotice = styled.p.attrs({ role: 'status' })`
 
 const METHOD_OPTIONS = CALC_METHODS.map((method) => ({ value: method.code, label: method.label }))
 
-// 기간 칩 맨 끝의 [직접 입력] 칩 값 (개월 숫자와 겹치지 않는 글자)
-const CUSTOM_TERM = 'custom'
-
 // 월 상환액 아래 설명: 방식마다 '월 상환액'이 뜻하는 것이 다름 (첫 달 납입액을 보여 줌)
 function getMonthlyNote(method, graceMonths) {
   if (method !== 'BULLET' && graceMonths > 0) return `거치 ${graceMonths}개월은 이자만 내요 (첫 달 기준)`
@@ -113,25 +101,12 @@ function LoanCalculator() {
   const [form, setForm] = useState(() => createCalcForm(initial))
   const [applied, setApplied] = useState(() => createCalcForm(initial))
   const [hasTried, setHasTried] = useState(false)
-  const [termOptions, setTermOptions] = useState(initial.termOptions)
-  // [직접 입력] 칩을 골랐는지: 처음 값의 기간이 칩에 없으면 처음부터 직접 입력
-  const [isCustomTerm, setIsCustomTerm] = useState(() => !initial.termOptions.includes(initial.months))
   const [isSaving, setIsSaving] = useState(false)
   const [historyKey, setHistoryKey] = useState(0)
   const topRef = useRef(null)
   const resultRef = useRef(null)
 
   const handleChange = (patch) => setForm((prev) => ({ ...prev, ...patch }))
-
-  // 기간 칩: [직접 입력]은 입력칸을 열기만 하고 값은 그대로, 개월 칩은 그 값으로 바꾸고 입력칸을 닫음
-  const handleTermChange = (value) => {
-    if (value === CUSTOM_TERM) {
-      setIsCustomTerm(true)
-      return
-    }
-    setIsCustomTerm(false)
-    handleChange({ months: value })
-  }
 
   // 입력 검사: [계산하기]을 한 번 눌러 본 뒤부터 칸마다 오류 문구를 보임
   const formErrors = getCalcErrors(form)
@@ -201,8 +176,6 @@ function LoanCalculator() {
   const handleLoad = (item) => {
     const loaded = getInitialCalc(item)
     const loadedForm = createCalcForm(loaded)
-    setTermOptions(loaded.termOptions)
-    setIsCustomTerm(!loaded.termOptions.includes(loaded.months))
     setForm(loadedForm)
     setHasTried(false)
     if (Object.keys(getCalcErrors(loadedForm)).length === 0) setApplied(loadedForm)
@@ -251,108 +224,98 @@ function LoanCalculator() {
   }
 
   return (
-    <Layout ref={topRef}>
-      <Panel>
-        <FormStack>
-          <FormField>
-            <FormLabel>상환 방식</FormLabel>
-            <SegmentedFull>
-              <Segmented
-                options={METHOD_OPTIONS}
-                value={form.method}
-                onChange={(method) => handleChange({ method })}
-                isOnPanel
-                label="상환 방식"
-              />
-            </SegmentedFull>
-          </FormField>
-
-          <LoanOptions form={form} errors={errors} onChange={handleChange} />
-
-          <NumberField
-            label="빌릴 금액"
-            unit="만원"
-            value={form.amount}
-            onChange={(amount) => handleChange({ amount })}
-            hasComma
-            isRequired
-            placeholder="예: 1,000"
-            error={errors.amount}
-          />
-
-          <FormField>
-            <FormLabel>상환 기간</FormLabel>
-            <ChipGroup
-              options={[
-                ...termOptions.map((term) => ({ value: term, label: `${term}개월` })),
-                { value: CUSTOM_TERM, label: '직접 입력' },
-              ]}
-              value={isCustomTerm ? CUSTOM_TERM : form.months}
-              onChange={handleTermChange}
-              label="상환 기간"
-            />
-            {isCustomTerm && (
-              <NumberField
-                label="상환 기간 직접 입력"
-                unit="개월"
-                value={form.months}
-                onChange={(months) => handleChange({ months })}
-                isRequired
-                placeholder="예: 24"
-                error={errors.months}
-              />
-            )}
-          </FormField>
-
-          <NumberField
-            label="연 이자율"
-            unit="%"
-            decimals={2}
-            value={form.rate}
-            onChange={(rate) => handleChange({ rate })}
-            isRequired
-            placeholder="예: 5.5"
-            error={errors.rate}
-          />
-
-          {form.method === 'GRADUATED' && (
+    <CalcLayout ref={topRef}>
+      <Left>
+        <CalcPanel>
+          <CalcFormStack>
             <FormField>
-              <NumberField
-                label="연 증가율"
-                unit="%"
-                decimals={2}
-                value={form.growth}
-                onChange={(growth) => handleChange({ growth })}
-                isRequired
-                placeholder="예: 5"
-                error={errors.growth}
-              />
-              <Hint>체증식은 12개월마다 납입액이 이 비율만큼 늘어나요.</Hint>
+              <FormLabel>상환 방식</FormLabel>
+              <SegmentedFull>
+                <Segmented
+                  options={METHOD_OPTIONS}
+                  value={form.method}
+                  onChange={(method) => handleChange({ method })}
+                  isOnPanel
+                  label="상환 방식"
+                />
+              </SegmentedFull>
             </FormField>
-          )}
 
-          <Actions>
-            <Button onClick={handleCalculate}>
-              <Icon name="calc" size={16} />
-              계산하기
-            </Button>
-            <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
-              <Icon name="doc" size={16} />
-              결과 저장
-            </Button>
-          </Actions>
-        </FormStack>
+            <LoanOptions form={form} errors={errors} onChange={handleChange} />
 
-        <History>
-          <CalcHistoryList onLoad={handleLoad} refreshKey={historyKey} />
-        </History>
-      </Panel>
+            <NumberField
+              isLabelInside
+              label="빌릴 금액"
+              unit="원"
+              value={form.amount}
+              onChange={(amount) => handleChange({ amount })}
+              hasComma
+              showReadable
+              isRequired
+              placeholder="예: 10,000,000"
+              error={errors.amount}
+            />
+
+            <NumberField
+              isLabelInside
+              label="상환 기간"
+              unit="개월"
+              value={form.months}
+              onChange={(months) => handleChange({ months })}
+              isRequired
+              placeholder="예: 36"
+              error={errors.months}
+            />
+
+            <NumberField
+              isLabelInside
+              label="연 이자율"
+              unit="%"
+              decimals={2}
+              value={form.rate}
+              onChange={(rate) => handleChange({ rate })}
+              isRequired
+              placeholder="예: 5.5"
+              error={errors.rate}
+            />
+
+            {form.method === 'GRADUATED' && (
+              <FormField>
+                <NumberField
+                  isLabelInside
+                  label="연 증가율"
+                  unit="%"
+                  decimals={2}
+                  value={form.growth}
+                  onChange={(growth) => handleChange({ growth })}
+                  isRequired
+                  placeholder="예: 5"
+                  error={errors.growth}
+                />
+                <Hint>체증식은 12개월마다 납입액이 이 비율만큼 늘어나요.</Hint>
+              </FormField>
+            )}
+
+            <Actions>
+              <Button onClick={handleCalculate}>
+                <Icon name="calc" size={16} />
+                계산하기
+              </Button>
+              <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
+                <Icon name="doc" size={16} />
+                결과 저장
+              </Button>
+            </Actions>
+          </CalcFormStack>
+        </CalcPanel>
+        <CalcHistoryList onLoad={handleLoad} refreshKey={historyKey} />
+      </Left>
 
       <Result ref={resultRef}>
         {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {result}
       </Result>
-    </Layout>
+    </CalcLayout>
   )
 }
 

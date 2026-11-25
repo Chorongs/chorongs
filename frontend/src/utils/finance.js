@@ -1,6 +1,6 @@
 import { MONTHS_OPTIONS_DEFAULT, MONTHS_OPTIONS_HOUSING } from '../constants/options'
 import { CALC_LIMITS, REPAY_METHODS, calcPayment, isNumber } from './loanMath'
-import { formatNumber } from './format'
+import { formatMoney } from './format'
 
 // 대출 갈아타기, DSR, 내 집 대출한도, 상환능력 기반 대출 계산 (화면 없는 계산, CHORONG-56)
 // 갈아타기(CA-08), 내 집 대출한도(CA-11), 상환능력 기반 대출(CA-10), DSR(CA-09) 계산이 계산기마다 한 구역씩 있다.
@@ -13,13 +13,13 @@ const isInRange = (value, min, max) => isNumber(value) && value >= min && value 
 // 대출 갈아타기 (CA-08)
 // ---------------------------------------------------------------------------
 
-// 갈아타기 입력 한도: 기간 1-600개월, 금리 0-20%, 수수료 0-5% (명세서). 금액은 대출 이자 계산기와 같은 1만-100,000만원 (위쪽 한도는 명세서에 없어 정한 값)
+// 갈아타기 입력 한도: 기간 1-600개월, 금리 0-20%, 수수료 0-5% (명세서). 금액은 대출 이자 계산기와 같은 1만원-10억원, 원 단위 (위쪽 한도는 명세서에 없어 정한 값)
 export const CHANGE_LIMITS = { ...CALC_LIMITS, monthsMin: 1, monthsMax: 600 }
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 만원, 기간은 개월, 금리와 수수료는 %
+// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리와 수수료는 %
 export const CHANGE_DEFAULTS = {
   currentMethod: 'EQUAL_PI',
-  balance: 5000,
+  balance: 50000000,
   currentRate: 5.5,
   currentMonths: 36,
   newMethod: 'EQUAL_PI',
@@ -33,7 +33,7 @@ const CHANGE_METHOD_CODES = REPAY_METHODS.map((method) => method.code)
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → 갈아타기 입력칸 처음 값 (CA-01)
 // state: { currentRepayMethod, currentBalance 원, currentRate, currentMonths, newRepayMethod, newRate, newMonths, feeRate, etcCost 원 }
-// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 → 만원)
+// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로)
 export function getInitialChange(state) {
   const form = { ...CHANGE_DEFAULTS }
   const { amountMin, amountMax, rateMax, feeMax, monthsMin, monthsMax } = CHANGE_LIMITS
@@ -41,11 +41,8 @@ export function getInitialChange(state) {
   if (CHANGE_METHOD_CODES.includes(state?.currentRepayMethod)) form.currentMethod = state.currentRepayMethod
   if (CHANGE_METHOD_CODES.includes(state?.newRepayMethod)) form.newMethod = state.newRepayMethod
 
-  const balance = isNumber(state?.currentBalance) ? Math.round(state.currentBalance / 10000) : null
-  if (isInRange(balance, amountMin, amountMax)) form.balance = balance
-
-  const etcCost = isNumber(state?.etcCost) ? Math.round(state.etcCost / 10000) : null
-  if (isInRange(etcCost, 0, amountMax)) form.etcCost = etcCost
+  if (isInRange(state?.currentBalance, amountMin, amountMax)) form.balance = Math.round(state.currentBalance)
+  if (isInRange(state?.etcCost, 0, amountMax)) form.etcCost = Math.round(state.etcCost)
 
   if (isInRange(state?.currentRate, 0, rateMax)) form.currentRate = state.currentRate
   if (isInRange(state?.newRate, 0, rateMax)) form.newRate = state.newRate
@@ -66,7 +63,7 @@ export function getInitialChange(state) {
 export function getChangeErrors(form) {
   const errors = {}
   const { amountMin, amountMax, rateMax, feeMax, monthsMin, monthsMax } = CHANGE_LIMITS
-  const amountText = `${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하`
+  const amountText = `${formatMoney(amountMin, '원')} 이상 ${formatMoney(amountMax, '원')} 이하`
 
   if (isEmptyValue(form.balance)) errors.balance = '남은 대출금을 입력해 주세요'
   else if (!isInRange(form.balance, amountMin, amountMax)) errors.balance = `남은 대출금은 ${amountText}로 입력해 주세요`
@@ -95,7 +92,7 @@ export function getChangeErrors(form) {
     errors.feeRate = `수수료는 0% 이상 ${feeMax}% 이하로 입력해 주세요`
   }
   if (!isEmptyValue(form.etcCost) && !isInRange(form.etcCost, 0, amountMax)) {
-    errors.etcCost = `기타 비용은 0만원 이상 ${formatNumber(amountMax)}만원 이하로 입력해 주세요`
+    errors.etcCost = `기타 비용은 0원 이상 ${formatMoney(amountMax, '원')} 이하로 입력해 주세요`
   }
 
   return errors
@@ -106,13 +103,13 @@ export function getChangeErrors(form) {
 // 결과 (모두 원 단위): { savingAmount (더 내면 음수), isGain, currentInterest, newInterest, currentFirstPayment, newFirstPayment, prepayFee, etcCost }
 // 입력이 이상하거나 계산이 안 되면 null
 export function getChangeResult(form) {
-  const balance = form.balance * 10000
+  const balance = form.balance
   const current = calcPayment(form.currentMethod, balance, form.currentRate, form.currentMonths)
   const next = calcPayment(form.newMethod, balance, form.newRate, form.newMonths)
   if (!current || !next) return null
 
   const prepayFee = Math.round((balance * orZero(form.feeRate)) / 100)
-  const etcCost = orZero(form.etcCost) * 10000
+  const etcCost = orZero(form.etcCost)
   const savingAmount = current.totalInterest - next.totalInterest - prepayFee - etcCost
   if (![savingAmount, prepayFee, etcCost].every(isNumber)) return null
 
@@ -128,11 +125,11 @@ export function getChangeResult(form) {
   }
 }
 
-// [결과 저장]으로 보낼 값 (API-56): 입력은 원 단위로 바꿔 보냄 (화면은 만원, 서버는 원). 수수료율, 기타 비용의 빈 칸은 0
+// [결과 저장]으로 보낼 값 (API-56): 화면과 서버가 같은 원 단위라 그대로 보냄. 수수료율, 기타 비용의 빈 칸은 0
 export function toChangeRecord(form, result) {
   return {
     currentRepayMethod: form.currentMethod,
-    currentBalance: form.balance * 10000,
+    currentBalance: form.balance,
     currentRate: form.currentRate,
     currentMonths: form.currentMonths,
     newRepayMethod: form.newMethod,
@@ -150,61 +147,138 @@ export function toChangeRecord(form, result) {
 // 내 집 대출한도 (CA-11)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 금리 0-20%, 기간 1-50년 (명세서). 금액은 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원)에 맞춘 999,999만원
-export const HOME_LIMITS = { amountMin: 1, amountMax: 999999, rateMax: 20, yearsMin: 1, yearsMax: 50 }
+// 입력 한도: 금리 0-20%, 기간 1-50년 (명세서). 금액은 원 단위로 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
+export const HOME_LIMITS = {
+  amountMin: 10000,
+  amountMax: 9999990000,
+  rateMax: 20,
+  yearsMin: 1,
+  yearsMax: 50,
+  otherMonthsMin: 1,
+  otherMonthsMax: 600,
+}
 
-// 집이 있는 곳 (코드는 API-59 homeRegion)
+// 집이 있는 곳 (코드는 API-59 homeRegion), description: 고른 선택지 아래에 보일 설명 (용어를 모르는 사람을 위해)
 export const HOME_REGIONS = [
-  { code: 'OTHER', label: '그 외 지역' },
-  { code: 'REGULATED', label: '규제 지역' },
+  {
+    code: 'REGULATED',
+    label: '수도권·규제 지역',
+    description: '서울, 경기, 인천 등 수도권이거나 정부가 정한 규제지역이면 이쪽을 골라요. 해당되는지 모르겠으면 은행에 확인해 보세요.',
+  },
+  { code: 'OTHER', label: '그 외 지역', description: '수도권도 규제지역도 아닌 지방이면 이쪽을 골라요.' },
 ]
 
-// 상환 방식은 원리금균등, 원금균등만 (만기일시는 주택담보대출 한도 계산에 쓰지 않음)
-export const HOME_METHODS = REPAY_METHODS.filter((method) => method.code !== 'BULLET')
-
-// 지역별 LTV, DTI 비율(%)과 생애 첫 집 기준 (명세서 비고의 예시 값, 실제 값은 담당자가 개발 때 정함)
+// 지역별 LTV 비율(%): ltv는 일반 무주택, firstLtv는 생애 첫 집 (예시 값, 실제 값은 담당자가 개발 때 정함)
+// 2025년 10.15 대책 기준: 규제 지역 40%, 규제 지역 첫 집 70% (40%라는 해설도 있어 확인 필요), 그 외 지역 70%, 첫 집 80% (2026-11-25 사용자 결정)
+// 소득 기준은 지역과 관계없이 은행 DSR 기준 (DSR_BASELINES.bank, 2026-11-25 사용자 결정으로 DTI에서 바꿈)
 export const HOME_RATIOS = {
-  OTHER: { ltv: 70, dti: 60 },
-  REGULATED: { ltv: 50, dti: 40 },
+  OTHER: { ltv: 70, firstLtv: 80 },
+  REGULATED: { ltv: 40, firstLtv: 70 },
 }
-// 생애 첫 집: LTV 80% (지역과 관계없이), 집값 기준 한도는 최대 6억원 (만원 단위)
-export const HOME_FIRST = { ltv: 80, maxLoanMan: 60000 }
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 만원, 기간은 년, 금리는 %
+// 다른 대출은 남은 기간 동안 원리금균등으로 갚는다고 보고 1년 상환액을 계산 (DSR에 넣을 값), 남은 기간을 비우면 5년(60개월)
+export const HOME_OTHER_MONTHS = 60
+
+// 다른 대출은 여러 건 넣을 수 있다 (최대 10건, DSR 계산기와 같음). 건마다 { balance 원, rate %, months 개월 }, 새 줄의 처음 값
+export const HOME_MAX_OTHER_LOANS = 10
+export const HOME_OTHER_LOAN_DEFAULT = { balance: 0, rate: 5, months: HOME_OTHER_MONTHS }
+
+// 수도권·규제 지역의 집값 구간별 대출 상한 (원, 예시 값, 실제 값은 담당자가 개발 때 정함): 집값 15억 이하 6억, 25억 이하 4억, 그 위 2억
+// maxPrice 이하일 때 그 줄의 maxLoan이 상한 (위에서부터 처음 맞는 줄), 그 외 지역은 상한 없음
+export const HOME_PRICE_CAPS = [
+  { maxPrice: 1500000000, maxLoan: 600000000 },
+  { maxPrice: 2500000000, maxLoan: 400000000 },
+  { maxPrice: Infinity, maxLoan: 200000000 },
+]
+
+// 금리 유형과 스트레스 금리 (예시 값, 실제 값은 담당자가 개발 때 정함): 소득 기준(DSR) 한도를 계산할 때 입력한 금리에 이 가산금리(%p)를 더함
+// description: 고른 유형 아래에 보일 설명 (용어를 모르는 사람을 위해)
+// 변동형 1.5%p, 혼합형은 그 70% (1.05%p), 고정형은 가산 없음. 한도에만 쓰고 첫 달 납입액은 입력한 금리로 계산
+export const HOME_RATE_TYPES = [
+  {
+    code: 'VARIABLE',
+    label: '변동형',
+    stressRate: 1.5,
+    description: '금리가 주기적으로 바뀌어요. 금리가 오르면 이자도 늘어서 한도를 가장 작게 봐요.',
+  },
+  {
+    code: 'MIXED',
+    label: '혼합형',
+    stressRate: 1.05,
+    description: '처음 몇 년(보통 5년)은 금리가 같고, 그 뒤에는 바뀌어요. 한도는 변동형보다 조금 크게 봐요.',
+  },
+  {
+    code: 'FIXED',
+    label: '고정형',
+    stressRate: 0,
+    description: '만기까지 금리가 같아요. 스트레스 금리를 더하지 않아서 한도를 가장 크게 봐요.',
+  },
+]
+
+// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 년, 금리는 %
 export const HOME_DEFAULTS = {
-  housePrice: 50000,
+  housePrice: 500000000,
   region: 'OTHER',
   isFirstHome: false,
-  annualIncome: 6000,
-  otherInterest: 0,
+  annualIncome: 60000000,
+  isOtherLoan: false,
+  otherLoans: [{ ...HOME_OTHER_LOAN_DEFAULT }],
   rate: 4.5,
+  rateType: 'VARIABLE',
   years: 30,
-  method: 'EQUAL_PI',
 }
 
 const HOME_REGION_CODES = HOME_REGIONS.map((region) => region.code)
-const HOME_METHOD_CODES = HOME_METHODS.map((method) => method.code)
+
+// 다른 대출 1년 이자 합계 (원): 건마다 잔액 x 금리 / 100을 더해 반올림, '다른 대출이 있어요'를 체크하지 않았으면 0
+const getHomeOtherInterest = (form) =>
+  form.isOtherLoan
+    ? Math.round((form.otherLoans ?? []).reduce((sum, loan) => sum + (orZero(loan.balance) * orZero(loan.rate)) / 100, 0))
+    : 0
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → 내 집 계산기 입력칸 처음 값 (CA-01)
-// state: { housePrice 원, homeRegion, firstHome (Y, N), annualIncome 원, otherInterest 원, interestRate, loanYears, repayMethod }
-// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 → 만원)
+// state: { housePrice 원, homeRegion, firstHome (Y, N), annualIncome 원, otherInterest 원, interestRate, loanYears, repayMethod, rateType, otherLoans: [{ loanAmount 원, interestRate, loanMonths }] }
+// 다른 대출은 서버에 건별로 저장된 otherLoans가 있으면 그대로 채우고(모든 건이 범위 안일 때만), 없는 옛 기록은 아래처럼 1년 이자로 맞춘 한 건
+// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로)
+// 건별 값이 없는 옛 기록은 1년 이자(otherInterest)만 있어서, 이자가 있으면 기본 금리로 잔액을 거꾸로 맞춘 한 건으로 채우고 남은 기간은 기본값(5년)
+// 상환 방식은 원리금균등 하나라 기록의 repayMethod는 쓰지 않음
+function getSavedOtherLoans(loans) {
+  if (!Array.isArray(loans) || loans.length < 1 || loans.length > HOME_MAX_OTHER_LOANS) return null
+  const { amountMin, amountMax, rateMax, otherMonthsMin, otherMonthsMax } = HOME_LIMITS
+  const isValid = loans.every(
+    (loan) =>
+      isInRange(loan?.loanAmount, amountMin, amountMax) &&
+      isInRange(loan?.interestRate, 0, rateMax) &&
+      Number.isInteger(loan?.loanMonths) &&
+      isInRange(loan.loanMonths, otherMonthsMin, otherMonthsMax),
+  )
+  if (!isValid) return null
+  return loans.map((loan) => ({ balance: Math.round(loan.loanAmount), rate: loan.interestRate, months: loan.loanMonths }))
+}
+
 export function getInitialHome(state) {
-  const form = { ...HOME_DEFAULTS }
+  const form = { ...HOME_DEFAULTS, otherLoans: HOME_DEFAULTS.otherLoans.map((loan) => ({ ...loan })) }
   const { amountMin, amountMax, rateMax, yearsMin, yearsMax } = HOME_LIMITS
 
   if (HOME_REGION_CODES.includes(state?.homeRegion)) form.region = state.homeRegion
-  if (HOME_METHOD_CODES.includes(state?.repayMethod)) form.method = state.repayMethod
   if (state?.firstHome === 'Y') form.isFirstHome = true
   if (state?.firstHome === 'N') form.isFirstHome = false
 
-  const housePrice = isNumber(state?.housePrice) ? Math.round(state.housePrice / 10000) : null
-  if (isInRange(housePrice, amountMin, amountMax)) form.housePrice = housePrice
+  if (isInRange(state?.housePrice, amountMin, amountMax)) form.housePrice = Math.round(state.housePrice)
+  if (isInRange(state?.annualIncome, amountMin, amountMax)) form.annualIncome = Math.round(state.annualIncome)
+  if (HOME_RATE_TYPES.some((type) => type.code === state?.rateType)) form.rateType = state.rateType
 
-  const annualIncome = isNumber(state?.annualIncome) ? Math.round(state.annualIncome / 10000) : null
-  if (isInRange(annualIncome, amountMin, amountMax)) form.annualIncome = annualIncome
-
-  const otherInterest = isNumber(state?.otherInterest) ? Math.round(state.otherInterest / 10000) : null
-  if (isInRange(otherInterest, 0, amountMax)) form.otherInterest = otherInterest
+  const savedLoans = getSavedOtherLoans(state?.otherLoans)
+  if (savedLoans) {
+    form.otherLoans = savedLoans
+    form.isOtherLoan = true
+  } else if (isInRange(state?.otherInterest, 0, amountMax)) {
+    const balance = Math.round((state.otherInterest * 100) / HOME_OTHER_LOAN_DEFAULT.rate)
+    if (isInRange(balance, 0, amountMax)) {
+      form.otherLoans = [{ ...HOME_OTHER_LOAN_DEFAULT, balance }]
+      form.isOtherLoan = balance > 0
+    }
+  }
 
   if (isInRange(state?.interestRate, 0, rateMax)) form.rate = state.interestRate
   if (Number.isInteger(state?.loanYears) && isInRange(state.loanYears, yearsMin, yearsMax)) {
@@ -215,11 +289,12 @@ export function getInitialHome(state) {
 }
 
 // 내 집 계산 입력 검사 (E2): 칸 이름별 오류 문구, 오류가 없으면 빈 객체 = 계산할 수 있음
-// 다른 대출 1년 이자는 비워 두면 0으로 본다
+// 다른 대출 칸은 '다른 대출이 있어요'를 체크했을 때만 검사: 잔액은 비워 두면 0으로 보고, 잔액이 있으면 다른 대출 금리가 필요하다 (남은 기간은 비워 두면 5년)
+// 다른 대출 칸의 오류는 errors.otherLoans[줄 번호] = { balance, rate, months } (오류 없는 줄은 {}), 1년 이자 합계가 한도를 넘으면 errors.otherInterestTotal
 export function getHomeErrors(form) {
   const errors = {}
   const { amountMin, amountMax, rateMax, yearsMin, yearsMax } = HOME_LIMITS
-  const amountText = `${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하`
+  const amountText = `${formatMoney(amountMin, '원')} 이상 ${formatMoney(amountMax, '원')} 이하`
 
   if (isEmptyValue(form.housePrice)) errors.housePrice = '집값을 입력해 주세요'
   else if (!isInRange(form.housePrice, amountMin, amountMax)) errors.housePrice = `집값은 ${amountText}로 입력해 주세요`
@@ -227,11 +302,34 @@ export function getHomeErrors(form) {
   if (isEmptyValue(form.annualIncome)) errors.annualIncome = '연소득을 입력해 주세요'
   else if (!isInRange(form.annualIncome, amountMin, amountMax)) errors.annualIncome = `연소득은 ${amountText}로 입력해 주세요`
 
-  if (!isEmptyValue(form.otherInterest) && !isInRange(form.otherInterest, 0, amountMax)) {
-    errors.otherInterest = `다른 대출 1년 이자는 0만원 이상 ${formatNumber(amountMax)}만원 이하로 입력해 주세요`
+  // 다른 대출은 '다른 대출이 있어요'를 체크했을 때만 검사 (체크를 풀면 숨은 칸의 값은 무시)
+  if (form.isOtherLoan) {
+    const { otherMonthsMin, otherMonthsMax } = HOME_LIMITS
+    const loanErrors = (form.otherLoans ?? []).map((loan) => {
+      const rowErrors = {}
+      if (!isEmptyValue(loan.balance) && !isInRange(loan.balance, 0, amountMax)) {
+        rowErrors.balance = `다른 대출 잔액은 0원 이상 ${formatMoney(amountMax, '원')} 이하로 입력해 주세요`
+      }
+      if (isEmptyValue(loan.rate)) {
+        if (orZero(loan.balance) > 0) rowErrors.rate = '다른 대출 금리를 입력해 주세요'
+      } else if (!isInRange(loan.rate, 0, rateMax)) {
+        rowErrors.rate = `다른 대출 금리는 0% 이상 ${rateMax}% 이하로 입력해 주세요`
+      }
+      if (!isEmptyValue(loan.months)) {
+        if (!Number.isInteger(loan.months) || !isInRange(loan.months, otherMonthsMin, otherMonthsMax)) {
+          rowErrors.months = `다른 대출 남은 기간은 ${otherMonthsMin}개월 이상 ${otherMonthsMax}개월 이하로 입력해 주세요`
+        }
+      }
+      return rowErrors
+    })
+    if (loanErrors.some((rowErrors) => Object.keys(rowErrors).length > 0)) errors.otherLoans = loanErrors
+    // 서버가 받는 다른 대출 1년 이자 합계 한도 (건별 검사를 통과했을 때만)
+    else if (getHomeOtherInterest(form) > amountMax) {
+      errors.otherInterestTotal = '다른 대출의 1년 이자 합계가 너무 커요. 잔액과 금리를 확인해 주세요.'
+    }
   }
 
-  if (isEmptyValue(form.rate)) errors.rate = '주택담보대출 금리를 입력해 주세요'
+  if (isEmptyValue(form.rate)) errors.rate = '대출 금리를 입력해 주세요'
   else if (!isInRange(form.rate, 0, rateMax)) errors.rate = `금리는 0% 이상 ${rateMax}% 이하로 입력해 주세요`
 
   if (isEmptyValue(form.years)) errors.years = '대출 기간을 입력해 주세요'
@@ -259,48 +357,88 @@ export function calcMaxLoan(method, monthlyWon, annualRate, months) {
   return isNumber(principal) ? Math.round(principal) : null
 }
 
-// 내 집 대출한도 계산 (모두 원 단위): 한도 = 집값 기준(LTV)과 소득 기준(DTI) 중 작은 쪽
-// LTV 한도 = 집값 x LTV (생애 첫 집은 LTV 80%, 최대 6억원)
-// DTI 한도 = (연소득 x DTI - 다른 대출 1년 이자)를 12로 나눠 매달 갚을 돈으로 보고, 대출 기간으로 거꾸로 계산 (calcMaxLoan). 갚을 돈이 없으면 0
-// 결과: { maxLoan, ltvLimit, dtiLimit, ltvRate, dtiRate, isLtvLower } / 입력이 이상하거나 계산이 안 되면 null
+// 집 살 때 대출한도 계산 (모두 원 단위): 한도 = 집값 기준(LTV)과 소득 기준(DSR) 중 작은 쪽
+// LTV 한도 = 집값 x LTV (생애 첫 집은 지역별 firstLtv), 수도권·규제 지역은 집값 구간별 대출 상한(HOME_PRICE_CAPS)도 넘지 않음 (생애 첫 집만 6억 상한을 두던 규칙은 뺌)
+// DSR 한도 = (연소득 x DSR 40% - 다른 대출 1년 상환액)을 12로 나눠 매달 갚을 돈으로 보고, 대출 기간으로 거꾸로 계산 (calcMaxLoan, 원리금균등). 갚을 돈이 없으면 0
+//   이때 쓰는 금리 = 입력한 금리 + 금리 유형의 스트레스 금리 (HOME_RATE_TYPES). 다른 대출에는 스트레스 금리를 더하지 않음
+//   다른 대출은 '다른 대출이 있어요'(isOtherLoan)를 체크했을 때만 반영
+//   다른 대출 1년 상환액 = 건마다 잔액을 연 금리로 남은 기간(비우면 5년) 원리금균등으로 갚는 월 상환액 x 12 를 모두 더함 (잔액이 없는 건은 0)
+// 결과: { maxLoan, ltvLimit, dsrLimit, ltvRate, dsrRate, priceCap, isPriceCapped, stressRate, limitRate, isLtvLower, firstPayment, ownMoney } / 입력이 이상하거나 계산이 안 되면 null
+// priceCap: 집값 구간별 대출 상한 (그 외 지역은 null) / isPriceCapped: 그 상한 때문에 집값 기준 한도가 줄었는지 / limitRate: DSR 한도에 쓴 금리 (소수 둘째 자리까지)
+// firstPayment: 최대 대출 한도를 입력한 금리로 빌렸을 때 첫 달 납입액 (대출 이자 계산기와 같은 calcPayment, 한도가 0이면 0) / ownMoney: 집값에서 대출을 뺀 내 돈 (0 이상)
 export function getHomeResult(form) {
   const ratios = HOME_RATIOS[form.region]
-  if (!ratios) return null
+  const rateType = HOME_RATE_TYPES.find((type) => type.code === form.rateType)
+  if (!ratios || !rateType) return null
 
-  const ltvRate = form.isFirstHome ? HOME_FIRST.ltv : ratios.ltv
-  const ltvRaw = Math.round((form.housePrice * 10000 * ltvRate) / 100)
-  const ltvLimit = form.isFirstHome ? Math.min(ltvRaw, HOME_FIRST.maxLoanMan * 10000) : ltvRaw
+  const ltvRate = form.isFirstHome ? ratios.firstLtv : ratios.ltv
+  const ltvByRatio = Math.round((form.housePrice * ltvRate) / 100)
+  const priceCap =
+    form.region === 'REGULATED' ? (HOME_PRICE_CAPS.find((cap) => form.housePrice <= cap.maxPrice)?.maxLoan ?? null) : null
+  const isPriceCapped = priceCap !== null && ltvByRatio > priceCap
+  const ltvLimit = isPriceCapped ? priceCap : ltvByRatio
 
-  const yearlyRoom = (form.annualIncome * 10000 * ratios.dti) / 100 - orZero(form.otherInterest) * 10000
-  const dtiLimit = yearlyRoom > 0 ? calcMaxLoan(form.method, yearlyRoom / 12, form.rate, form.years * 12) : 0
+  const dsrRate = DSR_BASELINES.bank
+  let otherYearly = 0
+  const otherLoans = form.isOtherLoan ? (form.otherLoans ?? []) : []
+  for (const loan of otherLoans) {
+    if (orZero(loan.balance) <= 0) continue
+    const months = isEmptyValue(loan.months) ? HOME_OTHER_MONTHS : loan.months
+    const other = calcPayment('EQUAL_PI', loan.balance, orZero(loan.rate), months)
+    if (!other) return null
+    otherYearly += other.monthly * 12
+  }
+  const limitRate = Number((form.rate + rateType.stressRate).toFixed(2))
+  const yearlyRoom = (form.annualIncome * dsrRate) / 100 - otherYearly
+  const dsrLimit = yearlyRoom > 0 ? calcMaxLoan('EQUAL_PI', yearlyRoom / 12, limitRate, form.years * 12) : 0
 
-  if (![ltvLimit, dtiLimit].every(isNumber)) return null
+  if (![ltvLimit, dsrLimit].every(isNumber)) return null
+
+  const maxLoan = Math.min(ltvLimit, dsrLimit)
+  const plan = maxLoan > 0 ? calcPayment('EQUAL_PI', maxLoan, form.rate, form.years * 12) : null
 
   return {
-    maxLoan: Math.min(ltvLimit, dtiLimit),
+    maxLoan,
     ltvLimit,
-    dtiLimit,
+    dsrLimit,
     ltvRate,
-    dtiRate: ratios.dti,
-    isLtvLower: ltvLimit <= dtiLimit,
+    dsrRate,
+    priceCap,
+    isPriceCapped,
+    stressRate: rateType.stressRate,
+    limitRate,
+    isLtvLower: ltvLimit <= dsrLimit,
+    firstPayment: plan?.monthly ?? 0,
+    ownMoney: Math.max(0, form.housePrice - maxLoan),
   }
 }
 
-// [결과 저장]으로 보낼 값 (API-59): 입력은 원 단위로 바꿔 보냄 (화면은 만원, 서버는 원). 다른 대출 1년 이자의 빈 칸은 0
-// LTV, DTI 비율은 저장하지 않음
+// [결과 저장]으로 보낼 값 (API-59): 화면과 서버가 같은 원 단위라 그대로 보냄
+// 다른 대출은 건별 otherLoans (잔액이 있는 건만, 입력 순서대로, 남은 기간을 비웠으면 5년)와 모든 건의 1년 이자 합계 otherInterest를 같이 보냄 (체크 안 했으면 [] 와 0)
+// 상환 방식은 원리금균등 고정, 금리 유형 rateType 저장, 서버 칸 이름 dtiLimit에는 소득 기준(DSR) 한도를 넣음 / LTV, DSR 비율, 스트레스 금리는 저장하지 않음 (금리 유형으로 다시 정해짐)
 export function toHomeRecord(form, result) {
   return {
-    housePrice: form.housePrice * 10000,
+    housePrice: form.housePrice,
     homeRegion: form.region,
     firstHome: form.isFirstHome ? 'Y' : 'N',
-    annualIncome: form.annualIncome * 10000,
-    otherInterest: orZero(form.otherInterest) * 10000,
+    annualIncome: form.annualIncome,
+    otherInterest: getHomeOtherInterest(form),
     interestRate: form.rate,
     loanYears: form.years,
-    repayMethod: form.method,
+    repayMethod: 'EQUAL_PI',
+    rateType: form.rateType,
+    otherLoans: form.isOtherLoan
+      ? (form.otherLoans ?? [])
+          .filter((loan) => orZero(loan.balance) > 0)
+          .map((loan) => ({
+            loanAmount: loan.balance,
+            interestRate: orZero(loan.rate),
+            loanMonths: isEmptyValue(loan.months) ? HOME_OTHER_MONTHS : loan.months,
+          }))
+      : [],
     maxLoan: result.maxLoan,
     ltvLimit: result.ltvLimit,
-    dtiLimit: result.dtiLimit,
+    dtiLimit: result.dsrLimit,
   }
 }
 
@@ -308,31 +446,30 @@ export function toHomeRecord(form, result) {
 // 상환능력 기반 대출 (CA-10)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 매달 갚을 돈 1만원 이상 (위쪽은 서버가 받는 한도 9,999,999,999원에 맞춘 999,999만원), 금리 0-20%
-export const REVERSE_LIMITS = { amountMin: 1, amountMax: 999999, rateMax: 20 }
+// 입력 한도: 매달 갚을 돈은 원 단위로 1만원 이상 (위쪽은 서버가 받는 한도 9,999,999,999원 안의 99억 9,999만원), 금리 0-20%, 대출 기간 1-600개월 (직접 입력)
+export const REVERSE_LIMITS = { amountMin: 10000, amountMax: 9999990000, rateMax: 20, monthsMin: 1, monthsMax: 600 }
 
-// 대출 기간 선택지 (개월): 대출 이자 계산기 기간 칩과 같은 12, 36, 60, 120, 180 (넘어가는 기간을 그 계산기가 받을 수 있게), 기간별 표도 이 기간들
+// 기간별 표에 보일 기간 (개월): 12, 36, 60, 120, 180 (입력한 기간이 이 안에 없으면 표에 끼워 넣음)
 export const REVERSE_TERMS = [...new Set([...MONTHS_OPTIONS_DEFAULT, ...MONTHS_OPTIONS_HOUSING])].sort((a, b) => a - b)
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 만원, 기간은 개월, 금리는 %
-export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: 100, rate: 5, months: 36 }
+// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리는 %
+export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: 1000000, rate: 5, months: 36 }
 
 const REVERSE_METHOD_CODES = REPAY_METHODS.map((method) => method.code)
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → 상환능력 입력칸 처음 값 (CA-01)
 // state: { repayMethod, monthlyPayment 원, interestRate, loanMonths }
-// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 → 만원, 기간은 기간 칩에 있는 값만)
+// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로, 기간은 1-600 정수)
 export function getInitialReverse(state) {
   const form = { ...REVERSE_DEFAULTS }
-  const { amountMin, amountMax, rateMax } = REVERSE_LIMITS
+  const { amountMin, amountMax, rateMax, monthsMin, monthsMax } = REVERSE_LIMITS
 
   if (REVERSE_METHOD_CODES.includes(state?.repayMethod)) form.method = state.repayMethod
 
-  const monthly = isNumber(state?.monthlyPayment) ? Math.round(state.monthlyPayment / 10000) : null
-  if (isInRange(monthly, amountMin, amountMax)) form.monthly = monthly
+  if (isInRange(state?.monthlyPayment, amountMin, amountMax)) form.monthly = Math.round(state.monthlyPayment)
 
   if (isInRange(state?.interestRate, 0, rateMax)) form.rate = state.interestRate
-  if (REVERSE_TERMS.includes(state?.loanMonths)) form.months = state.loanMonths
+  if (Number.isInteger(state?.loanMonths) && isInRange(state.loanMonths, monthsMin, monthsMax)) form.months = state.loanMonths
 
   return form
 }
@@ -341,42 +478,46 @@ export function getInitialReverse(state) {
 // 만기일시는 금리가 0%이면 이자가 없어 빌릴 수 있는 돈을 정할 수 없으므로 0%보다 커야 한다
 export function getReverseErrors(form) {
   const errors = {}
-  const { amountMin, amountMax, rateMax } = REVERSE_LIMITS
+  const { amountMin, amountMax, rateMax, monthsMin, monthsMax } = REVERSE_LIMITS
 
   if (isEmptyValue(form.monthly)) errors.monthly = '매달 갚을 돈을 입력해 주세요'
   else if (!isInRange(form.monthly, amountMin, amountMax)) {
-    errors.monthly = `매달 갚을 돈은 ${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하로 입력해 주세요`
+    errors.monthly = `매달 갚을 돈은 ${formatMoney(amountMin, '원')} 이상 ${formatMoney(amountMax, '원')} 이하로 입력해 주세요`
   }
 
   if (isEmptyValue(form.rate)) errors.rate = '연 이자율을 입력해 주세요'
   else if (!isInRange(form.rate, 0, rateMax)) errors.rate = `연 이자율은 0% 이상 ${rateMax}% 이하로 입력해 주세요`
   else if (form.method === 'BULLET' && form.rate === 0) errors.rate = '만기일시는 연 이자율이 0%보다 커야 계산할 수 있어요'
 
-  if (!REVERSE_TERMS.includes(form.months)) errors.months = '대출 기간을 골라 주세요'
+  if (isEmptyValue(form.months)) errors.months = '대출 기간을 입력해 주세요'
+  else if (!Number.isInteger(form.months) || !isInRange(form.months, monthsMin, monthsMax)) {
+    errors.months = `대출 기간은 ${monthsMin}개월 이상 ${monthsMax}개월 이하로 입력해 주세요`
+  }
 
   return errors
 }
 
 // 상환능력 기반 대출 계산 (모두 원 단위): 매달 갚을 돈으로 빌릴 수 있는 최대 대출 금액을 거꾸로 계산 (calcMaxLoan)
 // 그 금액을 빌렸을 때 총이자는 대출 이자 계산기와 같은 함수(calcPayment)로 계산
-// 결과: { maxLoan, totalInterest, totalPayment, byTerm: [{ months, maxLoan }] (기간별 빌릴 수 있는 금액) } / 입력이 이상하거나 계산이 안 되면 null
+// 결과: { maxLoan, totalInterest, totalPayment, byTerm: [{ months, maxLoan }] (기간별 빌릴 수 있는 금액, 입력한 기간 포함해 짧은 순) } / 입력이 이상하거나 계산이 안 되면 null
 export function getReverseResult(form) {
-  const monthlyWon = form.monthly * 10000
+  const monthlyWon = form.monthly
   const maxLoan = calcMaxLoan(form.method, monthlyWon, form.rate, form.months)
   if (maxLoan === null) return null
 
   const plan = calcPayment(form.method, maxLoan, form.rate, form.months)
-  const byTerm = REVERSE_TERMS.map((months) => ({ months, maxLoan: calcMaxLoan(form.method, monthlyWon, form.rate, months) }))
+  const terms = [...new Set([...REVERSE_TERMS, form.months])].sort((a, b) => a - b)
+  const byTerm = terms.map((months) => ({ months, maxLoan: calcMaxLoan(form.method, monthlyWon, form.rate, months) }))
   if (!plan || byTerm.some((term) => term.maxLoan === null)) return null
 
   return { maxLoan, totalInterest: plan.totalInterest, totalPayment: maxLoan + plan.totalInterest, byTerm }
 }
 
-// [결과 저장]으로 보낼 값 (API-58): 입력은 원 단위로 바꿔 보냄 (화면은 만원, 서버는 원). 기간별 표는 저장하지 않음
+// [결과 저장]으로 보낼 값 (API-58): 화면과 서버가 같은 원 단위라 그대로 보냄. 기간별 표는 저장하지 않음
 export function toReverseRecord(form, result) {
   return {
     repayMethod: form.method,
-    monthlyPayment: form.monthly * 10000,
+    monthlyPayment: form.monthly,
     interestRate: form.rate,
     loanMonths: form.months,
     maxLoan: result.maxLoan,
@@ -387,7 +528,7 @@ export function toReverseRecord(form, result) {
 // 대출 이자 계산기는 금액 위쪽 한도(10억원)를 넘으면 그 칸을 무시하므로, 넘으면 한도 금액으로 넘긴다
 export function toLoanCalcState(form, result) {
   return {
-    loanAmount: Math.min(result.maxLoan, CALC_LIMITS.amountMax * 10000),
+    loanAmount: Math.min(result.maxLoan, CALC_LIMITS.amountMax),
     loanMonths: form.months,
     interestRate: form.rate,
     repayMethod: form.method,
@@ -398,8 +539,8 @@ export function toLoanCalcState(form, result) {
 // DSR (CA-09)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 금리 0-20%, 기간 1-600개월 (명세서). 금액은 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원)에 맞춘 999,999만원
-export const DSR_LIMITS = { amountMin: 1, amountMax: 999999, rateMax: 20, monthsMin: 1, monthsMax: 600 }
+// 입력 한도: 금리 0-20%, 기간 1-600개월 (명세서). 금액은 원 단위로 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
+export const DSR_LIMITS = { amountMin: 10000, amountMax: 9999990000, rateMax: 20, monthsMin: 1, monthsMax: 600 }
 
 // 대출은 1건부터 최대 10건 (사용자 결정, API-57 loans 1-10건)
 export const DSR_MAX_LOANS = 10
@@ -408,7 +549,7 @@ export const DSR_MAX_LOANS = 10
 export const DSR_KINDS = [
   { code: 'CREDIT', label: '신용대출' },
   { code: 'MORTGAGE', label: '주택담보대출' },
-  { code: 'OTHER', label: '그 밖' },
+  { code: 'OTHER', label: '기타' },
 ]
 
 // 기준선 비율(%): 은행 40%, 2금융권 50% (명세서 비고의 예시 값, 실제 값은 담당자가 개발 때 정함)
@@ -417,13 +558,13 @@ export const DSR_BASELINES = { bank: 40, second: 50 }
 // 만기일시 신용대출은 원금을 5년(60개월)에 나눠 갚는다고 봄 (명세서)
 const DSR_CREDIT_BULLET_MONTHS = 60
 
-// [+ 대출 추가]로 새로 생기는 대출 한 줄의 처음 값 (명세서에 없어 정한 값). 금액은 만원, 기간은 개월, 금리는 %
-export const DSR_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', amount: 1000, rate: 6, months: 36 }
+// [+ 대출 추가]로 새로 생기는 대출 한 줄의 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리는 %
+export const DSR_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', amount: 10000000, rate: 6, months: 36 }
 
 // 바로 열었을 때 처음 값 (명세서에 없어 정한 값): 연소득 5,000만원, 대출 1건 (주택담보대출 2억원)
 export const DSR_DEFAULTS = {
-  annualIncome: 5000,
-  loans: [{ kind: 'MORTGAGE', method: 'EQUAL_PI', amount: 20000, rate: 4.5, months: 360 }],
+  annualIncome: 50000000,
+  loans: [{ kind: 'MORTGAGE', method: 'EQUAL_PI', amount: 200000000, rate: 4.5, months: 360 }],
 }
 
 const DSR_KIND_CODES = DSR_KINDS.map((kind) => kind.code)
@@ -436,8 +577,7 @@ function getInitialDsrLoan(item) {
   if (DSR_KIND_CODES.includes(item?.loanKind)) loan.kind = item.loanKind
   if (REPAY_METHODS.some((method) => method.code === item?.repayMethod)) loan.method = item.repayMethod
 
-  const amount = isNumber(item?.loanAmount) ? Math.round(item.loanAmount / 10000) : null
-  if (isInRange(amount, amountMin, amountMax)) loan.amount = amount
+  if (isInRange(item?.loanAmount, amountMin, amountMax)) loan.amount = Math.round(item.loanAmount)
 
   if (isInRange(item?.interestRate, 0, rateMax)) loan.rate = item.interestRate
   if (Number.isInteger(item?.loanMonths) && isInRange(item.loanMonths, monthsMin, monthsMax)) {
@@ -449,13 +589,12 @@ function getInitialDsrLoan(item) {
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → DSR 입력칸 처음 값 (CA-01)
 // state: { annualIncome 원, loans: [{ loanKind, repayMethod, loanAmount 원, interestRate, loanMonths }] }
-// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 → 만원). 대출 목록이 없거나 비면 기본 대출 1건, 10건을 넘으면 앞의 10건만
+// 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로). 대출 목록이 없거나 비면 기본 대출 1건, 10건을 넘으면 앞의 10건만
 export function getInitialDsr(state) {
   const { amountMin, amountMax } = DSR_LIMITS
   const form = { annualIncome: DSR_DEFAULTS.annualIncome, loans: DSR_DEFAULTS.loans.map((loan) => ({ ...loan })) }
 
-  const annualIncome = isNumber(state?.annualIncome) ? Math.round(state.annualIncome / 10000) : null
-  if (isInRange(annualIncome, amountMin, amountMax)) form.annualIncome = annualIncome
+  if (isInRange(state?.annualIncome, amountMin, amountMax)) form.annualIncome = Math.round(state.annualIncome)
 
   if (Array.isArray(state?.loans) && state.loans.length > 0) {
     form.loans = state.loans.slice(0, DSR_MAX_LOANS).map(getInitialDsrLoan)
@@ -469,7 +608,7 @@ export function getInitialDsr(state) {
 export function getDsrErrors(form) {
   const errors = {}
   const { amountMin, amountMax, rateMax, monthsMin, monthsMax } = DSR_LIMITS
-  const amountText = `${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하`
+  const amountText = `${formatMoney(amountMin, '원')} 이상 ${formatMoney(amountMax, '원')} 이하`
 
   if (isEmptyValue(form.annualIncome)) errors.annualIncome = '연소득을 입력해 주세요'
   else if (!isInRange(form.annualIncome, amountMin, amountMax)) errors.annualIncome = `연소득은 ${amountText}로 입력해 주세요`
@@ -507,7 +646,7 @@ function getYearlyEqualPrincipal(principal, annualRate, months) {
 // 원리금균등: 월 상환액 x 12 (기간이 짧으면 그 개월 수) / 원금균등: 첫 1년의 원금 + 이자 합
 // 만기일시: 원금을 대출 기간(신용대출은 5년)에 나눠 갚는다고 보고 원금균등과 같게 계산 (명세서)
 function getDsrLoanYearly(loan) {
-  const principal = loan.amount * 10000
+  const principal = loan.amount
   if (!isNumber(principal) || principal <= 0 || !isNumber(loan.rate) || loan.rate < 0) return null
   if (!Number.isInteger(loan.months) || loan.months <= 0) return null
 
@@ -528,7 +667,7 @@ function getDsrLoanYearly(loan) {
 // 40% 이하 GOOD (좋음), 50% 이하 WARN (주의), 넘으면 BAD (위험) / extraRoom = 40%까지 더 갚을 수 있는 1년 상환액 (이미 넘었으면 0)
 // 결과: { dsrRate, yearlyPayment, level, extraRoom, loanPayments (대출별 1년 상환액, 입력 순서대로) } / 입력이 이상하거나 계산이 안 되면 null
 export function getDsrResult(form) {
-  const income = form.annualIncome * 10000
+  const income = form.annualIncome
   if (!isNumber(income) || income <= 0 || !Array.isArray(form.loans) || form.loans.length === 0) return null
 
   const loanPayments = form.loans.map(getDsrLoanYearly)
@@ -544,17 +683,17 @@ export function getDsrResult(form) {
   return { dsrRate, yearlyPayment, level, extraRoom, loanPayments }
 }
 
-// [결과 저장]으로 보낼 값 (API-57): 입력은 원 단위로 바꿔 보냄 (화면은 만원, 서버는 원). 대출은 입력한 건수만큼 입력 순서대로
+// [결과 저장]으로 보낼 값 (API-57): 화면과 서버가 같은 원 단위라 그대로 보냄. 대출은 입력한 건수만큼 입력 순서대로
 // 화면에서 줄을 구별하려고 붙인 id 같은 값은 보내지 않음
 export function toDsrRecord(form, result) {
   return {
-    annualIncome: form.annualIncome * 10000,
+    annualIncome: form.annualIncome,
     dsrRate: result.dsrRate,
     yearlyPayment: result.yearlyPayment,
     loans: form.loans.map((loan) => ({
       loanKind: loan.kind,
       repayMethod: loan.method,
-      loanAmount: loan.amount * 10000,
+      loanAmount: loan.amount,
       interestRate: loan.rate,
       loanMonths: loan.months,
     })),

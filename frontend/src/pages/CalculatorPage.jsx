@@ -12,7 +12,7 @@ const TABS = [
   { label: '대출 이자', to: '/calc', end: true },
   { label: '대출 갈아타기', to: '/calc/change' },
   { label: 'DSR', to: '/calc/dsr' },
-  { label: '내 집 대출한도', to: '/calc/home' },
+  { label: '집 살 때 대출한도', to: '/calc/home' },
   { label: '상환능력 기반 대출', to: '/calc/reverse' },
 ]
 
