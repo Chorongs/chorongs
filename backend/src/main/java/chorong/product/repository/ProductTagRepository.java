@@ -2,11 +2,10 @@ package chorong.product.repository;
 
 import java.util.Collection;
 import java.util.List;
-
+import java.util.Set;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
 import chorong.product.entity.ProductStatus;
 import chorong.product.entity.ProductTag;
 
@@ -24,4 +23,6 @@ public interface ProductTagRepository extends JpaRepository<ProductTag, Long> {
 			where p.productId = pt.productId and p.productStatus = :status
 			""")
 	List<Object[]> findTagPairsByProductStatus(@Param("status") ProductStatus status);
+
+	List<ProductTag> findByTagIdIn(Set<Long> tagIds);
 }
