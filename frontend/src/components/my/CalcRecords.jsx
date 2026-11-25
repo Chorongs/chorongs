@@ -8,7 +8,7 @@ import MySection from './MySection'
 // 대출 이자는 CalcHistoryList(API-24)를 다시 씀. [불러오기]는 계산기(/calc)로 이동하며 값을 넘김
 // 목록 부품이 없는 종류는 MySection의 준비 중 안내 (구역 이름 '{칩 이름} 계산 기록', MY-03)
 // TODO(MY-10): 나머지 4종 목록 부품(ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList,
-//   ReverseHistoryList, API-56부터 59까지)이 올라오면 KINDS의 list에 연결
+//   ReverseHistoryList, API-56부터 59까지)이 올라오면 KINDS의 list에 연결 (그 부품도 title을 받아 구역 이름으로 씀)
 const KINDS = [
   { key: 'interest', label: '대출 이자', list: CalcHistoryList },
   { key: 'change', label: '대출 갈아타기', list: null },
@@ -28,6 +28,8 @@ function CalcRecords() {
   const [kindKey, setKindKey] = useState(KINDS[0].key)
   const kind = KINDS.find((item) => item.key === kindKey)
   const List = kind.list
+  // 구역 이름 '{칩 이름} 계산 기록' (MY-03): 지우기 확인 창, 알림 글에도 그대로 쓰임
+  const title = `${kind.label} 계산 기록`
 
   return (
     <section>
@@ -39,9 +41,9 @@ function CalcRecords() {
         ))}
       </Chips>
       {List ? (
-        <List />
+        <List title={title} />
       ) : (
-        <MySection title={`${kind.label} 계산 기록`} description="[결과 저장]을 누른 기록이에요." status="preparing" />
+        <MySection title={title} description="[결과 저장]을 누른 기록이에요." status="preparing" />
       )}
     </section>
   )

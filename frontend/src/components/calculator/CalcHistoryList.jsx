@@ -13,6 +13,7 @@ import MySection from '../my/MySection'
 // - 비회원: API를 부르지 않고 '로그인하면 저장 가능' 문구만 (확인 중에는 아무것도 안 그림)
 // - [불러오기]: onLoad(item)이 있으면 그 화면이 입력칸을 채움 (계산기). 없으면 계산기(/calc)로 이동하며 기록 한 줄을 넘김 (MY 계산 기록)
 // - refreshKey: 바뀌면 목록을 다시 받음 (계산기에서 [결과 저장] 뒤)
+// - title: 구역 이름 (기본 '계산 기록'. MY 계산 기록 칩 안에서는 '대출 이자 계산 기록', MY-03)
 const METHOD_LABEL = Object.fromEntries(CALC_METHODS.map((method) => [method.code, method.label]))
 
 const Guest = styled.section`
@@ -61,7 +62,7 @@ function getItemLabel(item) {
   return `${formatMoney(item.loanAmount, '원')}, ${item.loanMonths}개월, ${METHOD_LABEL[item.repayMethod] ?? ''}`
 }
 
-function CalcHistoryList({ onLoad, refreshKey = 0 }) {
+function CalcHistoryList({ onLoad, refreshKey = 0, title = '계산 기록' }) {
   const navigate = useNavigate()
   const authStatus = useAuthStore((state) => state.status)
   const isMember = authStatus === 'member'
@@ -121,7 +122,7 @@ function CalcHistoryList({ onLoad, refreshKey = 0 }) {
 
   return (
     <MySection
-      title="계산 기록"
+      title={title}
       description="[결과 저장]을 누른 기록이에요."
       status={result.status}
       onRetry={handleRetry}
