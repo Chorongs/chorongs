@@ -9,7 +9,7 @@ import HomeLimitHistoryList from '../calculator/HomeLimitHistoryList'
 import ReverseHistoryList from '../calculator/ReverseHistoryList'
 
 // MY-10 계산 기록: 맨 위 계산기 종류 칩 5개 (CALC_RECORD_KINDS, 처음은 대출 이자) / 칩을 누르면 그 종류 목록만
-// 고른 종류는 주소 /my/calcs?kind={key}에 둠 (MY 왼쪽 메뉴의 펼침 메뉴로 바로 열고, 새로고침해도 유지). 없거나 틀린 값이면 대출 이자
+// 고른 종류는 주소 /my/calcs?kind={key}에 둠 (MY 왼쪽 메뉴 '계산 기록' 아래 하위 메뉴로 바로 열고, 새로고침해도 유지). 없거나 틀린 값이면 대출 이자
 // 목록: 대출 이자 CalcHistoryList(API-24), 나머지는 ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList, ReverseHistoryList (API-56부터 59까지)
 //   다섯 목록 모두 CalcRecordList 한 틀을 씀. [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
 const LISTS = {

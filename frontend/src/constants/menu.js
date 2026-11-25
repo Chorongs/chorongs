@@ -102,7 +102,7 @@ export const FULL_MENU = [
   { title: '도움말', items: HELP_MENU },
 ]
 
-// MY 계산 기록의 계산기 종류 (계산기 탭 순서, 처음은 대출 이자): MY-10 칩과 MY 왼쪽 메뉴 '계산 기록' 아래 펼침 메뉴가 같이 씀
+// MY 계산 기록의 계산기 종류 (계산기 탭 순서, 처음은 대출 이자): MY-10 칩과 MY 왼쪽 메뉴 '계산 기록' 아래 하위 메뉴가 같이 씀
 // key: 주소 /my/calcs?kind={key}
 export const CALC_RECORD_KINDS = [
   { key: 'interest', label: '대출 이자' },
@@ -114,7 +114,7 @@ export const CALC_RECORD_KINDS = [
 
 // MY 메뉴 (MY-01 왼쪽 메뉴, LY-08 계정 메뉴가 같이 씀)
 // title이 없는 묶음: 묶음 제목 없이 맨 위에 따로 보이는 메뉴 (한눈에 보기) / key: 주소 /my/{key} (null이면 /my)
-// children: MY 왼쪽 메뉴에서 그 메뉴 아래로 펼치는 메뉴 (계정 메뉴에는 안 보임)
+// children: MY 왼쪽 메뉴에서 그 메뉴 아래에 늘 펼쳐 두는 하위 메뉴 (계정 메뉴에는 안 보임)
 export const MY_MENU_GROUPS = [
   { title: null, items: [{ key: null, label: '한눈에 보기' }] },
   {
