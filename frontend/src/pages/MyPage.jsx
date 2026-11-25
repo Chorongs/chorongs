@@ -10,6 +10,7 @@ import MyOverview from '../components/my/MyOverview'
 import RecentList from '../components/my/RecentList'
 import SavedRecList from '../components/my/SavedRecList'
 import SearchHistoryList from '../components/my/SearchHistoryList'
+import { MY_MENU_GROUPS, getMyMenuPath } from '../constants/menu'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
@@ -18,35 +19,24 @@ import { StatusText } from '../styles/common'
 // MY-01 MY 화면 (/my, /my/:section, 회원 전용): 왼쪽 메뉴 9개 / 오른쪽 고른 항목 하나 (useParams)
 // checking 동안은 로딩만 (로그인 안내가 번쩍 보이지 않게) / 비회원 → 로그인 안내만, 항목 숨김 / 없는 section → /my
 // 메뉴 틀은 관리자 화면과 같은 SideNavLayout (900px 미만은 위에 가로 알약 메뉴, 아래 고른 항목)
-// 메뉴 묶음은 SCR-18 나눔대로: 내 기록 (한눈에 보기 + 기록 7개) / 계정 (회원 정보)
-const MENU_GROUPS = [
-  {
-    title: '내 기록',
-    items: [
-      { key: null, label: '한눈에 보기', component: MyOverview },
-      { key: 'liked', label: '찜한 대출', component: LikedList },
-      { key: 'recent', label: '최근 본 대출', component: RecentList },
-      { key: 'searches', label: '최근 검색', component: SearchHistoryList },
-      { key: 'compares', label: '비교 내역', component: CompareHistoryList },
-      { key: 'recommendations', label: '저장한 추천 결과', component: SavedRecList },
-      { key: 'report', label: '내 진단 리포트', component: DiagnosisReport },
-      { key: 'calcs', label: '계산 기록', component: CalcRecords },
-    ],
-  },
-  {
-    title: '계정',
-    items: [
-      { key: 'profile', label: '회원 정보', component: MemberInfo },
-    ],
-  },
+// 메뉴 목록은 계정 메뉴(LY-08)와 같이 쓰는 MY_MENU_GROUPS: 한눈에 보기 (맨 위 따로) / 내 기록 (기록 7개) / 계정 (회원 정보)
+// 메뉴 key → 오른쪽에 그릴 구역 (한눈에 보기는 key가 null, 주소 /my)
+const SECTIONS = [
+  { key: null, component: MyOverview },
+  { key: 'liked', component: LikedList },
+  { key: 'recent', component: RecentList },
+  { key: 'searches', component: SearchHistoryList },
+  { key: 'compares', component: CompareHistoryList },
+  { key: 'recommendations', component: SavedRecList },
+  { key: 'report', component: DiagnosisReport },
+  { key: 'calcs', component: CalcRecords },
+  { key: 'profile', component: MemberInfo },
 ]
 
-const SECTIONS = MENU_GROUPS.flatMap((group) => group.items)
-
-const NAV_GROUPS = MENU_GROUPS.map((group) => ({
+const NAV_GROUPS = MY_MENU_GROUPS.map((group) => ({
   title: group.title,
   items: group.items.map((item) => ({
-    to: item.key ? `/my/${item.key}` : '/my',
+    to: getMyMenuPath(item.key),
     label: item.label,
     end: item.key === null,
   })),

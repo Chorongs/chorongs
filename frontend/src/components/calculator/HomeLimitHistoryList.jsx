@@ -3,7 +3,7 @@ import { formatMoney } from '../../utils/format'
 import CalcRecordList from './CalcRecordList'
 
 // MY-10 내 집 대출한도 계산 기록 (API-59): 목록, 지우기, 불러오기는 CalcRecordList / 이 파일은 API와 줄 글만 정함
-// 줄: '집값 {집값}' / 지역 글 · '최대 한도 {최대 대출 한도}'
+// 줄: '집값 {집값}' / 지역 글, '최대 한도 {최대 대출 한도}'
 // [불러오기] → /calc/home으로 입력값만 넘김 (CA-01, 결과는 계산기가 다시 계산)
 const API = { getAll: myApi.getHomeCalcs, removeOne: myApi.deleteHomeCalc, removeAll: myApi.deleteHomeCalcs }
 

@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import styled from 'styled-components'
+import styled, { css } from 'styled-components'
 
 // 옆 메뉴 + 본문 두 칸 틀 (MY, 관리자가 같이 씀)
 // 웹: 왼쪽 230px 메뉴(묶음 제목 + 링크, 스크롤해도 따라옴) / 900px 미만: 메뉴가 위에 가로 알약으로
 // groups: [{ title, items: [{ to, label, end, count, countLabel }] }]
+//   title이 없는 묶음: 묶음 제목 없이 링크만, 웹에서는 링크 글자 크기와 굵기를 묶음 제목과 같게 (밑줄 없음, MY '한눈에 보기')
 //   end: 그 주소일 때만 현재 메뉴로 표시 (예: '/my'가 '/my/liked'에서도 켜지지 않게)
 //   count: 0보다 크면 링크 옆 빨간 알약 (countLabel은 화면 낭독기용 이름)
 // activeTone: 현재 메뉴 글자색 'brand'(주황, 기본) / 'ink'(검정)
@@ -72,6 +73,15 @@ const MenuLink = styled(NavLink)`
     color: ${({ $activeTone }) => ($activeTone === 'ink' ? 'var(--ink)' : 'var(--brand-text)')};
     font-weight: 800;
   }
+  ${({ $isTop }) =>
+    $isTop &&
+    css`
+      @media (min-width: 900px) {
+        color: var(--ink);
+        font-size: var(--fs-base);
+        font-weight: 800;
+      }
+    `}
   @media (max-width: 899px) {
     padding: 9px 14px;
     border-radius: var(--r-pill);
@@ -112,10 +122,10 @@ function SideNavLayout({ label, groups, activeTone = 'brand', children }) {
       <Menu aria-label={label}>
         {groups.map((group) =>
           group.items.length === 0 ? null : (
-            <MenuGroup key={group.title}>
-              <MenuTitle>{group.title}</MenuTitle>
+            <MenuGroup key={group.title ?? group.items[0].to}>
+              {group.title && <MenuTitle>{group.title}</MenuTitle>}
               {group.items.map((item) => (
-                <MenuLink key={item.to} to={item.to} end={item.end} $activeTone={activeTone}>
+                <MenuLink key={item.to} to={item.to} end={item.end} $activeTone={activeTone} $isTop={!group.title}>
                   {item.label}
                   {item.count > 0 && <Count aria-label={`${item.countLabel} ${item.count}`}>{item.count}</Count>}
                 </MenuLink>

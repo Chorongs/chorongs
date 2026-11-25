@@ -7,19 +7,19 @@ import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError, InputField } from '../../styles/common'
-import { BIRTH_ERROR, isValidBirthDate, isValidNickname } from '../../utils/validate'
+import { BIRTH_ERROR, isAdultBirthDate, isValidNickname } from '../../utils/validate'
 import BirthDateField from '../auth/BirthDateField'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
 
 // MY-11 회원 정보: 닉네임, 생년월일 수정 (API-28 PATCH, 바꾼 것만 보냄) / [회원 탈퇴] (API-28 DELETE)
-// 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜 → 오류 문구 (E2) / 400 → 서버 문구
-// 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 후 [탈퇴하기] → sessionStorage 비움
+// 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜, 만 19세 미만 → 오류 문구 (E2) / 400 → 서버 문구
+// 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 + 칸에 '탈퇴할게요' 입력(앞뒤 공백 무시) 후 [탈퇴하기] → sessionStorage 비움
 //   → 안내 창 → 닫으면 새로고침하며 메인(/)으로 (로그아웃과 같은 방식) / 누르는 중 잠금 (E5)
 // 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
-//   - 생년월일: 숫자 8자리 입력 (BirthDateField) → 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate)
+//   - 생년월일: 숫자 8자리 입력 (BirthDateField) → 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전, 만 19세 이상 (isAdultBirthDate)
 //   - 원래 생년월일이 있던 회원이 칸을 비우거나 덜 치면 저장 안 됨
 //   - 오류는 칸 바로 아래에 치는 동안 바로 보임 (닉네임 글, 생년월일 칸 안내는 BirthDateField)
 //     오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림 (생년월일이 비었거나 덜 쳤으면 그때 칸 아래도 오류로)
@@ -27,6 +27,8 @@ import Checkbox from '../ui/Checkbox'
 //   - 서버 400 → 서버 문구를 맨 아래에 표시
 //   - 생년월일 칸, 오류 문구 BIRTH_ERROR는 가입 단계와 같이 씀 (BirthDateField, utils/validate.js)
 const NICKNAME_ERROR = '닉네임은 2~12자로 입력해 주세요'
+// 탈퇴 확인 창에서 한 번 더 받는 글 (실수로 탈퇴하지 않게)
+const WITHDRAW_PHRASE = '탈퇴할게요'
 // 탈퇴 때 지워지는 것 (명세서 MY-11 기록 7종 + 회원 관리 기획서 3-9의 닉네임, 생년월일, 소셜 연결 정보)
 const WIPED_RECORDS = [
   '찜',
@@ -105,13 +107,14 @@ function MemberInfo() {
   // 탈퇴 창 단계: null 닫힘 / 'confirm' 확인 / 'done' 끝남 안내
   const [withdrawStep, setWithdrawStep] = useState(null)
   const [isChecked, setIsChecked] = useState(false)
+  const [withdrawText, setWithdrawText] = useState('')
   const [withdrawError, setWithdrawError] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
   // 칸마다 지금 오류 (치는 동안 바로 보임)
   const hadBirth = toBirthText(user) !== ''
   const nicknameError = isValidNickname(nickname) ? '' : NICKNAME_ERROR
-  const isBirthWrong = birth === '' ? hadBirth : !isValidBirthDate(birth)
+  const isBirthWrong = birth === '' ? hadBirth : !isAdultBirthDate(birth)
 
   const handleBirthChange = (text) => {
     setBirth(text)
@@ -160,6 +163,7 @@ function MemberInfo() {
 
   const openWithdraw = () => {
     setIsChecked(false)
+    setWithdrawText('')
     setWithdrawError('')
     setWithdrawStep('confirm')
   }
@@ -228,7 +232,7 @@ function MemberInfo() {
         titleSize="lg"
         confirmLabel="탈퇴하기"
         onConfirm={handleWithdraw}
-        isConfirmDisabled={!isChecked || isWithdrawing}
+        isConfirmDisabled={!isChecked || withdrawText.trim() !== WITHDRAW_PHRASE || isWithdrawing}
         width={460}
         showClose
       >
@@ -243,6 +247,16 @@ function MemberInfo() {
           <p>상품 조회 집계는 누구인지 알 수 없는 통계로만 남아요.</p>
           <p>소셜 계정 설정에서 연결을 끊을 수 있어요.</p>
           <Checkbox checked={isChecked} onChange={setIsChecked} label="위 내용을 확인했어요" />
+          <InputField>
+            {`확인을 위해 '${WITHDRAW_PHRASE}'를 입력해 주세요`}
+            <input
+              value={withdrawText}
+              placeholder={WITHDRAW_PHRASE}
+              maxLength={20}
+              autoComplete="off"
+              onChange={(event) => setWithdrawText(event.target.value)}
+            />
+          </InputField>
           <ErrorText>{withdrawError}</ErrorText>
         </DialogBody>
       </ConfirmDialog>

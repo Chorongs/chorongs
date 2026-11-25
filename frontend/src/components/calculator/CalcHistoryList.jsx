@@ -20,7 +20,7 @@ function getItemLabel(item) {
 
 // 금액, 기간, 연 금리 / 상환 방식, 거치 (있을 때만), 총이자
 const getMain = (item) =>
-  `${formatMoney(item.loanAmount, '원')} · ${item.loanMonths}개월 · 연 ${formatRate(item.interestRate)}%`
+  `${formatMoney(item.loanAmount, '원')}, ${item.loanMonths}개월, 연 ${formatRate(item.interestRate)}%`
 
 const getSubs = (item) => [
   METHOD_LABEL[item.repayMethod],

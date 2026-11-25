@@ -8,6 +8,7 @@ import {
   isBlank,
   isLengthInRange,
   isNumberInRange,
+  isAdultBirthDate,
   isSafeReturnPath,
   isValidAdminName,
   isValidBirthDate,
@@ -666,9 +667,9 @@ describe('getBirthInputState', () => {
     expect(result).toBe('bad')
   })
 
-  it('올해의 지나지 않은 달은 bad', () => {
+  it('만 19세가 되는 해(2007년)의 아직 안 온 달은 bad', () => {
     // Given
-    const text = '202612'
+    const text = '200712'
     // When
     const result = getBirthInputState(text, today)
     // Then
@@ -700,5 +701,73 @@ describe('getBirthInputState', () => {
     const result = getBirthInputState(text, today)
     // Then
     expect(result).toBe('bad')
+  })
+
+  it('만 19세가 안 되는 해(2008년)는 연도만 쳐도 bad', () => {
+    // Given
+    const text = '2008'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('만 19세가 되는 해(2007년)는 연도만으로는 typing', () => {
+    // Given
+    const text = '2007'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('typing')
+  })
+
+  it('8자리를 다 쳤는데 만 19세 생일 전이면 bad', () => {
+    // Given
+    const text = '20071118'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+})
+
+describe('isAdultBirthDate', () => {
+  const today = new Date(2026, 10, 17)
+
+  it('만 19세 생일 당일은 통과한다', () => {
+    // Given
+    const text = '2007-11-17'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it('만 19세 생일 하루 전은 실패한다', () => {
+    // Given
+    const text = '2007-11-18'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('맞지 않는 날짜(2월 30일)는 실패한다', () => {
+    // Given
+    const text = '2001-02-30'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('2월 29일생은 평년 2월 28일에 생일이 지난 것으로 본다', () => {
+    // Given
+    const text = '2008-02-29'
+    const nonLeapDay = new Date(2027, 1, 28)
+    // When
+    const result = isAdultBirthDate(text, nonLeapDay)
+    // Then
+    expect(result).toBe(true)
   })
 })

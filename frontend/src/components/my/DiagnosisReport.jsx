@@ -5,10 +5,11 @@ import * as myApi from '../../api/myApi'
 import { CREDIT_BAND_LABEL } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, StatusText } from '../../styles/common'
+import { Button, EmptyBox } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
+import { LoadingText } from './MySection'
 
 // MY-09 내 진단 리포트: 저장한 신용 구간 + 진단 시각 / [이 구간으로 추천받기] / [삭제]
 // 삭제 → 확인 후 API-25 DELETE / 없으면(204) 빈 상태 + '신용 셀프 진단 하기' (E11)
@@ -121,9 +122,9 @@ function DiagnosisReport() {
       await myApi.deleteCreditReport()
       setResult({ status: 'done', report: null })
       setIsConfirmOpen(false)
-      showToast('내 진단 리포트를 지웠어요')
+      showToast('내 진단 리포트를 삭제했어요')
     } catch (error) {
-      if (error.response?.status !== 401) showToast('지우지 못했어요. 다시 시도해 주세요')
+      if (error.response?.status !== 401) showToast('삭제하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsPending(false)
     }
@@ -131,7 +132,7 @@ function DiagnosisReport() {
 
   let body
   if (result.status === 'loading') {
-    body = <StatusText role="status">불러오는 중이에요</StatusText>
+    body = <LoadingText />
   } else if (result.status === 'error') {
     body = (
       <EmptyBox>
@@ -182,7 +183,7 @@ function DiagnosisReport() {
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         label="진단 리포트 삭제"
-        title="내 진단 리포트를 지울까요?"
+        title="내 진단 리포트를 삭제할까요?"
         confirmLabel="삭제"
         onConfirm={handleDelete}
         isConfirmDisabled={isPending}

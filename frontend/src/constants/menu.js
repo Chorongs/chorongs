@@ -101,3 +101,25 @@ export const FULL_MENU = [
   },
   { title: '도움말', items: HELP_MENU },
 ]
+
+// MY 메뉴 (MY-01 왼쪽 메뉴, LY-08 계정 메뉴가 같이 씀)
+// title이 없는 묶음: 묶음 제목 없이 맨 위에 따로 보이는 메뉴 (한눈에 보기) / key: 주소 /my/{key} (null이면 /my)
+export const MY_MENU_GROUPS = [
+  { title: null, items: [{ key: null, label: '한눈에 보기' }] },
+  {
+    title: '내 기록',
+    items: [
+      { key: 'liked', label: '찜한 대출' },
+      { key: 'recent', label: '최근 본 대출' },
+      { key: 'searches', label: '최근 검색' },
+      { key: 'compares', label: '비교 내역' },
+      { key: 'recommendations', label: '저장한 추천 결과' },
+      { key: 'report', label: '내 진단 리포트' },
+      { key: 'calcs', label: '계산 기록' },
+    ],
+  },
+  { title: '계정', items: [{ key: 'profile', label: '회원 정보' }] },
+]
+
+// MY 메뉴 key → 주소
+export const getMyMenuPath = (key) => (key ? `/my/${key}` : '/my')

@@ -1,15 +1,20 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
+import { MY_MENU_GROUPS, getMyMenuPath } from '../../constants/menu'
+import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
 import useAuthStore from '../../store/useAuthStore'
+import useMyStore from '../../store/useMyStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
 import ConfirmDialog from '../common/ConfirmDialog'
 import Icon from '../ui/Icon'
 import Popover from '../ui/Popover'
 
-// LY-08 계정 메뉴: 비회원 [로그인] / 회원 닉네임 버튼 → 작은 메뉴 (MY, 로그아웃)
+// LY-08 계정 메뉴: 비회원 [로그인] / 회원 '{닉네임}님' 버튼 → 작은 메뉴
+//   윗줄 '{닉네임}님', '{카카오|네이버} 로그인' + [로그아웃] / 아래 MY 메뉴 링크 (MY 왼쪽 메뉴와 같은 MY_MENU_GROUPS)
+//   제목 없는 묶음(한눈에 보기)은 한 줄 전체, 제목 있는 묶음(내 기록, 계정)은 한 칸씩 2칸 / '찜한 대출' 옆에 찜 개수 (0이면 안 보임)
 // 모바일(900px 미만)은 작은 메뉴 대신 /my 이동 / 바깥 클릭, Esc(Popover), 화면 이동(key=주소) 시 메뉴 닫기
 // 로그아웃: 메뉴는 창 열기(openLogout)만. 창은 아래 LogoutDialog를 Layout이 한 번만 그림
 //   (상단바(z-index 50) 안에서 그리면 하단 탭바(55), 비교함 띠(58) 아래에 깔려서. UI-15 'createPortal 안 쓰고 Layout에서 그림')
@@ -21,12 +26,12 @@ const MOBILE_QUERY = '(max-width: 899px)'
 const NameButton = styled.button.attrs({ type: 'button' })`
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 36px;
-  max-width: 160px;
-  padding: 0 10px;
+  gap: 8px;
+  height: 44px;
+  max-width: 180px;
+  padding: 0 12px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
   background: transparent;
   color: var(--ink);
   font-size: var(--fs-md);
@@ -40,27 +45,79 @@ const NameButton = styled.button.attrs({ type: 'button' })`
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  svg {
+    flex: none;
+    color: var(--cocoa);
+  }
 `
 
-const MenuList = styled.div`
+// 메뉴 판: 2칸 (윗줄과 제목 없는 묶음은 두 칸 전체)
+const MenuPanel = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 20px;
+  width: 376px;
+  max-width: calc(100vw - 76px);
+`
+
+const Who = styled.div`
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  div {
+    min-width: 0;
+  }
+  b {
+    display: block;
+    overflow: hidden;
+    font-size: var(--fs-lg);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  small {
+    color: var(--cocoa);
+    font-size: var(--fs-sm);
+  }
+  button {
+    flex: none;
+    margin-left: auto;
+  }
+`
+
+const MenuGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  a,
-  button {
-    padding: 8px 4px;
-    border: 0;
-    background: transparent;
-    color: var(--ink);
-    font-size: var(--fs-base);
-    font-weight: 600;
-    text-align: left;
-    cursor: pointer;
-  }
-  a:hover,
-  button:hover {
+  ${({ $isTop }) => $isTop && 'grid-column: 1 / -1;'}
+`
+
+const MenuTitle = styled.h4`
+  margin-bottom: 6px;
+  padding: 2px 0 10px;
+  border-bottom: 2px solid var(--ink);
+  font-size: var(--fs-base);
+  font-weight: 800;
+`
+
+const MenuLink = styled(Link)`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 0;
+  color: ${({ $isTop }) => ($isTop ? 'var(--ink)' : 'var(--ink-2)')};
+  font-size: ${({ $isTop }) => ($isTop ? 'var(--fs-base)' : 'var(--fs-md)')};
+  font-weight: ${({ $isTop }) => ($isTop ? 800 : 500)};
+  &:hover {
     color: var(--brand-text);
   }
+`
+
+const Count = styled.span`
+  font-family: var(--f-num);
+  font-variant-numeric: tabular-nums;
 `
 
 // 로그아웃 창 (LY-08, MY-02 같이 씀). Layout이 한 번만 그림
@@ -118,6 +175,7 @@ function AccountMenu() {
   const openLogout = useUiStore((state) => state.openLogout)
   const showToast = useUiStore((state) => state.showToast)
   const isAdminAuthed = useAdminStore((state) => state.status) === 'authed'
+  const likedCount = useMyStore((state) => state.likedIds.length)
   const navigate = useNavigate()
   const { pathname } = useLocation()
 
@@ -145,26 +203,41 @@ function AccountMenu() {
           aria-expanded={isOpen}
           onClick={() => (window.matchMedia(MOBILE_QUERY).matches ? navigate('/my') : toggle())}
         >
-          <span>{user.memberNickname}</span>
-          <Icon name="chevron_down" size={13} />
+          <span>{user.memberNickname}님</span>
+          <Icon name="chevron_down" size={16} />
         </NameButton>
       )}
     >
       {(close) => (
-        <MenuList>
-          <Link to="/my" onClick={close}>
-            MY
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              close()
-              openLogout()
-            }}
-          >
-            로그아웃
-          </button>
-        </MenuList>
+        <MenuPanel>
+          <Who>
+            <div>
+              <b>{user.memberNickname}님</b>
+              <small>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType} 로그인</small>
+            </div>
+            <Button
+              $size="sm"
+              $variant="outline"
+              onClick={() => {
+                close()
+                openLogout()
+              }}
+            >
+              로그아웃
+            </Button>
+          </Who>
+          {MY_MENU_GROUPS.map((group) => (
+            <MenuGroup key={group.title ?? 'top'} $isTop={!group.title}>
+              {group.title && <MenuTitle>{group.title}</MenuTitle>}
+              {group.items.map((item) => (
+                <MenuLink key={item.label} to={getMyMenuPath(item.key)} $isTop={!group.title} onClick={close}>
+                  {item.label}
+                  {item.key === 'liked' && likedCount > 0 && <Count>{likedCount}</Count>}
+                </MenuLink>
+              ))}
+            </MenuGroup>
+          ))}
+        </MenuPanel>
       )}
     </Popover>
   )

@@ -92,7 +92,7 @@ function SavedRecList() {
           <div>
             <Label>{save.conditionLabel}</Label>
             <Meta>
-              {formatDate(save.createdAt)} 저장 · 상품 {products.length}개
+              {formatDate(save.createdAt)} 저장, 상품 {products.length}개
             </Meta>
           </div>
           <Button $size="sm" $variant="outline" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : save.saveId)}>

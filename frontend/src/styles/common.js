@@ -155,6 +155,7 @@ export const Panel = styled.div`
 `
 
 // UI-06 칩: 높이 38 / 작은 32 ($size="sm"), 선택 상태는 aria-pressed
+// 글이 길어도 놓인 칸 폭을 넘지 않음 (넘는 부분은 잘림)
 export const Chip = styled.button.attrs((props) => ({
   type: props.type || 'button',
 }))`
@@ -162,6 +163,8 @@ export const Chip = styled.button.attrs((props) => ({
   align-items: center;
   justify-content: center;
   gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
   height: ${({ $size }) => ($size === 'sm' ? '32px' : '38px')};
   padding: 0 ${({ $size }) => ($size === 'sm' ? '12px' : '15px')};
   border: 1px solid var(--line-2);

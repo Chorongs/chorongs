@@ -5,7 +5,7 @@ import { BIRTH_ERROR, BIRTH_GUIDE, getBirthInputState } from '../../utils/valida
 
 // 생년월일 칸 (가입 단계 AU-03, MY 회원 정보 MY-11이 같이 씀)
 // 칸에는 숫자만 보임 (8자리, 휴대폰은 숫자 키패드, 붙여 넣은 '1990.01.01'도 숫자만 남김. 붙여 넣기가 잘리지 않게 칸은 10자까지 받음)
-// value, onChange(글): 'YYYY-MM-DD' 모양의 글 (덜 쳤으면 '1990-01'처럼 짧음, formatBirthInput). 맞는 날짜인지는 부르는 쪽도 isValidBirthDate로 봄
+// value, onChange(글): 'YYYY-MM-DD' 모양의 글 (덜 쳤으면 '1990-01'처럼 짧음, formatBirthInput). 맞는 날짜인지(만 19세 이상 포함)는 부르는 쪽도 isAdultBirthDate로 봄
 // 칸 아래 한 줄은 치는 동안 바로 바뀜 (getBirthInputState):
 //   비었거나 치는 중이고 틀린 곳 없음 → 회색 안내 BIRTH_GUIDE / 틀림 또는 forceError → 빨간 BIRTH_ERROR
 //   / 맞음 → doneText가 있으면 초록 글 (가입 단계 '생년월일 입력 완료'), 없으면 안 그림
