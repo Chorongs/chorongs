@@ -227,6 +227,12 @@ export async function postSavedRecommend(body) {
   return response.data.data
 }
 
+// API-38 같은 결과를 이미 저장했는지: 저장과 같은 값 → true / false (읽기만)
+export async function checkSavedRecommend(body) {
+  const response = await api.post('/api/me/recommendations/check', body)
+  return response.data.data
+}
+
 // API-38 저장한 추천 결과 삭제: saveId가 있으면 그 1건, 없으면 전체
 export async function deleteSavedRecommend(saveId = null) {
   await api.delete(saveId === null ? '/api/me/recommendations' : `/api/me/recommendations/${saveId}`)

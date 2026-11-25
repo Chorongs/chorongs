@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import { ShortcutPanel } from '../../styles/common'
 import Icon from '../ui/Icon'
 
 // 다른 도구로 가는 알약 버튼 8개 (이동 주소는 화면 목록 순서대로)
@@ -196,22 +197,6 @@ const SampleChip = styled.span`
   font-weight: 800;
 `
 
-// 바로가기 판 (공통 Panel(UI-05)과 여백이 달라 이름을 따로 둠)
-// TODO(RC, CHORONG-45 김채희): HelpShortcuts.jsx에 똑같은 ShortcutPanel이 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
-const ShortcutPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 44px 40px;
-  border-radius: var(--r-lg);
-  background: var(--mist);
-
-  @media (max-width: 899px) {
-    padding: 28px 20px 20px;
-  }
-`
-
 const PanelText = styled.p`
   margin: 0;
   color: var(--ink-2);
@@ -279,9 +264,8 @@ const Pill = styled(Link)`
 /*
     RC-10 도구 바로가기 (SCR-01)
     - 큰 제목 + 한 줄 + 예시 그림 칸(추천 카드 1장, 고정 글) + 알약 버튼 8개 → 누르면 이동 (서버 호출 없음)
-    - 예시 카드와 안내 문구는 가안 기준 (실제 추천 결과 아님)
-    - TODO(LY-01, 각 이슈 담당): 이동 주소 중 /search, /search/simple, /compare, /ranking, /calc, /calc/reverse, /diagnosis/*는 각 이슈
-      (CHORONG-64 조빌립, 47 조빌립, 60 김채희, 49 김진석, 56 김진석, 51 김진석, 59 조빌립)가 라우트를 추가해야 화면이 생김. 그 전에는 '찾을 수 없음' 화면이 나옴 (App.jsx TODO 참고)
+    - 예시 카드와 안내 문구는 고정 글 (실제 추천 결과 아님)
+    - TODO(LY-01): 이동 주소 중 /ranking, /calc/reverse, /diagnosis/habit은 아직 라우트가 없어 '찾을 수 없음' 화면이 나옴 (App.jsx에 Route가 생기면 지움)
 */
 function ToolShortcuts() {
   return (
@@ -302,9 +286,9 @@ function ToolShortcuts() {
           <BackCard />
           <SampleCard>
             <SampleTop>
-              추천 1위<SampleBadge>일치도 96%</SampleBadge>
+              추천 1위<SampleBadge>추천도 96%</SampleBadge>
             </SampleTop>
-            <SampleName>다함 근로자 생활자금</SampleName>
+            <SampleName>예시 상품</SampleName>
             <SampleNums>
               <SampleNum $isRate>
                 <SampleNumLabel>예상 금리</SampleNumLabel>

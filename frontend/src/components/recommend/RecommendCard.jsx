@@ -15,9 +15,9 @@ import Icon from '../ui/Icon'
 const TOP_RANK = 3
 const CALC_PATH = '/calc'
 
-// 서버가 주는 판단 태그 중 '주의' 쪽 글 (나머지는 좋은 점). 명세서 be_recommend '추천 규칙'의 판단 태그 줄(주의 7개, 좋은 점 7개)과 서버 RecommendRule.judgeTags와 같음
-// TODO(RC-08, CHORONG-44 Jung-YoonB): 서버가 judgeTags를 [{ text, level }]로 바꾸면(명세서 확정 뒤 새 이슈) 이 목록을 지우고 level로 색을 정함.
-//   바뀌기 전에 프론트만 먼저 바꾸지 말 것 (객체를 글자로 그리면 화면이 깨짐). 바뀌는 날 서버와 같이 맞출 것
+// 서버가 주는 판단 태그 중 '주의' 쪽 글 (나머지는 좋은 점). 명세서 be_recommend '추천 규칙' 판단 태그 줄의 주의 7개 (서버 RecommendRule.judgeTags가 만드는 글)
+// TODO(RC-08): 서버가 judgeTags를 [{ text, level }]로 바꾸면 이 목록을 지우고 level로 색을 정함.
+//   서버보다 먼저 바꾸지 말 것 (지금 서버는 글자 배열이라 객체로 그리면 화면이 깨짐). 서버와 같은 때에 바꿈
 const WARN_TAGS = [
   '용도 확인 필요',
   '신용 구간 주의',
@@ -39,7 +39,7 @@ const Wrap = styled(Card)`
   box-shadow: ${({ $isTop }) => ($isTop ? '0 0 0 2px var(--brand)' : 'var(--shadow-1)')};
 `
 
-// 맨 윗줄: 메달 + 순위 + 일치도 (오른쪽 끝에 찜 버튼 자리, 가안). 아래 상품명과 가깝게 붙임
+// 맨 윗줄: 메달 + 순위 + 추천도 (오른쪽 끝에 찜 버튼 자리). 아래 상품명과 가깝게 붙임
 const Top = styled.div`
   display: flex;
   align-items: center;
@@ -47,7 +47,7 @@ const Top = styled.div`
   margin-bottom: -6px;
 `
 
-// 찜 버튼 자리: 맨 윗줄 오른쪽 끝 (가안). 안에 LikeButton (CM-06, CHORONG-43에서 연결)
+// 찜 버튼 자리: 맨 윗줄 오른쪽 끝. 안에 LikeButton (CM-06)
 const LikeSpot = styled.div`
   margin-left: auto;
 `
@@ -57,7 +57,7 @@ const RankText = styled.b`
   font-weight: 800;
 `
 
-// 일치도: 주황 알약 (가안)
+// 추천도: 주황 알약
 const MatchRate = styled.span`
   padding: 3px 10px;
   border-radius: 999px;
@@ -67,7 +67,7 @@ const MatchRate = styled.span`
   font-weight: 800;
 `
 
-// 상품명이 위, 금융사 · 소분류가 아래 (가안). 카드에 마우스를 올리면 상품명 밑줄
+// 상품명이 위, 금융사 · 소분류가 아래. 카드에 마우스를 올리면 상품명 밑줄
 const NameBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -93,7 +93,7 @@ const Org = styled.span`
   font-weight: 700;
 `
 
-// 지표 3개: 칸을 늘리지 않고 왼쪽부터 일정한 간격으로 (가안)
+// 지표 3개: 칸을 늘리지 않고 왼쪽부터 일정한 간격으로
 const Metrics = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -154,11 +154,18 @@ const Tags = styled.div`
   gap: 6px;
 `
 
-// 버튼 줄: 상세 보기가 두 배 넓음 (가안, 모바일에서도 같음). 899px 이하는 글자를 줄이고 아이콘은 숨김
+// 버튼 줄: [이자 계산] [+ 비교]를 같은 폭, 같은 글자로 (금리가 없어 [이자 계산]이 숨으면 [+ 비교]가 한 줄 전체). 899px 이하는 글자를 줄이고 아이콘은 숨김
+// [+ 비교]는 주황 (primary 버튼), 담긴 상품 ('A 담음')과 '비교 불가'는 outline 바탕으로 각자 모양을 유지. 글자는 primary의 큰 글자를 쓰지 않고 [이자 계산]과 같게 맞춤
 const Actions = styled.div`
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 8px;
+
+  & > button {
+    font-size: var(--fs-base);
+    font-weight: 700;
+  }
 
   @media (max-width: 899px) {
     gap: 6px;
@@ -183,15 +190,15 @@ const Note = styled.p`
 /*
     RC-08 추천 카드: 추천 상품 1개 요약
     - props: item (RecommendItemDTO: rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote, judgeTags)
-    - 카드 아무 곳 클릭 (Enter) → 상품 상세 창 openProduct(id, 'recommend')
-    - [상세 보기] → 카드 클릭과 같음 (가안에 있는 버튼) / [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
-    - TODO(LY-01, CHORONG-49 김진석): /calc 계산기 화면은 계산기 이슈가 라우트를 추가해야 생김. 그 전에는 [이자 계산]이 '찾을 수 없음' 화면으로 감 (넘기는 값은 utils/recommend.js getCalcState)
+    - 카드 아무 곳 클릭 (Enter) → 상품 상세 창 openProduct(id, 'recommend'). 별도 [상세 보기] 버튼은 없음
+    - [이자 계산] → navigate('/calc', { state }) / 버튼 클릭은 카드 클릭으로 안 퍼지게 함
+    - 계산기로 넘기는 값은 utils/recommend.js getCalcState
     - 판단 태그는 서버가 보낸 글 그대로, 순서도 그대로 (서버가 주의 먼저 정렬). 서버 글은 글자로만 출력 (E1)
-    - 하트: LikeButton (CM-06. 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 LikeButton이 stopPropagation, CHORONG-43에서 연결)
-    - [+ 비교] (ST-04, CHORONG-47): 누르면 상세 창이 아니라 바로 비교함에 담음 (useCompareStore.addTray, 클릭이 카드까지 안 퍼지게 stopPropagation). 담긴 상품은 'A 담음', 비교함 첫 상품과 용도나 상환 방식이 안 맞으면 '비교 불가'. 안 맞는 상품은 눌러도 안 담기고 알림 (addTray)
-    - 모양은 가안(cashlink_21.html .rec.rc): 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 2:1:1
+    - 하트: LikeButton (CM-06. 비회원은 requireLogin, 클릭이 카드까지 안 퍼지게 LikeButton이 stopPropagation)
+    - [+ 비교] (ST-04): 누르면 상세 창이 아니라 바로 비교함에 담음 (useCompareStore.addTray, 클릭이 카드까지 안 퍼지게 stopPropagation). 담긴 상품은 'A 담음', 비교함 첫 상품과 용도나 상환 방식이 안 맞으면 '비교 불가'. 안 맞는 상품은 눌러도 안 담기고 알림 (addTray)
+    - 모양: 상품명 위 / 금융사 · 소분류(SECTOR 태그) 아래, 지표는 왼쪽부터 간격, 판단 태그는 체크(좋음), 느낌표(주의) 아이콘, 버튼 줄은 [이자 계산] [+ 비교] 1:1
     - 금리가 없으면 [이자 계산] 숨김, 월 상환이 없으면 '계산 불가', 만기일시만 있는 상품은 '월 이자' (서버 월 상환이 매달 이자만이므로)
-    - 판단 태그: 서버가 글자 배열(List<String>)로 줌 (RecommendItemDTO 확인함). WARN_TAGS에 있는 글은 주의(노랑), 나머지는 좋은 점(초록)으로 색만 나눔
+    - 판단 태그: 서버가 글자 배열(RecommendItemDTO List<String>)로 줌. WARN_TAGS에 있는 글은 주의(노랑), 나머지는 좋은 점(초록)으로 색만 나눔
 */
 function RecommendCard({ item }) {
   const { rankNo, product, matchRate, estRateMin, estRateMax, rateEstimated, monthlyPayment, calcNote } = item
@@ -221,11 +228,6 @@ function RecommendCard({ item }) {
     if (event.key === 'Enter' && event.target === event.currentTarget) handleOpen()
   }
 
-  const handleOpenClick = (event) => {
-    event.stopPropagation()
-    handleOpen()
-  }
-
   const handleCalc = (event) => {
     event.stopPropagation()
     navigate(CALC_PATH, { state: calcState })
@@ -242,7 +244,7 @@ function RecommendCard({ item }) {
       <Top>
         {isTop && <Medal rank={rankNo} size={26} />}
         <RankText>추천 {rankNo}위</RankText>
-        <MatchRate>일치도 {formatMatchRate(matchRate)}%</MatchRate>
+        <MatchRate>추천도 {formatMatchRate(matchRate)}%</MatchRate>
         <LikeSpot>
           <LikeButton productId={product.productId} />
         </LikeSpot>
@@ -303,9 +305,6 @@ function RecommendCard({ item }) {
       )}
 
       <Actions>
-        <Button $size="sm" onClick={handleOpenClick}>
-          상세 보기
-        </Button>
         {hasRate && (
           <Button $variant="outline" $size="sm" onClick={handleCalc}>
             <Icon name="calc" size={16} />
@@ -313,7 +312,7 @@ function RecommendCard({ item }) {
           </Button>
         )}
         <CompareButton
-          $variant="outline"
+          $variant={traySlot || isNo ? 'outline' : undefined}
           $size="sm"
           $state={traySlot ? 'in' : isNo ? 'no' : undefined}
           aria-pressed={Boolean(traySlot)}
