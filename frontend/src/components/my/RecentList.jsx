@@ -4,8 +4,8 @@ import * as myApi from '../../api/myApi'
 import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
-// MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / 지우기
-// 줄 X → API-21 DELETE /{productId} / 지우기 → API-21 DELETE (전체) / 알림은 MySection (MY-03)
+// MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / [선택 삭제] [전체 삭제]
+// 줄 X → API-21 DELETE /{productId} / [전체 삭제] → API-21 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
 const StatusLine = styled.div`
   display: flex;

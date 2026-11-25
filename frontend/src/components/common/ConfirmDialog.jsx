@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { Button } from '../../styles/common'
 import Modal from '../ui/Modal'
 
-// 확인 창 공통 틀 (MY 지우기, 진단 리포트 삭제, 로그아웃, 회원 탈퇴, 관리자 승인, 반영, 되돌리기 등이 같이 씀)
+// 확인 창 공통 틀 (MY 기록 삭제, 진단 리포트 삭제, 로그아웃, 회원 탈퇴, 관리자 승인, 반영, 되돌리기 등이 같이 씀)
 // 위 글 title / 그 아래 내용 children (있을 때) / 오른쪽 끝 버튼 줄 [취소] [confirmLabel]
 // titleSize: 'md' 질문 한 줄 (기본) / 'lg' 큰 제목 (내용이 있는 창)
 // cancelLabel을 null로 넘기면 [취소] 없이 확인 버튼 하나 (끝남 안내 창)

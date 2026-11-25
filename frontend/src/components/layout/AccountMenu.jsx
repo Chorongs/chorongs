@@ -118,7 +118,6 @@ const MenuLink = styled(Link)`
   }
 `
 
-
 // 로그아웃 창 (LY-08, MY-02 같이 씀). Layout이 한 번만 그림
 export function LogoutDialog() {
   const logoutOpen = useUiStore((state) => state.logoutOpen)

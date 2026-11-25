@@ -129,13 +129,6 @@ const WhoText = styled.div`
   }
 `
 
-
-
-
-
-
-
-
 // 관리자 목록 안 빈 상태, 안내: 테두리 없는 작은 글씨 (fe_design 빈 상태)
 const Status = styled.p`
   padding: 36px 20px;

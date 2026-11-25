@@ -33,7 +33,7 @@ function requireLogin(action, text) {
 
 export default requireLogin
 
-// 여러 화면이 같이 쓰는 로그인 안내 글 (CM-17, AU-01, AU-03)
+// 여러 화면이 같이 쓰는 로그인 안내 글 (찜 버튼 CM-06, 찜 바로가기 LY-07, 로그인 안내 창 CM-17, 로그인 화면 AU-01, 로그인 처리 AU-02, 가입 단계 AU-03)
 export const LIKE_LOGIN_TEXT = '찜하기는 회원 전용이에요.'
 export const ALREADY_LOGGED_IN_TEXT = '이미 로그인되어 있어요'
 export const LOGIN_OFFLINE_TEXT = '로그인하지 못했어요. 다시 시도해 주세요'

@@ -7,8 +7,8 @@ import { Button } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import MySection, { ProductStatusTag } from './MySection'
 
-// MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / 지우기
-// 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / 지우기 → API-23 DELETE (전체) / 알림은 MySection (MY-03)
+// MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / [선택 삭제] [전체 삭제]
+// 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / [전체 삭제] → API-23 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료, 숨긴 상품이 있으면 딱지 + 안내
 // '다시 비교' → useCompareStore.setPair(productA.productId, productB.productId) 후 /compare (ST-04)
 const Row = styled.div`

@@ -9,7 +9,7 @@ import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
 // MY-04 찜한 대출 (최대 30개): 상품 목록, 쪽 나눔 (E7) / 빈 상태 '맞춤 추천 받기'
-// 찜 취소는 줄의 하트(LikeButton)로 함 (X, 지우기 없음)
+// 찜 취소는 줄의 하트(LikeButton)로 함 (X, [선택 삭제], [전체 삭제] 없음)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
 // 찜 목록 응답은 공통 PageInfo { list, total, page, size }
 // '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음: 추천받기 전이면 추천 창, 받은 뒤면 /recommend (hasResult = useRecommendStore result 유무)

@@ -12,7 +12,6 @@ import {
   formatRateRange,
   formatTagValues,
   formatTime,
-  getTodayText,
 } from './format'
 
 describe('formatNumber', () => {
@@ -255,17 +254,6 @@ describe('formatTagValues', () => {
     const result = formatTagValues(product, 'REPAY')
     // Then
     expect(result).toBe('정보 없음')
-  })
-})
-
-describe('getTodayText', () => {
-  it('한 자리 달, 날짜는 0을 붙여 YYYY-MM-DD로 만든다', () => {
-    // Given
-    const today = new Date(2026, 0, 5)
-    // When
-    const result = getTodayText(today)
-    // Then
-    expect(result).toBe('2026-01-05')
   })
 })
 
