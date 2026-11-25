@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
-import { postSavedRecommend } from '../../api/myApi'
+import { checkSavedRecommend, postSavedRecommend } from '../../api/myApi'
 import {
   CREDIT_BAND_LABEL,
   HOUSING_PURPOSES,
@@ -11,12 +11,13 @@ import {
   MONTHS_UNKNOWN,
   PRIORITY_OPTIONS,
 } from '../../constants/options'
+import useAuthStore from '../../store/useAuthStore'
 import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, IconButton, Panel, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
-import { formatMatchRate } from '../../utils/recommend'
+import { buildSavePayload, formatMatchRate, getSaveKey } from '../../utils/recommend'
 import requireLogin from '../../utils/requireLogin'
 import Disclaimer from '../common/Disclaimer'
 import ProductList from '../common/ProductList'
@@ -37,7 +38,7 @@ const DISCLAIMER_TEXT = '실제 심사가 아닌 참고용이에요. 예상 금�
 // 서민금융진흥원 누리집 (0건 안내의 상담 안내에서 새 창으로)
 const KINFA_URL = 'https://www.kinfa.or.kr/main.do'
 
-// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록, 버튼 글자는 가안 기준)
+// 결과가 0건일 때 바로가기 (이동 주소는 화면 목록, 버튼 글자는 RC-07)
 const EMPTY_SHORTCUTS = [
   { label: '상세 검색으로 찾기', to: '/search' },
   { label: '신용 셀프 진단', to: '/diagnosis/credit' },
@@ -67,7 +68,7 @@ const HeadMain = styled.div`
   gap: 12px;
 `
 
-// 줄이 바뀌어도 오른쪽 끝에 붙음 (가안 .save-row)
+// 줄이 바뀌어도 오른쪽 끝에 붙음
 const SaveButton = styled(Button)`
   margin-left: auto;
 `
@@ -90,8 +91,8 @@ const ConditionTags = styled.div`
   gap: 6px;
 `
 
-// 안내 줄: 앞에 느낌표 아이콘 (가안). 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
-// 안내 줄 사이 간격 20, 카드까지 20 (가안 .excl)
+// 안내 줄: 앞에 느낌표 아이콘. 연체, 기간 모름 같은 서버 안내와 제외 요약에 씀
+// 안내 줄 사이 간격 20, 카드까지 20
 const Notes = styled.ul`
   margin: 0 0 8px;
   padding: 0;
@@ -115,7 +116,7 @@ const NoteLine = styled.li`
   }
 `
 
-// 1~3위 카드는 한 줄에 하나씩 세로로 (가안)
+// 1~3위 카드는 한 줄에 하나씩 세로로
 const CardList = styled.div`
   display: flex;
   flex-direction: column;
@@ -149,7 +150,7 @@ const Hint = styled.p`
   font-size: var(--fs-sm);
 `
 
-// 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼 (가안)
+// 0건 안내 판: 큰 회색 판(Panel) 안에 글 + 바로가기 버튼
 const EmptyText = styled.p`
   margin: 0;
   color: var(--ink-2);
@@ -182,7 +183,7 @@ const getBandText = (creditBand) => {
   return /^\d+ /.test(label) ? label.replace(' ', '점 ') : `${label}점`
 }
 
-// 입력 조건 태그 (가안 순서: 직업, 나이, 지역, 소득, 용도 금액 · 기간, 신용, 기존 대출, 연체, 중요한 것)
+// 입력 조건 태그 (RC-07 순서: 직업, 나이, 지역, 소득, 용도 금액 · 기간, 신용, 기존 대출, 연체, 중요한 것)
 const getConditionLabels = (input) => {
   if (!input) return []
   const job = JOB_OPTIONS.find((option) => option.value === input.job)
@@ -216,18 +217,45 @@ const getConditionLabels = (input) => {
     - useRecommendStore의 result, lastInput을 읽음. 결과가 없으면 아무것도 안 그림 (빈 안내는 RecommendPage가 함)
     - [결과 저장] → API-38 (purpose, need, months, job + 순위대로 productIds), 연타 방지 (E5)
     - 서버가 준 안내 문구(notes, hint)와 제외 요약은 글자로만 출력 (E1)
-    - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 일치도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
-    - TODO(LY-01, 각 이슈 담당): 0건 바로가기의 /search(CHORONG-64 조빌립), /diagnosis/credit(CHORONG-51 김진석), /ranking(CHORONG-60 김채희) 화면은 각 이슈가 라우트를 추가해야 생김 (그 전에는 '찾을 수 없음' 화면)
+    - 1~3위는 추천 카드를 세로로, 4위부터는 상품 한 줄(ProductList, 순위와 추천도 포함)을 10개씩 쪽 넘김 (이미 받은 30개 안에서)
+    - TODO(LY-01): 0건 바로가기 중 /ranking은 아직 라우트가 없어 '찾을 수 없음' 화면이 나옴 (App.jsx에 랭킹 Route가 생기면 지움)
     - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
-    - TODO(RC-07, LOAN-04, CHORONG-45 김채희, CHORONG-43 Tong B): 같은 결과를 누를 때마다 다시 저장됨 (명세서에 중복 규칙 없음, 10개 넘으면 오래된 저장이 밀려 지워짐).
-      시연 뒤 A안: 저장 성공하면 버튼을 '저장했어요'로 잠그고, 새로 추천받으면 다시 풀기 (새로고침 뒤에도 막으려면 useRecommendStore에 저장한 결과 표시 추가). 문서_반영_목록 Q12
-    - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
+    - 같은 내용은 중복 저장하지 않음: 저장에 성공하면 그 내용(조건 + 순위대로 상품 번호, getSaveKey)을 useRecommendStore.savedKey에 기억하고,
+      지금 결과가 같은 내용이면 버튼을 '저장했어요'로 잠금 (새로 추천받아 내용이 달라지면 다시 풀림, 새로고침 뒤에도 유지, 로그아웃과 탈퇴 때 clear()로 지움)
+    - 회원이 이미 저장한 결과면 서버가 추천 응답에 saved: true를 줌 (API-06) → 처음부터 '저장했어요'로 잠금 (다른 탭, 다른 단말기에서 저장한 결과도)
+    - 회원인데 saved를 모르는 결과(추천받은 뒤 로그인함, 다른 탭에서 저장한 뒤 이 화면을 다시 엶)는 서버에 한 번 물어봄 (API-38 check) → true면 잠금
+    - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 결과 화면을 보는 동안 다른 탭이나 다른 단말기에서 같은 결과를 저장했으면 409 → 오류 알림 대신 안내 + 버튼을 '저장했어요'로 잠금
+    - 비교함 필터 (CM-10): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
       (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
 function RecommendResult() {
   const result = useRecommendStore((state) => state.result)
   const lastInput = useRecommendStore((state) => state.lastInput)
+  const savedKey = useRecommendStore((state) => state.savedKey)
+  const markSaved = useRecommendStore((state) => state.markSaved)
   const showToast = useUiStore((state) => state.showToast)
+  const isMember = useAuthStore((state) => state.status === 'member')
+
+  // 지금 결과의 저장 지문 (조건 + 순위대로 상품 번호, 결과가 없거나 0건이면 null)
+  const saveKey = result && lastInput && result.items?.length > 0 ? getSaveKey(buildSavePayload(lastInput, result.items)) : null
+  // 이미 저장한 결과: 이 탭에서 저장한 내용(savedKey)과 같거나, 추천받을 때 서버가 이미 저장했다고 알려 줌(API-06 saved)
+  const isSaved = saveKey !== null && (saveKey === savedKey || result.saved === true)
+
+  // 회원인데 아직 저장했는지 모르면 서버에 한 번 물어봄 (API-38 check): 화면이 열릴 때, 로그인했을 때, 새 결과가 왔을 때
+  // saveKey는 저장 값을 JSON 글로 만든 것이라 다시 객체로 바꿔 보냄 (글자를 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  // 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || saveKey === null || isSaved) return undefined
+    let isCancelled = false
+    checkSavedRecommend(JSON.parse(saveKey))
+      .then((saved) => {
+        if (!isCancelled && saved) markSaved(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, saveKey, isSaved, markSaved])
 
   const tray = useCompareStore((state) => state.tray)
   const [restPage, setRestPage] = useState(0)
@@ -263,27 +291,29 @@ function RecommendResult() {
   const excludedTotal = excluded.reduce((sum, entry) => sum + entry.count, 0)
 
   const saveResult = async () => {
-    if (isSaving) return
+    if (isSaving || isSaved) return
     setIsSaving(true)
     try {
-      await postSavedRecommend({
-        purpose: lastInput.purpose,
-        need: lastInput.need,
-        months: lastInput.months,
-        job: lastInput.job,
-        productIds: items.map((item) => item.product.productId),
-      })
+      await postSavedRecommend(buildSavePayload(lastInput, items))
+      markSaved(saveKey)
       showToast('추천 결과를 저장했어요')
     } catch (error) {
+      const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 실패 알림을 겹쳐 띄우지 않음 (E4)
-      if (error.response?.status === 401) return
+      if (status === 401) return
+      // 409: 서버에 같은 결과가 이미 있음 (다른 탭이나 다른 단말기에서 저장함). 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (RC-07)
+      if (status === 409) {
+        markSaved(saveKey)
+        showToast('이미 저장한 추천 결과예요')
+        return
+      }
       showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
     }
   }
 
-  // 비회원이면 저장 대신 로그인 안내 창 (RC-07 비회원: requireLogin, 문구는 CM-17 '추천 결과 저장', CHORONG-43에서 연결)
+  // 비회원이면 저장 대신 로그인 안내 창 (RC-07 비회원: requireLogin, 문구는 CM-17 '추천 결과 저장')
   const handleSave = () => requireLogin(saveResult, '추천 결과 저장은 회원 전용이에요.')
 
   return (
@@ -303,9 +333,9 @@ function RecommendResult() {
           </ConditionTags>
         </HeadMain>
         {canSave && (
-          <SaveButton $variant="outline" $size="sm" disabled={isSaving} onClick={handleSave}>
-            <Icon name="doc" size={16} />
-            결과 저장
+          <SaveButton $variant="outline" $size="sm" disabled={isSaving || isSaved} onClick={handleSave}>
+            <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+            {isSaved ? '저장했어요' : '결과 저장'}
           </SaveButton>
         )}
       </Head>

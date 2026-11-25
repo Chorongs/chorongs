@@ -34,6 +34,7 @@ import chorong.recommend.dto.EligibilityResponseDTO;
 import chorong.recommend.dto.RecommendItemDTO;
 import chorong.recommend.dto.RecommendRequestDTO;
 import chorong.recommend.dto.RecommendResponseDTO;
+import chorong.recommend.dto.RecommendSaveRequestDTO;
 import chorong.recommend.service.RecommendRule.Candidate;
 import chorong.recommend.service.RecommendRule.Evaluation;
 import chorong.recommend.service.RecommendRule.Filter;
@@ -42,7 +43,7 @@ import lombok.RequiredArgsConstructor;
 
 /*
  * 맞춤 추천 (LOAN-01, 02), 내 조건 판정 (LOAN-05)
- * 후보 = 게시 상품 (메모리 캐시) -> RecommendRule로 판정 -> 일치도 정렬 -> 상위 30개
+ * 후보 = 게시 상품 (메모리 캐시) -> RecommendRule로 판정 -> 일치도 정렬 -> 상위 30개 -> 회원이면 이미 저장한 결과인지 (saved)
  * 입력값은 계산에만 쓰고 DB, 로그에 남기지 않음 (B8)
  */
 @Service
@@ -63,6 +64,7 @@ public class RecommendServiceImpl implements RecommendService {
 	private final ProductRateRepository productRateRepository;
 	private final MemoryCache memoryCache;
 	private final RecommendRule recommendRule;
+	private final RecommendResultService recommendResultService;
 
 	// 판정에 쓰는 나이 범위 (회원 생년월일이 있으면 그 나이 하나)
 	private record AgeRange(int min, int max, boolean birthNote) {}
@@ -118,7 +120,17 @@ public class RecommendServiceImpl implements RecommendService {
 		}
 
 		String hint = passed.isEmpty() ? hint(candidates, request, age) : null;
-		return new RecommendResponseDTO(passed.size(), excluded, notes(request, age, passed.isEmpty()), hint, items);
+		return new RecommendResponseDTO(passed.size(), excluded, notes(request, age, passed.isEmpty()), hint, items,
+				isSaved(request, loginMember, items));
+	}
+
+	// 회원이 이 결과(조건 + 순위대로 상품 번호)를 이미 저장했는지. 화면이 [결과 저장]을 처음부터 '저장했어요'로 잠글 때 씀 (RC-07)
+	private boolean isSaved(RecommendRequestDTO request, LoginMemberDTO loginMember, List<RecommendItemDTO> items) {
+		if (loginMember == null || items.isEmpty()) return false;
+		List<Long> productIds = items.stream().map(item -> item.getProduct().getProductId()).toList();
+		RecommendSaveRequestDTO saveRequest = new RecommendSaveRequestDTO(request.getPurpose(), request.getNeed(),
+				request.getMonths(), request.getJob(), productIds);
+		return recommendResultService.hasSavedResult(loginMember.getMemberId(), saveRequest);
 	}
 
 	@Override

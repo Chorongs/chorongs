@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.repository.MemberRepository;
 import chorong.product.dto.ProductSummaryDTO;
 import chorong.product.entity.LoanProduct;
 import chorong.product.entity.ProductTag;
@@ -35,6 +36,7 @@ import lombok.RequiredArgsConstructor;
 public class RecommendResultServiceImpl implements RecommendResultService {
 
 	private static final int MAX_SAVES = 10;	// 회원당 저장 묶음 수
+	private static final String MSG_ALREADY_SAVED = "이미 저장한 추천 결과예요";	// 같은 결과 다시 저장 409
 
 	// 직업 코드 -> 라벨 글
 	private static final Map<String, String> JOB_NAMES = Map.of(
@@ -51,6 +53,7 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 	private final LoanProductRepository loanProductRepository;
 	private final ProductTagRepository productTagRepository;
 	private final TagRepository tagRepository;
+	private final MemberRepository memberRepository;
 
 	@Override
 	@Transactional
@@ -65,13 +68,22 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 			throw new BusinessException(ErrorCode.INVALID_INPUT, "저장할 상품을 확인해 주세요.");
 		}
 
-		// 2. 라벨 -> 3. 묶음 번호 1개 발급 -> 상품마다 1행 (같은 라벨, 같은 시각)
+		// 2. 라벨
 		String label = conditionLabel(request);
+
+		// 3. 회원 행 잠금 (B9): 같은 회원의 저장은 한 번에 하나씩 → 다른 탭, 단말기에서 동시에 눌러도 같은 결과 확인과 10개 정리가 맞음
+		memberRepository.findLockedByMemberId(memberId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_REQUIRED));
+		if (hasSameResult(recommendResultRepository.findByMemberIdOrderBySaveIdDescRankNoAsc(memberId), label, productIds)) {
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_SAVED);
+		}
+
+		// 4. 묶음 번호 1개 발급 -> 상품마다 1행 (같은 라벨, 같은 시각)
 		Long saveId = recommendResultRepository.nextSaveId();
 		LocalDateTime now = LocalDateTime.now().withNano(0);
 		recommendResultRepository.saveAll(request.toEntities(saveId, memberId, label, now));
 
-		// 4. 10개 넘으면 가장 오래된 묶음부터 삭제
+		// 5. 10개 넘으면 가장 오래된 묶음부터 삭제
 		List<Long> saveIds = recommendResultRepository.findByMemberIdOrderBySaveIdDescRankNoAsc(memberId).stream()
 				.map(RecommendResult::getSaveId)
 				.distinct()
@@ -80,6 +92,14 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 			recommendResultRepository.deleteBySaveIdAndMemberId(saveIds.get(i), memberId);
 		}
 		return saveId;
+	}
+
+	// 읽기만 하므로 잠그지 않음 (저장은 saveRecommendResult가 잠근 뒤 다시 확인)
+	@Override
+	@Transactional(readOnly = true)
+	public boolean hasSavedResult(Long memberId, RecommendSaveRequestDTO request) {
+		return hasSameResult(recommendResultRepository.findByMemberIdOrderBySaveIdDescRankNoAsc(memberId),
+				conditionLabel(request), request.getProductIds());
 	}
 
 	@Override
@@ -138,6 +158,18 @@ public class RecommendResultServiceImpl implements RecommendResultService {
 		String term = request.getMonths() == 0 ? "기간 모름" : request.getMonths() / 12 + "년";
 		return request.getPurpose() + " " + RecommendRule.formatMoney(request.getNeed())
 				+ " / " + term + " / " + JOB_NAMES.get(request.getJob());
+	}
+
+	// 같은 결과: 조건 라벨과 순위별 상품 번호가 모두 같은 저장 (행은 저장 번호 내림차순, 저장 안에서 순위 오름차순)
+	// 라벨은 용도, 금액, 기간, 직업으로 하나씩 정해지는 글이라 라벨이 같으면 네 값이 같음
+	private static boolean hasSameResult(List<RecommendResult> rows, String label, List<Long> productIds) {
+		Map<Long, List<Long>> productIdsBySave = new LinkedHashMap<>();
+		for (RecommendResult row : rows) {
+			if (label.equals(row.getConditionLabel())) {
+				productIdsBySave.computeIfAbsent(row.getSaveId(), id -> new ArrayList<>()).add(row.getProductId());
+			}
+		}
+		return productIdsBySave.containsValue(productIds);
 	}
 
 	// 상품별 태그 (태그 번호순)

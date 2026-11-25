@@ -44,6 +44,7 @@ import chorong.recommend.dto.EligibilityResponseDTO;
 import chorong.recommend.dto.RecommendItemDTO;
 import chorong.recommend.dto.RecommendRequestDTO;
 import chorong.recommend.dto.RecommendResponseDTO;
+import chorong.recommend.dto.RecommendSaveRequestDTO;
 
 /*
  * RecommendServiceImpl 테스트 (LOAN-01, 02, 05)
@@ -57,6 +58,7 @@ class RecommendServiceImplTest {
 	private TagRepository tagRepository;
 	private ProductTagRepository productTagRepository;
 	private ProductRateRepository productRateRepository;
+	private RecommendResultService recommendResultService;
 	private RecommendServiceImpl recommendService;
 
 	// 모든 상품이 같이 쓰는 태그 (생활비, 전월세, 제한 없음, 전국, 신용 무관)
@@ -73,9 +75,10 @@ class RecommendServiceImplTest {
 		tagRepository = mock(TagRepository.class);
 		productTagRepository = mock(ProductTagRepository.class);
 		productRateRepository = mock(ProductRateRepository.class);
+		recommendResultService = mock(RecommendResultService.class);
 		RecommendRule rule = new RecommendRule(0.2, 0.3, 0.1, 0.6, 0.4, 40, 30);
 		recommendService = new RecommendServiceImpl(loanProductRepository, tagRepository, productTagRepository,
-				productRateRepository, new MemoryCache(), rule);
+				productRateRepository, new MemoryCache(), rule, recommendResultService);
 		when(tagRepository.findAll()).thenReturn(tags);
 		when(productRateRepository.findByRateKind(RateKind.CREDIT)).thenReturn(List.of());
 	}
@@ -461,6 +464,80 @@ class RecommendServiceImplTest {
 
 		// Then
 		assertFalse(output.getAll().contains("98765"));
+	}
+
+	// ---- 이미 저장한 결과인지 (saved) ----
+
+	private static LoginMemberDTO member() {
+		return new LoginMemberDTO(1L, "회원", "1990", "01-01");
+	}
+
+	@Test
+	void 회원이_같은_결과를_저장했으면_saved는_true() {
+		// Given
+		givenProducts(3);
+		when(recommendResultService.hasSavedResult(any(), any())).thenReturn(true);
+
+		// When
+		RecommendResponseDTO response = recommendService.getRecommendations(request(), member());
+
+		// Then
+		assertTrue(response.getSaved());
+	}
+
+	@Test
+	void 회원이_저장하지_않은_결과면_saved는_false() {
+		// Given
+		givenProducts(3);
+		when(recommendResultService.hasSavedResult(any(), any())).thenReturn(false);
+
+		// When
+		RecommendResponseDTO response = recommendService.getRecommendations(request(), member());
+
+		// Then
+		assertFalse(response.getSaved());
+	}
+
+	@Test
+	void 비회원이면_saved는_false() {
+		// Given
+		givenProducts(3);
+
+		// When
+		RecommendResponseDTO response = recommendService.getRecommendations(request(), null);
+
+		// Then
+		assertFalse(response.getSaved());
+	}
+
+	@Test
+	void 비회원이면_저장_여부를_조회하지_않음() {
+		// Given
+		givenProducts(3);
+
+		// When
+		recommendService.getRecommendations(request(), null);
+
+		// Then
+		verify(recommendResultService, never()).hasSavedResult(any(), any());
+	}
+
+	@Test
+	void 저장_여부는_결과의_순위대로_상품_번호로_조회() {
+		// Given: 조회에 넘어온 상품 번호를 모아 둠
+		givenProducts(3);
+		List<Long> asked = new ArrayList<>();
+		when(recommendResultService.hasSavedResult(any(), any())).thenAnswer(invocation -> {
+			RecommendSaveRequestDTO saveRequest = invocation.getArgument(1);
+			asked.addAll(saveRequest.getProductIds());
+			return false;
+		});
+
+		// When
+		List<RecommendItemDTO> items = recommendService.getRecommendations(request(), member()).getItems();
+
+		// Then
+		assertEquals(items.stream().map(item -> item.getProduct().getProductId()).toList(), asked);
 	}
 
 	// ---- 내 조건 판정 (LOAN-05) ----

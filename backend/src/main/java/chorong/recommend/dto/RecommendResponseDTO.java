@@ -18,6 +18,7 @@ public class RecommendResponseDTO {
 	private List<String> notes;				// 결과 위 안내 문구
 	private String hint;					// 0건일 때 조건 하나를 풀면 가장 많이 늘어나는 조건 문구, 아니면 null
 	private List<RecommendItemDTO> items;	// 최대 30개
+	private Boolean saved;					// 회원이 이 결과(조건 라벨 + 순위별 상품 번호)를 이미 저장했으면 true, 비회원과 0건은 false
 
 	@Data
 	@NoArgsConstructor
