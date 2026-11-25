@@ -7,6 +7,7 @@ import naverSymbol from '../../assets/images/naver_symbol.png'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
 import { ADMIN_SESSION_TEXT, ALREADY_LOGGED_IN_TEXT, LOGIN_OFFLINE_TEXT, checkSocialLogin } from '../../utils/requireLogin'
+import { lockScroll, unlockScroll } from '../../utils/scrollLock'
 import Modal from '../ui/Modal'
 
 // CM-17 로그인 안내 창: 회원 전용 기능 안내 (Layout에서 한 번만 그림, 다른 팝업 위 z-index 91)
@@ -45,11 +46,8 @@ function LoginRequiredDialog() {
   // 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
     if (!loginDialogOpen) return undefined
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prevOverflow
-    }
+    lockScroll()
+    return unlockScroll
   }, [loginDialogOpen])
 
   const handleClose = () => useUiStore.setState({ loginDialogOpen: false })

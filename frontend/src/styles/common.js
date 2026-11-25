@@ -414,6 +414,7 @@ export const StatusText = styled.p`
 `
 
 // 글자 입력칸 하나: label 안에 칸 이름 글자 + input + 칸 아래 글 (닉네임, 생년월일 칸이 같이 씀)
+// input에 aria-invalid="true"면 테두리 빨간색 (틀린 칸 표시, NumberField와 같은 색)
 export const InputField = styled.label`
   display: flex;
   flex-direction: column;
@@ -432,4 +433,22 @@ export const InputField = styled.label`
       height: 48px;
     }
   }
+  input[aria-invalid='true'] {
+    border-color: var(--bad);
+  }
+`
+
+// 개수 딱지: 높이 16 주황 알약 + 흰 숫자 (상단 찜 하트 LY-07, 계정 메뉴 '찜한 대출' LY-08이 같이 씀)
+export const CountBadge = styled.span`
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--brand-strong);
+  color: var(--on-brand);
+  font-family: var(--f-num);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 `

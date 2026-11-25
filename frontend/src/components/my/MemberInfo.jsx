@@ -7,7 +7,7 @@ import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError, InputField } from '../../styles/common'
-import { BIRTH_ERROR, isAdultBirthDate, isValidNickname } from '../../utils/validate'
+import { BIRTH_ERROR, RECHECK_INPUT_TEXT, isAdultBirthDate, isValidNickname } from '../../utils/validate'
 import BirthDateField from '../auth/BirthDateField'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
@@ -21,7 +21,7 @@ import Checkbox from '../ui/Checkbox'
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
 //   - 생년월일: 숫자 8자리 입력 (BirthDateField) → 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전, 만 19세 이상 (isAdultBirthDate)
 //   - 원래 생년월일이 있던 회원이 칸을 비우거나 덜 치면 저장 안 됨
-//   - 오류는 칸 바로 아래에 치는 동안 바로 보임 (닉네임 글, 생년월일 칸 안내는 BirthDateField)
+//   - 오류는 칸 바로 아래에 치는 동안 바로 보임 (닉네임 글, 생년월일 칸 안내는 BirthDateField), 틀린 칸은 테두리도 빨간색 (InputField aria-invalid)
 //     오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림 (생년월일이 비었거나 덜 쳤으면 그때 칸 아래도 오류로)
 //   - [저장]은 하나: 원래 값과 비교해 바뀐 칸만 보냄 (아무것도 안 바뀌면 보내지 않고 '바뀐 내용이 없어요')
 //   - 서버 400 → 서버 문구를 맨 아래에 표시
@@ -127,7 +127,7 @@ function MemberInfo() {
     if (nicknameError || isBirthWrong) {
       setIsSaveTried(true)
       setError('')
-      showToast('입력한 내용을 다시 확인해 주세요')
+      showToast(RECHECK_INPUT_TEXT)
       return
     }
     const body = {}

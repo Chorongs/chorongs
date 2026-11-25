@@ -146,6 +146,8 @@ const GlobalStyle = createGlobalStyle`
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* 화면 스크롤바 틀을 늘 보임: 창이 열려 뒤 화면을 잠가도(utils/scrollLock.js) 막대가 사라지며 화면이 밀리지 않게 */
+    overflow-y: scroll;
   }
 
   body {
