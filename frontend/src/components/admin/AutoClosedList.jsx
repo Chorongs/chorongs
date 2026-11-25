@@ -3,11 +3,11 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { AUTO_CLOSED_STATUS_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
+import { Button, InlineError, Tag } from '../../styles/common'
 import { formatDate, formatDateTime } from '../../utils/format'
+import ConfirmDialog from '../common/ConfirmDialog'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
-import Modal from '../ui/Modal'
 
 // AD-11 자동 내림 확인: 칩 (확인 전 (기본) / 확인함 / 다시 게시함) / 선택 바 (전체 선택, n개 선택, [확인 · 판매 종료 유지] [다시 게시]) / 줄 (체크, 상품명·기관, 종료일, 내린 날, 상태)
 // 체크는 '확인 전'(checkResult null) 줄에만 (이미 처리한 줄은 서버가 409)
@@ -181,12 +181,6 @@ const Status = styled.p`
 const More = styled.div`
   display: flex;
   justify-content: center;
-`
-
-const DialogTitle = styled.h2`
-  margin-bottom: 16px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
 `
 
 const Mine = styled.p`
@@ -408,20 +402,21 @@ function AutoClosedList({ onChanged }) {
       )}
       <InlineError>{error}</InlineError>
 
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="다시 게시" width={460} showClose={false}>
-        <DialogTitle>{selectedIds.length}개를 다시 게시할까요?</DialogTitle>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        label="다시 게시"
+        title={`${selectedIds.length}개를 다시 게시할까요?`}
+        titleSize="lg"
+        confirmLabel="다시 게시"
+        onConfirm={() => handleAction('REOPEN')}
+        isConfirmDisabled={isPending}
+        width={460}
+      >
         <Mine>
           종료일을 비우고 다시 게시해요. 다음 불러오기에서 출처 종료일로 다시 채워져요. 판매가 계속되는 걸 확인한 경우에만 눌러 주세요.
         </Mine>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setIsConfirmOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={() => handleAction('REOPEN')} disabled={isPending}>
-            다시 게시
-          </Button>
-        </DialogActions>
-      </Modal>
+      </ConfirmDialog>
     </Wrap>
   )
 }

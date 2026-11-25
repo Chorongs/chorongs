@@ -4,10 +4,10 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { CHECK_REASON_LABEL, IMPORT_CHANGE_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
+import { Button, InlineError, Tag } from '../../styles/common'
+import ConfirmDialog from '../common/ConfirmDialog'
 import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
-import Modal from '../ui/Modal'
 
 // AD-05 바뀐 상품 확인, 반영 (② 바뀐 내용 확인 후 반영)
 // job: ①에서 [최신 상품 불러오기]로 DB에서 읽은 작업 (ImportStatusResponseDTO, jobStatus DONE. 없으면 안내만). AdminPage가 key={jobId}로 그려 작업마다 새로 시작
@@ -298,12 +298,6 @@ const Empty = styled.div`
   text-align: center;
 `
 
-const DialogTitle = styled.h2`
-  margin-bottom: 16px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
-`
-
 // 확인 창 숫자 4칸
 const Nums = styled.div`
   display: grid;
@@ -585,8 +579,17 @@ function ImportDiff({ job, onPublished }) {
       {body}
       <InlineError>{error}</InlineError>
 
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="사이트에 반영" width={520} showClose={false}>
-        <DialogTitle>{selectedItems.length}건을 사이트에 반영할까요?</DialogTitle>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        label="사이트에 반영"
+        title={`${selectedItems.length}건을 사이트에 반영할까요?`}
+        titleSize="lg"
+        confirmLabel="반영하기"
+        onConfirm={handlePublish}
+        isConfirmDisabled={isPublishing}
+        width={520}
+      >
         <Nums>
           {COUNT_TYPES.map((type) => (
             <div key={type}>
@@ -602,15 +605,7 @@ function ImportDiff({ job, onPublished }) {
           반영하면 상품 찾기 · 대출 랭킹 · 추천 결과에 바로 나타나요. 판매 중단 상품은 사이트에서 내려가고, 찜 · 최근 본 · 비교 내역에는
           ‘판매 종료’ 딱지로 남아요. 숨긴 상품은 값만 바뀌고 숨김을 유지해요. 반영한 뒤에도 ‘반영 이력’에서 되돌릴 수 있어요.
         </Mine>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setIsConfirmOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={handlePublish} disabled={isPublishing}>
-            반영하기
-          </Button>
-        </DialogActions>
-      </Modal>
+      </ConfirmDialog>
     </Wrap>
   )
 }

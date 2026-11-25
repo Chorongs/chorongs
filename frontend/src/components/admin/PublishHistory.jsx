@@ -3,10 +3,10 @@ import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
 import { HISTORY_ACTION_TYPE_LABEL, IMPORT_SOURCE_LABEL } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, InlineError, Tag } from '../../styles/common'
+import { Button, InlineError, Tag } from '../../styles/common'
 import { formatDateTime } from '../../utils/format'
+import ConfirmDialog from '../common/ConfirmDialog'
 import ChipGroup from '../ui/ChipGroup'
-import Modal from '../ui/Modal'
 
 // AD-06 반영 이력: 종류 칩 (전체 + 6종) / 최신순 12건 + [더 보기] (E7, PageInfo) / v번호, 언제, 종류, 무엇, 누가 ('자동', '탈퇴한 관리자' 포함) / '이 시점으로'
 // '이 시점으로' → 되돌리기 미리보기 (API-54) → 확인 창 ('이 시점 이후 n건이 취소돼요, 상품 m개가 바뀌어요' + 종료일 지난 상품 안내 + 미처리 신고 안내)
@@ -134,12 +134,6 @@ const Status = styled.p`
 const More = styled.div`
   display: flex;
   justify-content: center;
-`
-
-const DialogTitle = styled.h2`
-  margin-bottom: 16px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
 `
 
 const DialogBody = styled.div`
@@ -363,33 +357,32 @@ function PublishHistory({ onChanged }) {
         </More>
       )}
 
-      <Modal isOpen={target !== null} onClose={() => setTarget(null)} label="이 시점으로 되돌리기" width={480} showClose={false}>
+      <ConfirmDialog
+        isOpen={target !== null}
+        onClose={() => setTarget(null)}
+        label="이 시점으로 되돌리기"
+        title={target !== null ? `v${target.item.historyId} 시점으로 되돌릴까요?` : ''}
+        titleSize="lg"
+        confirmLabel="되돌리기"
+        onConfirm={handleRollback}
+        isConfirmDisabled={isPending}
+        width={480}
+      >
         {target !== null && (
-          <>
-            <DialogTitle>v{target.item.historyId} 시점으로 되돌릴까요?</DialogTitle>
-            <DialogBody>
-              <Mine>
-                이 시점 이후 <b>{preview.cancelCount ?? 0}건</b>이 취소돼요. 상품 <b>{preview.changedProductCount ?? 0}개</b>가 바뀌어요.
-              </Mine>
-              <p>종료일이 지난 상품은 다음 자동 내림 때 다시 내려가요. 되돌리기도 새 이력으로 남아요.</p>
-              {preview.unhiddenReportCount > 0 && (
-                <Warn>
-                  미처리 신고 {preview.unhiddenReportCount}건이 남아 있어요. 다음 신고가 들어오면 다시 숨겨져요. 신고 상품 관리에서 처리해 주세요.
-                </Warn>
-              )}
-              <InlineError>{error}</InlineError>
-            </DialogBody>
-            <DialogActions>
-              <Button $variant="outline" onClick={() => setTarget(null)}>
-                취소
-              </Button>
-              <Button onClick={handleRollback} disabled={isPending}>
-                되돌리기
-              </Button>
-            </DialogActions>
-          </>
+          <DialogBody>
+            <Mine>
+              이 시점 이후 <b>{preview.cancelCount ?? 0}건</b>이 취소돼요. 상품 <b>{preview.changedProductCount ?? 0}개</b>가 바뀌어요.
+            </Mine>
+            <p>종료일이 지난 상품은 다음 자동 내림 때 다시 내려가요. 되돌리기도 새 이력으로 남아요.</p>
+            {preview.unhiddenReportCount > 0 && (
+              <Warn>
+                미처리 신고 {preview.unhiddenReportCount}건이 남아 있어요. 다음 신고가 들어오면 다시 숨겨져요. 신고 상품 관리에서 처리해 주세요.
+              </Warn>
+            )}
+            <InlineError>{error}</InlineError>
+          </DialogBody>
         )}
-      </Modal>
+      </ConfirmDialog>
     </Wrap>
   )
 }

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import styled from 'styled-components'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, DialogText, EmptyBox, IconButton, StatusText, Tag } from '../../styles/common'
+import { Button, EmptyBox, IconButton, StatusText, Tag } from '../../styles/common'
+import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
 import Icon from '../ui/Icon'
-import Modal from '../ui/Modal'
 
 // MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 [고르기] '지우기'(전체) / 목록(줄마다 X) 또는 빈 상태
 // 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 지웠어요' / '지우기' → 확인 창 → onClearAll() + '{구역 이름}을(를) 지웠어요'
@@ -85,24 +85,6 @@ export function ProductStatusTag({ product }) {
   if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
   if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
   return null
-}
-
-// 지우기 확인 창 (전체, 고른 기록, 줄 X가 같이 씀): 질문 / 지울 기록 이름(있을 때) / [취소] [지우기]
-function RemoveConfirm({ isOpen, onClose, label, question, target = '', onConfirm, isDisabled }) {
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} label={label} width={380} showClose={false}>
-      <DialogText>{question}</DialogText>
-      {target && <DialogTarget>{target}</DialogTarget>}
-      <DialogActions>
-        <Button $variant="outline" onClick={onClose}>
-          취소
-        </Button>
-        <Button onClick={onConfirm} disabled={isDisabled}>
-          지우기
-        </Button>
-      </DialogActions>
-    </Modal>
-  )
 }
 
 // 받침이 있으면 '을', 없으면 '를' (한글이 아닌 글자로 끝나면 '을(를)')
@@ -288,31 +270,35 @@ function MySection({
         </More>
       )}
 
-      <RemoveConfirm
+      <ConfirmDialog
         isOpen={isConfirmOpen}
         onClose={() => setIsConfirmOpen(false)}
         label={`${title} 지우기`}
-        question={`${withObjectParticle(title)} 모두 지울까요?`}
+        title={`${withObjectParticle(title)} 모두 지울까요?`}
+        confirmLabel="지우기"
         onConfirm={handleClearAll}
-        isDisabled={isPending}
+        isConfirmDisabled={isPending}
       />
-      <RemoveConfirm
+      <ConfirmDialog
         isOpen={isSelectConfirmOpen}
         onClose={() => setIsSelectConfirmOpen(false)}
         label={`${title}에서 고른 기록 지우기`}
-        question={`고른 기록 ${selectedItems.length}개를 지울까요?`}
+        title={`고른 기록 ${selectedItems.length}개를 지울까요?`}
+        confirmLabel="지우기"
         onConfirm={handleRemoveSelected}
-        isDisabled={isPending || selectedItems.length === 0}
+        isConfirmDisabled={isPending || selectedItems.length === 0}
       />
-      <RemoveConfirm
+      <ConfirmDialog
         isOpen={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
         label={`${title}에서 지우기`}
-        question="이 기록을 지울까요?"
-        target={removeTarget !== null ? getItemLabel(removeTarget) : ''}
+        title="이 기록을 지울까요?"
+        confirmLabel="지우기"
         onConfirm={() => handleRemove(removeTarget)}
-        isDisabled={isPending}
-      />
+        isConfirmDisabled={isPending}
+      >
+        {removeTarget !== null && <DialogTarget>{getItemLabel(removeTarget)}</DialogTarget>}
+      </ConfirmDialog>
     </section>
   )
 }

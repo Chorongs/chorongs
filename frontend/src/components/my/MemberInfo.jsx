@@ -6,12 +6,12 @@ import useAuthStore from '../../store/useAuthStore'
 import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, DialogActions, DialogText, InlineError, InputField } from '../../styles/common'
+import { Button, Card, InlineError, InputField } from '../../styles/common'
 import { BIRTH_ERROR, isValidBirthDate, isValidNickname } from '../../utils/validate'
 import BirthDateField from '../auth/BirthDateField'
+import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
-import Modal from '../ui/Modal'
 
 // MY-11 회원 정보: 닉네임, 생년월일 수정 (API-28 PATCH, 바꾼 것만 보냄) / [회원 탈퇴] (API-28 DELETE)
 // 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜 → 오류 문구 (E2) / 400 → 서버 문구
@@ -67,12 +67,6 @@ const Bottom = styled.div`
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px;
-`
-
-const DialogTitle = styled.h2`
-  margin-bottom: 12px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
 `
 
 const DialogBody = styled.div`
@@ -226,8 +220,18 @@ function MemberInfo() {
         </Form>
       </Card>
 
-      <Modal isOpen={withdrawStep === 'confirm'} onClose={() => setWithdrawStep(null)} label="회원 탈퇴" width={460}>
-        <DialogTitle>회원 탈퇴</DialogTitle>
+      <ConfirmDialog
+        isOpen={withdrawStep === 'confirm'}
+        onClose={() => setWithdrawStep(null)}
+        label="회원 탈퇴"
+        title="회원 탈퇴"
+        titleSize="lg"
+        confirmLabel="탈퇴하기"
+        onConfirm={handleWithdraw}
+        isConfirmDisabled={!isChecked || isWithdrawing}
+        width={460}
+        showClose
+      >
         <DialogBody>
           <p>탈퇴하면 아래 정보가 모두 지워지고 되돌릴 수 없어요.</p>
           <ul>
@@ -241,26 +245,23 @@ function MemberInfo() {
           <Checkbox checked={isChecked} onChange={setIsChecked} label="위 내용을 확인했어요" />
           <ErrorText>{withdrawError}</ErrorText>
         </DialogBody>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setWithdrawStep(null)}>
-            취소
-          </Button>
-          <Button onClick={handleWithdraw} disabled={!isChecked || isWithdrawing}>
-            탈퇴하기
-          </Button>
-        </DialogActions>
-      </Modal>
+      </ConfirmDialog>
 
-      <Modal isOpen={withdrawStep === 'done'} onClose={handleDoneClose} label="탈퇴 완료" width={380} showClose={false}>
-        <DialogText>
-          탈퇴했어요.
-          <br />
-          개인정보와 이용 기록을 모두 지웠어요
-        </DialogText>
-        <DialogActions>
-          <Button onClick={handleDoneClose}>확인</Button>
-        </DialogActions>
-      </Modal>
+      <ConfirmDialog
+        isOpen={withdrawStep === 'done'}
+        onClose={handleDoneClose}
+        label="탈퇴 완료"
+        title={
+          <>
+            탈퇴했어요.
+            <br />
+            개인정보와 이용 기록을 모두 지웠어요
+          </>
+        }
+        confirmLabel="확인"
+        onConfirm={handleDoneClose}
+        cancelLabel={null}
+      />
     </section>
   )
 }

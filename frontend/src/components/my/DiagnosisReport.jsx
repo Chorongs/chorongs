@@ -5,10 +5,10 @@ import * as myApi from '../../api/myApi'
 import { CREDIT_BAND_LABEL } from '../../constants/options'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, DialogText, EmptyBox, StatusText } from '../../styles/common'
+import { Button, EmptyBox, StatusText } from '../../styles/common'
 import { formatDate } from '../../utils/format'
+import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
-import Modal from '../ui/Modal'
 
 // MY-09 내 진단 리포트: 저장한 신용 구간 + 진단 시각 / [이 구간으로 추천받기] / [삭제]
 // 삭제 → 확인 후 API-25 DELETE / 없으면(204) 빈 상태 + '신용 셀프 진단 하기' (E11)
@@ -178,17 +178,15 @@ function DiagnosisReport() {
         )}
       </SectionHeader>
       {body}
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="진단 리포트 삭제" width={380} showClose={false}>
-        <DialogText>내 진단 리포트를 지울까요?</DialogText>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setIsConfirmOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={handleDelete} disabled={isPending}>
-            삭제
-          </Button>
-        </DialogActions>
-      </Modal>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        label="진단 리포트 삭제"
+        title="내 진단 리포트를 지울까요?"
+        confirmLabel="삭제"
+        onConfirm={handleDelete}
+        isConfirmDisabled={isPending}
+      />
     </section>
   )
 }

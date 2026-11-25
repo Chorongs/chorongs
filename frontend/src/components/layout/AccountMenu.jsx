@@ -4,9 +4,9 @@ import styled from 'styled-components'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
 import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, DialogActions, DialogText } from '../../styles/common'
+import { Button } from '../../styles/common'
+import ConfirmDialog from '../common/ConfirmDialog'
 import Icon from '../ui/Icon'
-import Modal from '../ui/Modal'
 import Popover from '../ui/Popover'
 
 // LY-08 계정 메뉴: 비회원 [로그인] / 회원 닉네임 버튼 → 작은 메뉴 (MY, 로그아웃)
@@ -83,28 +83,31 @@ export function LogoutDialog() {
 
   return (
     <>
-      <Modal isOpen={logoutOpen && !isDone} onClose={closeLogout} label="로그아웃 확인" width={380} showClose={false}>
-        <DialogText>로그아웃할까요?</DialogText>
-        <DialogActions>
-          <Button $variant="outline" onClick={closeLogout}>
-            취소
-          </Button>
-          <Button onClick={handleLogout} disabled={isPending}>
-            로그아웃
-          </Button>
-        </DialogActions>
-      </Modal>
+      <ConfirmDialog
+        isOpen={logoutOpen && !isDone}
+        onClose={closeLogout}
+        label="로그아웃 확인"
+        title="로그아웃할까요?"
+        confirmLabel="로그아웃"
+        onConfirm={handleLogout}
+        isConfirmDisabled={isPending}
+      />
 
-      <Modal isOpen={isDone} onClose={handleDoneClose} label="로그아웃 완료" width={380} showClose={false}>
-        <DialogText>
-          로그아웃했어요.
-          <br />
-          메인 페이지로 이동할게요
-        </DialogText>
-        <DialogActions>
-          <Button onClick={handleDoneClose}>확인</Button>
-        </DialogActions>
-      </Modal>
+      <ConfirmDialog
+        isOpen={isDone}
+        onClose={handleDoneClose}
+        label="로그아웃 완료"
+        title={
+          <>
+            로그아웃했어요.
+            <br />
+            메인 페이지로 이동할게요
+          </>
+        }
+        confirmLabel="확인"
+        onConfirm={handleDoneClose}
+        cancelLabel={null}
+      />
     </>
   )
 }
