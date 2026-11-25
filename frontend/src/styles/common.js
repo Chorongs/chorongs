@@ -413,3 +413,24 @@ export const StatusText = styled.p`
   color: var(--cocoa);
   text-align: center;
 `
+
+// 글자 입력칸 하나: label 안에 칸 이름 글자 + input + 칸 아래 글 (닉네임, 생년월일 칸이 같이 씀)
+export const InputField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  input {
+    height: 52px;
+    padding: 0 16px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    @media (max-width: 899px) {
+      height: 48px;
+    }
+  }
+`

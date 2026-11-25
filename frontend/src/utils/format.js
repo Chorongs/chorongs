@@ -108,8 +108,9 @@ export function approvedByText(admin) {
   return '첫 관리자 자동 승인'
 }
 
-// 생년월일 입력칸 글: 숫자만 8자리까지 남겨 'YYYY-MM-DD' 모양으로 이음 (예: '199001' → '1990-01', '19900101' → '1990-01-01')
-// 붙여 넣은 '1990.01.01', '1990-01-01'도 숫자만 남겨 같은 모양으로 (맞는 날짜인지는 validate.js isValidBirthDate)
+// 생년월일 칸 값: 숫자만 8자리까지 남겨 'YYYY-MM-DD' 모양으로 이음 (예: '199001' → '1990-01', '19900101' → '1990-01-01')
+// 칸에는 숫자만 보이고, 검사와 서버로 보낼 때 이 모양을 씀 (BirthDateField). 붙여 넣은 '1990.01.01'도 같은 모양으로
+// 맞는 날짜인지는 validate.js isValidBirthDate, 치는 동안 상태는 getBirthInputState
 export function formatBirthInput(text) {
   const digits = String(text ?? '').replace(/\D/g, '').slice(0, 8)
   return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-')

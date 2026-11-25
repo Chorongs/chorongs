@@ -13,6 +13,7 @@ import MySection from '../my/MySection'
 // - 기록 줄: 위 굵은 글 getMain(item) / 아래 작은 글 getSubs(item) (빈 값은 빼고 가운데 점으로 이음) + 저장 시각 / [불러오기]
 // - [불러오기]: onLoad(item)이 있으면 그 화면이 입력칸을 채움 (계산기 안)
 //   없으면 calcPath로 이동하며 값을 넘김 (MY): stateKeys가 있으면 그 칸만 (입력값만, 결과는 계산기가 다시 계산, CA-01), 없으면 기록 한 줄 그대로
+// - getItemLabel: 지우기 확인 창에 보일 기록 이름 (안 넘기면 '{위 굵은 글}, {저장 시각} 저장')
 // - api: { getAll, removeOne(기록 번호), removeAll } (파일 맨 위 상수로 둠, 그릴 때마다 새로 만들면 목록을 계속 다시 받음)
 // - getId(item): 기록 번호 / refreshKey: 바뀌면 목록을 다시 받음 (계산기에서 [결과 저장] 뒤)
 const Guest = styled.section`
@@ -83,8 +84,8 @@ function CalcRecordList({
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true
@@ -134,7 +135,7 @@ function CalcRecordList({
       onRetry={handleRetry}
       items={result.items}
       getKey={getId}
-      getItemLabel={getItemLabel}
+      getItemLabel={getItemLabel ?? ((item) => `${getMain(item)}, ${formatDate(item.calcAt)} 저장`)}
       renderItem={(item) => (
         <Row>
           <Info>

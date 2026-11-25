@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import styled from 'styled-components'
-import { PREPARING_TEXT } from '../../api/axiosInstance'
 import useUiStore from '../../store/useUiStore'
 import { Button, DialogActions, DialogText, EmptyBox, IconButton, StatusText, Tag } from '../../styles/common'
 import SectionHeader from '../common/SectionHeader'
@@ -10,9 +9,9 @@ import Modal from '../ui/Modal'
 // MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 '지우기'(전체) / 목록(줄마다 X) 또는 빈 상태
 // 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 지웠어요' / '지우기' → 확인 창 → onClearAll() + '{구역 이름}을(를) 지웠어요'
 // (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7)
-// title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록)
+// title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
 // onRemove, onClearAll을 안 넘기면 X, '지우기'를 안 그림 (찜한 대출) / isInline: 줄 대신 칩처럼 옆으로 (최근 검색)
-// status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'preparing' 서버 API가 아직 없음 → '아직 준비 중인 서비스예요' (E3) / 'done' 목록 또는 빈 상태 (E11)
+// status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
 const List = styled.ul`
@@ -120,8 +119,6 @@ function MySection({
   let body
   if (status === 'loading') {
     body = <StatusText role="status">불러오는 중이에요</StatusText>
-  } else if (status === 'preparing') {
-    body = <EmptyBox>{PREPARING_TEXT}</EmptyBox>
   } else if (status === 'error') {
     body = (
       <EmptyBox>

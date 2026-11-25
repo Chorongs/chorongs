@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   getAboutMeError,
+  getBirthInputState,
   getCreditError,
   getMoneyError,
   getMonthsOptions,
@@ -578,5 +579,126 @@ describe('isValidAdminName', () => {
     const result = isValidAdminName(name)
     // Then
     expect(result).toBe(false)
+  })
+})
+
+describe('getBirthInputState', () => {
+  const today = new Date(2026, 10, 17)
+
+  it('아무것도 안 쳤으면 empty', () => {
+    // Given
+    const text = ''
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('empty')
+  })
+
+  it('치는 중이고 틀린 곳이 없으면 typing', () => {
+    // Given
+    const text = '199404'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('typing')
+  })
+
+  it('맞는 날짜 8자리는 ok', () => {
+    // Given
+    const text = '19940429'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('ok')
+  })
+
+  it('붙임표가 있어도 숫자만 보고 ok', () => {
+    // Given
+    const text = '1994-04-29'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('ok')
+  })
+
+  it('첫 자리가 3이면 연도가 될 수 없어 bad', () => {
+    // Given
+    const text = '3'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('1900년 전 연도는 bad', () => {
+    // Given
+    const text = '1899'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('올해 뒤 연도는 bad', () => {
+    // Given
+    const text = '2027'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('월 첫 자리가 2 이상이면 bad', () => {
+    // Given
+    const text = '19942'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('13월은 bad', () => {
+    // Given
+    const text = '199413'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('올해의 지나지 않은 달은 bad', () => {
+    // Given
+    const text = '202612'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('일 첫 자리가 4 이상이면 bad', () => {
+    // Given
+    const text = '1994044'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('없는 날짜(2월 30일)는 bad', () => {
+    // Given
+    const text = '20010230'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('오늘보다 미래 날짜는 bad', () => {
+    // Given
+    const text = '20261118'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
   })
 })

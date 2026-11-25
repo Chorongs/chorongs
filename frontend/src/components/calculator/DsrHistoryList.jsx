@@ -21,7 +21,6 @@ function DsrHistoryList({ title }) {
       title={title}
       api={API}
       getId={getId}
-      getItemLabel={getMain}
       getMain={getMain}
       getSubs={getSubs}
       calcPath="/calc/dsr"

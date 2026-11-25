@@ -6,7 +6,7 @@ import useAuthStore from '../../store/useAuthStore'
 import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, Card, DialogActions, DialogText, InlineError } from '../../styles/common'
+import { Button, Card, DialogActions, DialogText, InlineError, InputField } from '../../styles/common'
 import { BIRTH_ERROR, isValidBirthDate, isValidNickname } from '../../utils/validate'
 import BirthDateField from '../auth/BirthDateField'
 import SectionHeader from '../common/SectionHeader'
@@ -20,8 +20,9 @@ import Modal from '../ui/Modal'
 // 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
 //   - 생년월일: 숫자 8자리 입력 (BirthDateField) → 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate)
-//   - 원래 생년월일이 있던 회원이 칸을 비우거나 덜 치면 오류 (덜 친 날짜는 칸을 떠났을 때 보임)
-//   - 오류는 칸 바로 아래에 입력하는 동안 바로 보이고, 오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림
+//   - 원래 생년월일이 있던 회원이 칸을 비우거나 덜 치면 저장 안 됨
+//   - 오류는 칸 바로 아래에 치는 동안 바로 보임 (닉네임 글, 생년월일 칸 안내는 BirthDateField)
+//     오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림 (생년월일이 비었거나 덜 쳤으면 그때 칸 아래도 오류로)
 //   - [저장]은 하나: 원래 값과 비교해 바뀐 칸만 보냄 (아무것도 안 바뀌면 보내지 않고 '바뀐 내용이 없어요')
 //   - 서버 400 → 서버 문구를 맨 아래에 표시
 //   - 생년월일 칸, 오류 문구 BIRTH_ERROR는 가입 단계와 같이 씀 (BirthDateField, utils/validate.js)
@@ -42,26 +43,6 @@ const Form = styled.div`
   display: flex;
   flex-direction: column;
   gap: 20px;
-`
-
-const Field = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  input {
-    height: 52px;
-    padding: 0 16px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--paper);
-    color: var(--ink);
-    font-size: var(--fs-lg);
-    @media (max-width: 899px) {
-      height: 48px;
-    }
-  }
 `
 
 const ReadOnly = styled.div`
@@ -125,27 +106,29 @@ function MemberInfo() {
   // 서버가 거절한 문구 (칸 검사 오류는 아래에서 바로 계산)
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  // 생년월일 칸을 떠난 적 있는지 (덜 친 날짜를 그때부터 오류로 보임)
-  const [isBirthTouched, setIsBirthTouched] = useState(false)
+  // 생년월일을 다시 치기 전에 [저장]을 눌렀는지 (비었거나 덜 친 날짜를 그때 오류로 보임)
+  const [isSaveTried, setIsSaveTried] = useState(false)
   // 탈퇴 창 단계: null 닫힘 / 'confirm' 확인 / 'done' 끝남 안내
   const [withdrawStep, setWithdrawStep] = useState(null)
   const [isChecked, setIsChecked] = useState(false)
   const [withdrawError, setWithdrawError] = useState('')
   const [isWithdrawing, setIsWithdrawing] = useState(false)
 
-  // 칸마다 지금 오류 (입력하는 동안 바로 보임)
+  // 칸마다 지금 오류 (치는 동안 바로 보임)
   const hadBirth = toBirthText(user) !== ''
   const nicknameError = isValidNickname(nickname) ? '' : NICKNAME_ERROR
   const isBirthWrong = birth === '' ? hadBirth : !isValidBirthDate(birth)
-  // 덜 친 채로 치는 중이면 아직 안 보임 (8자리를 다 쳤거나, 칸을 떠났거나, 비웠으면 보임)
-  const isBirthShown = birth === '' || birth.length === 10 || isBirthTouched
-  const birthError = isBirthWrong && isBirthShown ? BIRTH_ERROR : ''
+
+  const handleBirthChange = (text) => {
+    setBirth(text)
+    setIsSaveTried(false)
+  }
 
   const handleSave = async () => {
     const trimmed = nickname.trim()
-    // 오류가 남아 있으면 보내지 않고 다시 확인하라고 알림 (오류 문구는 칸 아래에 이미 보임)
+    // 오류가 남아 있으면 보내지 않고 다시 확인하라고 알림 (닉네임 오류는 칸 아래에 이미 보이고, 비었거나 덜 친 생년월일은 이때 칸 아래도 오류로)
     if (nicknameError || isBirthWrong) {
-      setIsBirthTouched(true)
+      setIsSaveTried(true)
       setError('')
       showToast('입력한 내용을 다시 확인해 주세요')
       return
@@ -214,7 +197,7 @@ function MemberInfo() {
       <SectionHeader title="회원 정보" description="닉네임과 생년월일을 바꿀 수 있어요." size="md" />
       <Card>
         <Form>
-          <Field>
+          <InputField>
             닉네임
             <input
               value={nickname}
@@ -223,18 +206,12 @@ function MemberInfo() {
               onChange={(event) => setNickname(event.target.value)}
             />
             <InlineError>{nicknameError}</InlineError>
-          </Field>
+          </InputField>
           <ReadOnly>
             로그인 방법
             <b>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType}</b>
           </ReadOnly>
-          <BirthDateField
-            value={birth}
-            onChange={setBirth}
-            onBlur={() => setIsBirthTouched(true)}
-            isInvalid={birthError !== ''}
-          >
-            <InlineError>{birthError}</InlineError>
+          <BirthDateField value={birth} onChange={handleBirthChange} forceError={isSaveTried && isBirthWrong}>
             <Hint>상품의 나이 조건 확인에만 써요</Hint>
           </BirthDateField>
           <ErrorText>{error}</ErrorText>

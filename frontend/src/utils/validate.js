@@ -45,6 +45,39 @@ export const isValidBirthDate = (text, today = new Date()) => {
 // 생년월일 오류 문구 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 기획서 문구 6-2)
 export const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
 
+// 생년월일 칸 안내 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 비었거나 치는 중이고 틀린 곳이 없을 때 회색)
+export const BIRTH_GUIDE = "생년월일을 '-' 없이 다음과 같이 입력해 주세요 (예: 19940429)"
+
+// 생년월일 칸을 치는 동안의 상태 (숫자만 봄): 'empty' 안 침 / 'typing' 치는 중, 아직 틀린 곳 없음 / 'bad' 틀림 / 'ok' 맞는 날짜
+// 다 치기 전이라도 이미 틀린 것이 보이면 'bad': 연도가 1900년 전이나 올해 뒤, 월 13 이상, 올해의 지나지 않은 달, 일 첫 자리 4 이상
+// 8자리를 다 치면 isValidBirthDate와 같은 검사 (없는 날짜, 미래 날짜)
+// today: 기준 날짜 (테스트에서 고정할 때만 넘김)
+export const getBirthInputState = (text, today = new Date()) => {
+  const digits = String(text ?? '').replace(/\D/g, '')
+  if (digits === '') return 'empty'
+  if (digits.length >= 8) {
+    const date = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`
+    return isValidBirthDate(date, today) ? 'ok' : 'bad'
+  }
+  // 연도: 친 자리까지로 될 수 있는 가장 작은 해, 가장 큰 해가 1900년부터 올해 사이에 걸치는지
+  const thisYear = today.getFullYear()
+  const yearPart = digits.slice(0, 4)
+  const rest = 10 ** (4 - yearPart.length)
+  const minYear = Number(yearPart) * rest
+  const maxYear = minYear + rest - 1
+  if (maxYear < 1900 || minYear > thisYear) return 'bad'
+  // 월: 첫 자리는 0, 1만 / 두 자리면 1부터 12, 올해면 지난 달까지
+  if (digits.length === 5 && digits[4] > '1') return 'bad'
+  if (digits.length >= 6) {
+    const month = Number(digits.slice(4, 6))
+    if (month < 1 || month > 12) return 'bad'
+    if (Number(yearPart) === thisYear && month > today.getMonth() + 1) return 'bad'
+  }
+  // 일: 첫 자리는 0부터 3
+  if (digits.length === 7 && digits[6] > '3') return 'bad'
+  return 'typing'
+}
+
 // 로그인 뒤 돌아갈 주소: '/'로 시작하는 사이트 안 주소만 (E12). '//다른사이트', '/\다른사이트'는 외부로 나가므로 막음
 export const isSafeReturnPath = (path) =>
   typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && !path.startsWith('/\\')

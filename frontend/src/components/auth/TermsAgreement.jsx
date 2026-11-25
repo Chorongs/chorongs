@@ -5,7 +5,7 @@ import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
 import { ADMIN_SESSION_TEXT } from '../../utils/requireLogin'
-import { BIRTH_ERROR, isValidBirthDate } from '../../utils/validate'
+import { isValidBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
 import AuthLayout from '../layout/AuthLayout'
 import Checkbox from '../ui/Checkbox'
@@ -18,11 +18,9 @@ import BirthDateField from './BirthDateField'
 // 검사 규칙 (회원 관리 기획서 4-2, 4-7, 5-1):
 //   - 필수 약관 2개(이용약관, 개인정보 수집/이용)를 모두 체크해야 함 → 아니면 맨 아래 '필수 약관에 동의해 주세요.' (문구 1)
 //   - 생년월일(needBirth일 때만, 필수): 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate)
-//   - 생년월일 안내는 칸 바로 아래에 입력하는 동안 바로 바뀜: 비어 있음 '생년월일을 입력해 주세요'(6-1)
-//     / 덜 입력, 범위 밖, [시작하기]를 눌렀는데 비어 있음, 서버 400 INVALID_INPUT '입력한 생년월일을 확인해주세요'(6-2)
-//     / 정상 '생년월일 입력 완료'(6-3)
-//   - 생년월일 칸은 숫자 8자리 입력 (BirthDateField). 덜 친 날짜는 칸을 떠났거나 [시작하기]를 눌렀을 때 오류로 보임
-//   - 생년월일 칸, 오류 문구 BIRTH_ERROR는 MY 회원 정보와 같이 씀 (BirthDateField, utils/validate.js)
+//   - 생년월일 칸은 숫자 8자리 입력, 칸 아래 안내는 치는 동안 바로 바뀜 (BirthDateField, MY 회원 정보와 같이 씀):
+//     비었거나 치는 중 → 회색 안내(6-1) / 틀림 → '입력한 생년월일을 확인해주세요'(6-2) / 정상 → '생년월일 입력 완료'(6-3)
+//   - [시작하기]를 눌렀는데 비었거나 덜 침, 서버 400 INVALID_INPUT도 6-2 (다시 치기 시작하면 실시간 안내로 돌아감)
 
 const AgreeList = styled.div`
   display: flex;
@@ -51,15 +49,6 @@ const ViewButton = styled.button.attrs({ type: 'button' })`
   cursor: pointer;
 `
 
-// $tone: info 안내 / bad 오류 / good 입력 완료
-const HINT_COLOR = { info: 'var(--cocoa)', bad: 'var(--bad)', good: 'var(--good)' }
-
-const BirthHint = styled.span`
-  color: ${({ $tone }) => HINT_COLOR[$tone]};
-  font-size: var(--fs-sm);
-  font-weight: 600;
-`
-
 // 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line)
 const ErrorText = styled(InlineError)`
   white-space: pre-line;
@@ -80,22 +69,18 @@ function TermsAgreement({ needBirth, onDone }) {
   const [termsKind, setTermsKind] = useState(null)
   const [error, setError] = useState('')
   const [isPending, setIsPending] = useState(false)
-  // 생년월일 칸을 떠난 적 있는지 / [시작하기]를 눌러 봤는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
-  const [isBirthTouched, setIsBirthTouched] = useState(false)
+  // 생년월일을 다시 치기 전에 [시작하기]를 눌렀는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isServerBirthError, setIsServerBirthError] = useState(false)
 
   const isAllAgreed = agreeService && agreePrivacy
   const isBirthDone = isValidBirthDate(birth) && !isServerBirthError
-  // 칸 아래 안내: 정상 → 6-3 / 8자리를 다 쳤는데 틀림, 덜 친 채 칸을 떠남, 눌렀는데 비어 있거나 덜 침, 서버 거절 → 6-2 / 그 밖(아직 안 씀, 치는 중) → 6-1
-  const isBirthComplete = birth.length === 10
-  const isBirthError = !isBirthDone && ((birth !== '' && (isBirthComplete || isBirthTouched)) || isSubmitted || isServerBirthError)
-  let birthHint = { tone: 'info', text: '생년월일을 입력해 주세요' }
-  if (isBirthDone) birthHint = { tone: 'good', text: '생년월일 입력 완료' }
-  else if (isBirthError) birthHint = { tone: 'bad', text: BIRTH_ERROR }
+  // 눌렀는데 아직 맞는 날짜가 아님, 서버가 거절함 → 칸 아래를 오류로 (그 밖은 BirthDateField가 치는 동안 정함)
+  const isBirthForcedError = isServerBirthError || (isSubmitted && !isValidBirthDate(birth))
 
   const handleBirthChange = (text) => {
     setBirth(text)
+    setIsSubmitted(false)
     setIsServerBirthError(false)
   }
 
@@ -170,13 +155,9 @@ function TermsAgreement({ needBirth, onDone }) {
         <BirthDateField
           value={birth}
           onChange={handleBirthChange}
-          onBlur={() => setIsBirthTouched(true)}
-          isInvalid={birthHint.tone === 'bad'}
-        >
-          <BirthHint $tone={birthHint.tone} role={birthHint.tone === 'bad' ? 'alert' : undefined}>
-            {birthHint.text}
-          </BirthHint>
-        </BirthDateField>
+          forceError={isBirthForcedError}
+          doneText="생년월일 입력 완료"
+        />
       )}
 
       <ErrorText>{error}</ErrorText>
