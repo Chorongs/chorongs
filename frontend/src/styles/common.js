@@ -377,3 +377,19 @@ export const Unit = styled.small`
   font-weight: ${({ $size }) => UNIT_WEIGHT[$size]};
   opacity: ${({ $tone }) => ($tone === 'soft' ? 0.8 : 1)};
 `
+
+// 바로가기 판 (RC-10 도구 바로가기, RC-11 도움말 바로가기): 연회색 큰 판, 위 글과 아래 버튼을 위아래 끝으로 벌림
+// 공통 Panel(UI-05)보다 여백이 넓어 따로 둠
+export const ShortcutPanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 44px 40px;
+  border-radius: var(--r-lg);
+  background: var(--mist);
+
+  @media (max-width: 899px) {
+    padding: 28px 20px 20px;
+  }
+`

@@ -25,8 +25,8 @@ export const NAV_MENU = [
     to: '/search',
     match: '/search',
     children: [
-      { label: '간편 검색', to: '/search/simple' },
       { label: '상세 검색', to: '/search', end: true },
+      { label: '간편 검색', to: '/search/simple' },
     ],
   },
   { label: '대출 비교', to: '/compare' },
@@ -76,8 +76,8 @@ export const FULL_MENU = [
     title: '대출 찾기',
     items: [
       { label: '캐링 추천', to: '/recommend', isRecommend: true, icon: 'home' },
-      { label: '간편 검색', to: '/search/simple', icon: 'spark' },
       { label: '상세 검색', to: '/search', end: true, icon: 'search' },
+      { label: '간편 검색', to: '/search/simple', icon: 'spark' },
       { label: '대출 비교', to: '/compare', icon: 'compare' },
       { label: '대출 랭킹', to: '/ranking', icon: 'trophy' },
     ],

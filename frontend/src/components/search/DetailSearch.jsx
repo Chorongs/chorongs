@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import { getSearches, postSearch } from '../../api/myApi'
 import { getFilterChips, getProducts } from '../../api/productApi'
@@ -31,7 +31,7 @@ import ResultBar from './ResultBar'
       → 칩 목록을 받은 뒤에 검색함. 칩 목록을 못 받으면 필터 구역만 실패 문구 + [다시 시도] (E3), 검색은 검색어만으로 함
     - 검색어는 입력 멈춘 뒤 0.3초 뒤 요청 (E8, SearchField), 결과는 20개씩 번호 쪽 나눔 (이전, 다음 + '1 / 70' + 쪽 번호 입력 이동, 요청서 D7). 조건이 바뀌면 1쪽으로
     - 회원: 조건이 바뀌고 0.7초 뒤 최근 검색 기록 (API-22 POST, FILTER). 실패해도 안내 안 함 (서버 CHORONG-42가 올라오기 전에는 '준비 중')
-    - 조건도 검색 기록도 없으면 상품 목록 대신 맞춤 추천 바로가기만 (명세서 SR-02)
+    - 조건이 없으면 (검색어 없음, 필터 전부 [전체]) 전체 상품 목록 (CHORONG-86)
     - 비교할 상품을 고르는 중이면 남겨 둔 상품 번호를 cmp로 같이 보내 서버가 그 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
       → 목록, 건수, 쪽 수는 거른 뒤 값. 위 띠에는 응답의 hiddenCount (숨긴 개수, 지금 금리 탭 기준)를 넘김. 프론트는 목록을 따로 거르지 않음. 기준 상품이 바뀌면 다시 검색
     - 서버 응답 칸 이름은 CHORONG-65 DTO가 올라올 때 맞춘다 (지금은 아래처럼 가정, docs/history/CHORONG-64/fe_search_history.md)
@@ -87,24 +87,6 @@ const TableNotice = styled.div`
 const Foot = styled.div`
   padding-top: 16px;
   border-top: 1px solid var(--line);
-`
-
-const Shortcut = styled(Panel)`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 28px;
-`
-
-const ShortcutTitle = styled.h2`
-  font-size: var(--fs-xl);
-  font-weight: 800;
-`
-
-const ShortcutText = styled.p`
-  color: var(--ink-2);
-  line-height: 1.6;
 `
 
 const Results = styled.div`
@@ -314,7 +296,6 @@ function DetailSearch() {
     }
   }, [isMember, historyAttempt])
   const historyItems = isMember ? searchHistory.items : []
-  const isHistoryReady = authStatus === 'guest' || (isMember && searchHistory.isLoaded)
 
   // 최근 검색 기록 (회원): 조건이 바뀌고 0.7초 뒤 한 번만. label은 시안 모양 '“검색어” · 칩 · 칩', condition은 주소와 같은 이름의 값 (JSON 글)
   const labelParts = [raw.q && `“${raw.q}”`, ...SEARCH_FILTERS.flatMap(({ key }) => applied[key])].filter(Boolean)
@@ -357,10 +338,8 @@ function DetailSearch() {
     )
   }
 
-  // 상품 목록 (API-01): 칩 목록 확인이 끝나면, 조건이 있거나 최근 검색이 있을 때만
-  // 비교 화면의 한 칸을 고르는 중이면 조건, 최근 검색이 없어도 안내 대신 거른 목록을 보여 줌
-  const isShortcut = !isPicking && !hasConditions && isHistoryReady && historyItems.length === 0
-  const canSearch = chipsState.status !== 'loading' && (hasConditions || isPicking || (isHistoryReady && !isShortcut))
+  // 상품 목록 (API-01): 칩 목록 확인이 끝나면 검색 (조건이 없으면 전체 상품)
+  const canSearch = chipsState.status !== 'loading'
   const params = { rt: raw.rt, sort: raw.sort, size: SEARCH_PAGE_SIZE, page: raw.page }
   if (baseItems.length > 0) params.cmp = baseItems.map((item) => item.productId).join(',') // 거르는 기준 상품 번호
   if (raw.q) params.q = raw.q
@@ -543,58 +522,47 @@ function DetailSearch() {
 
       <RecentSearchChips items={historyItems} onSelect={handleRecent} />
 
-      {isShortcut ? (
-        <Shortcut>
-          <ShortcutTitle>어떤 조건으로 찾을지 아직 정하지 못했다면</ShortcutTitle>
-          <ShortcutText>위에서 조건을 고르면 바로 결과가 나와요. 내 상황을 모르겠다면 맞춤 추천부터 받아 보세요.</ShortcutText>
-          <Button as={Link} to="/recommend" $variant="outline" $size="sm">
-            맞춤 추천 받기
-            <Icon name="arrow" size={13} />
-          </Button>
-        </Shortcut>
-      ) : (
-        <ResultsTop ref={resultsRef}>
-          <ResultBar
-            numCount={view.status === 'done' ? view.numCount : null}
-            memoCount={view.status === 'done' ? view.memoCount : null}
-            rt={raw.rt}
-            sort={raw.sort}
-            onChangeRt={handleChangeRt}
-            onChangeSort={handleChangeSort}
-          />
-          <Results>
-            {view.status === 'done' && <PurposeFilterBanner hiddenCount={view.hiddenCount} />}
-            {renderResults()}
-            {view.status === 'done' && view.items.length > 0 && pageCount > 1 && (
-              <Pager>
-                <PrevButton aria-label="이전 쪽" disabled={raw.page <= 1} onClick={() => goPage(raw.page - 1)}>
-                  <Icon name="chevron_right" />
-                </PrevButton>
-                <PageNumber aria-label={`${pageCount}쪽 중 ${raw.page}쪽`}>
-                  {raw.page} / {pageCount}
-                </PageNumber>
-                <IconButton aria-label="다음 쪽" disabled={raw.page >= pageCount} onClick={() => goPage(raw.page + 1)}>
-                  <Icon name="chevron_right" />
-                </IconButton>
-                <GoForm onSubmit={handleGo}>
-                  <GoInput
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    aria-label="이동할 쪽 번호"
-                    placeholder="쪽"
-                    value={pageText}
-                    onChange={(event) => setPageText(event.target.value.replace(/\D/g, '').slice(0, String(pageCount).length))}
-                  />
-                  <Button type="submit" $variant="outline" $size="sm">
-                    이동
-                  </Button>
-                </GoForm>
-              </Pager>
-            )}
-          </Results>
-        </ResultsTop>
-      )}
+      <ResultsTop ref={resultsRef}>
+        <ResultBar
+          numCount={view.status === 'done' ? view.numCount : null}
+          memoCount={view.status === 'done' ? view.memoCount : null}
+          rt={raw.rt}
+          sort={raw.sort}
+          onChangeRt={handleChangeRt}
+          onChangeSort={handleChangeSort}
+        />
+        <Results>
+          {view.status === 'done' && <PurposeFilterBanner hiddenCount={view.hiddenCount} />}
+          {renderResults()}
+          {view.status === 'done' && view.items.length > 0 && pageCount > 1 && (
+            <Pager>
+              <PrevButton aria-label="이전 쪽" disabled={raw.page <= 1} onClick={() => goPage(raw.page - 1)}>
+                <Icon name="chevron_right" />
+              </PrevButton>
+              <PageNumber aria-label={`${pageCount}쪽 중 ${raw.page}쪽`}>
+                {raw.page} / {pageCount}
+              </PageNumber>
+              <IconButton aria-label="다음 쪽" disabled={raw.page >= pageCount} onClick={() => goPage(raw.page + 1)}>
+                <Icon name="chevron_right" />
+              </IconButton>
+              <GoForm onSubmit={handleGo}>
+                <GoInput
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  aria-label="이동할 쪽 번호"
+                  placeholder="쪽"
+                  value={pageText}
+                  onChange={(event) => setPageText(event.target.value.replace(/\D/g, '').slice(0, String(pageCount).length))}
+                />
+                <Button type="submit" $variant="outline" $size="sm">
+                  이동
+                </Button>
+              </GoForm>
+            </Pager>
+          )}
+        </Results>
+      </ResultsTop>
     </section>
   )
 }

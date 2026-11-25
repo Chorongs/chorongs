@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
+import { ShortcutPanel } from '../../styles/common'
 import Icon from '../ui/Icon'
 
 // 도움말로 가는 알약 버튼 4개 (이동 주소는 화면 목록 순서대로)
@@ -161,22 +162,6 @@ const SampleItem = styled.li`
   }
 `
 
-// 바로가기 판 (공통 Panel(UI-05)과 여백이 달라 이름을 따로 둠)
-// TODO(RC, CHORONG-45 김채희): ToolShortcuts.jsx에 똑같은 ShortcutPanel이 있음. 공통으로 옮기려면 fe_common.md 폴더 구조 styles/common.js 목록에 먼저 추가
-const ShortcutPanel = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 44px 40px;
-  border-radius: var(--r-lg);
-  background: var(--mist);
-
-  @media (max-width: 899px) {
-    padding: 28px 20px 20px;
-  }
-`
-
 const PanelText = styled.p`
   margin: 0;
   color: var(--ink-2);
@@ -232,9 +217,8 @@ const Pill = styled(Link)`
 /*
     RC-11 도움말 바로가기 (SCR-01)
     - 큰 제목 + 한 줄 + 예시 그림 칸(용어 카드 1장, 필요 서류 목록 1장, 고정 글) + 알약 버튼 4개 → 누르면 이동
-    - 서버 호출 없음. 예시 카드와 안내 문구는 가안 기준
-    - TODO(LY-01, CHORONG-63 김채희): /help/terms, /help/docs, /help/faq, /help/tips 화면은 도움말 이슈가 라우트를 추가해야 생김.
-      그 전에는 '찾을 수 없음' 화면이 나옴 (App.jsx TODO 참고)
+    - 서버 호출 없음. 예시 카드와 안내 문구는 고정 글
+    - TODO(LY-01): /help/terms, /help/docs, /help/faq, /help/tips는 아직 라우트가 없어 '찾을 수 없음' 화면이 나옴 (App.jsx에 도움말 Route가 생기면 지움)
 */
 function HelpShortcuts() {
   return (
