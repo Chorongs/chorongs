@@ -9,7 +9,7 @@ import Icon from '../ui/Icon'
 // 추천 / 상품 찾기 / 비교 / 계산기 / 전체 (전체 → 전체 메뉴 열기)
 // 시안처럼 아이콘 위, 글자 아래. 현재 탭은 진한 글자 + 주황 아이콘
 // 추천 탭은 LY-05 '캐링 추천'과 같음 (추천받기 전이면 추천 창 열기, 받은 뒤면 /recommend 이동)
-// 상품 찾기 탭은 /search/simple로 이동하고 /search에서도 현재 탭으로 표시
+// 상품 찾기 탭은 /search(상세 검색)로 이동하고 /search/simple에서도 현재 탭으로 표시
 // hasResult: useRecommendStore의 result 유무
 const Bar = styled.nav`
   display: none;
