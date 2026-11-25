@@ -11,10 +11,8 @@ import chorong.ranking.dto.RankingResponseDTO;
 import chorong.ranking.service.RankingService;
 import lombok.RequiredArgsConstructor;
 
-/*
- * 대출 랭킹 (RANK-01, 02): GET /api/rankings?cat=&metric=&dir=  (권한: 모두)
- * TODO: 요청 검사(@Valid) 표시는 직접 작성
- */
+// 대출 랭킹 (RANK-01, 02): GET /api/rankings?cat=&metric=&dir=  (권한: 모두)
+
 @RestController
 @RequestMapping("/api/rankings")
 @RequiredArgsConstructor
