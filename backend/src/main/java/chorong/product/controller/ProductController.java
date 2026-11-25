@@ -5,13 +5,14 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
 import chorong.common.dto.ApiResponse;
 import chorong.product.dto.ProductDetailResponseDTO;
 import chorong.product.service.ProductService;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -33,5 +34,12 @@ public class ProductController {
 	public ResponseEntity<ApiResponse<List<ProductDetailResponseDTO>>> getCompareProducts(
 			@RequestParam List<Long> ids) {
 		return ResponseEntity.ok(ApiResponse.success(productService.getCompareProducts(ids)));
+	}
+
+	// RANK-03 상품 조회 기록 (조회수 +1, 세션당 1회, 비회원 포함, 응답 204)
+	@PostMapping("/{id}/views")
+	public ResponseEntity<Void> recordView(@PathVariable Long id, HttpSession session) {
+		productService.recordView(id, session);
+		return ResponseEntity.noContent().build();
 	}
 }
