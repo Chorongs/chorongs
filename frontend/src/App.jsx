@@ -12,6 +12,7 @@ import MyPage from './pages/MyPage'
 import NotFoundPage from './pages/NotFoundPage'
 import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import HomePage from './pages/HomePage'
+import RankingPage from './pages/RankingPage'
 import RecommendPage from './pages/RecommendPage'
 import SearchPage from './pages/SearchPage'
 import RequireAdmin from './components/admin/RequireAdmin'
@@ -20,8 +21,8 @@ import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminPage from './pages/admin/AdminPage'
 
 // LY-01 주소 규칙표: Routes > Route element={<Layout />} > 하위 Route (주소 목록은 '화면 목록')
-// TODO(LY-01, CHORONG-51 김진석, 56 김진석, 59 조빌립, 60 김채희, 63 김채희): 아래 페이지들은 각 이슈에서 올라온 뒤 이 자리에 Route로 추가한다.
-//   /ranking RankingPage(CHORONG-60), /calc/change, /calc/dsr, /calc/home, /calc/reverse (CalculatorPage 하위, CHORONG-56),
+// TODO(LY-01, CHORONG-51 김진석, 56 김진석, 59 조빌립, 63 김채희): 아래 페이지들은 각 이슈에서 올라온 뒤 이 자리에 Route로 추가한다.
+//   /calc/change, /calc/dsr, /calc/home, /calc/reverse (CalculatorPage 하위, CHORONG-56),
 //   /diagnosis/habit DiagnosisPage(CHORONG-59), /help/* HelpPage(CHORONG-63),
 //   (/login, /oauth/callback, /my, /my/:section 은 CHORONG-43에서 연결함)
 // 관리자: /admin/login, /admin/join은 그대로, /admin, /admin/:section은 RequireAdmin으로 감싸 AdminPage에 연결 (화면 숨김용, 권한 확인은 서버)
@@ -36,6 +37,7 @@ function App() {
           <Route path="simple" element={<SimpleSearch />} />
         </Route>
         <Route path="/compare" element={<ComparePage />} />
+        <Route path="/ranking" element={<RankingPage />} />
         <Route path="/calc" element={<CalculatorPage />}>
           <Route index element={<LoanCalculator />} />
           {/* TODO(CHORONG-56): change, dsr, home, reverse 하위 Route는 그 계산기 화면이 올라온 뒤 추가한다. */}
