@@ -1321,9 +1321,54 @@ describe('getInitialCalc', () => {
     expect(result).toMatchObject({ months: 120, rate: 4.35, method: 'EQUAL_P' })
   })
 
-  it('기간 선택지에 없는 기간은 무시한다', () => {
+  it('기간 선택지에 없어도 1개월부터 600개월 사이 정수면 받는다 (직접 입력)', () => {
+    // Given 24개월은 기간 칩에 없음
+    const state = { loanMonths: 24 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.months).toBe(24)
+  })
+
+  it('기간 선택지에 없는 기간이면 기간 칩은 전체 선택지다', () => {
     // Given
     const state = { loanMonths: 24 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.termOptions).toEqual([12, 36, 60, 120, 180])
+  })
+
+  it('600개월 기간은 받는다', () => {
+    // Given
+    const state = { loanMonths: 600 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.months).toBe(600)
+  })
+
+  it('600개월을 넘는 기간은 무시한다', () => {
+    // Given
+    const state = { loanMonths: 601 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.months).toBe(36)
+  })
+
+  it('1개월보다 작은 기간은 무시한다', () => {
+    // Given
+    const state = { loanMonths: 0 }
+    // When
+    const result = getInitialCalc(state)
+    // Then
+    expect(result.months).toBe(36)
+  })
+
+  it('소수 기간은 무시한다', () => {
+    // Given
+    const state = { loanMonths: 2.5 }
     // When
     const result = getInitialCalc(state)
     // Then
@@ -1747,6 +1792,78 @@ describe('getCalcErrors', () => {
     const errors = getCalcErrors(form)
     // Then
     expect(errors.rate).toBeUndefined()
+  })
+
+  it('직접 입력한 기간이 비면 기간 입력 안내가 난다', () => {
+    // Given 기간 빈 칸
+    const form = { ...createCalcForm(), months: '' }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBe('상환 기간을 입력해 주세요')
+  })
+
+  it('직접 입력한 기간이 0이면 기간 범위 안내가 난다', () => {
+    // Given 기간 0개월
+    const form = { ...createCalcForm(), months: 0 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBe('상환 기간은 1개월 이상 600개월 이하로 입력해 주세요')
+  })
+
+  it('직접 입력한 기간이 601개월이면 기간 범위 안내가 난다', () => {
+    // Given 기간 601개월
+    const form = { ...createCalcForm(), months: 601 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBe('상환 기간은 1개월 이상 600개월 이하로 입력해 주세요')
+  })
+
+  it('직접 입력한 기간 600개월은 오류가 아니다', () => {
+    // Given 기간 600개월
+    const form = { ...createCalcForm(), months: 600 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBeUndefined()
+  })
+
+  it('직접 입력한 기간 1개월은 오류가 아니다', () => {
+    // Given 기간 1개월 (거치는 0)
+    const form = { ...createCalcForm(), months: 1 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBeUndefined()
+  })
+
+  it('칩에 없는 기간(24개월)도 오류가 아니다', () => {
+    // Given 기간 24개월
+    const form = { ...createCalcForm(), months: 24 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.months).toBeUndefined()
+  })
+
+  it('직접 입력한 기간이 짧으면 거치 기간 한도도 그 기간으로 준다', () => {
+    // Given 기간 24개월에 거치 24개월
+    const form = { ...createCalcForm(), months: 24, graceMonths: 24 }
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.graceMonths).toContain('24개월 미만')
+  })
+
+  it('칩에 없는 기간(24개월)도 상환 스케줄이 24회차로 계산된다', () => {
+    // Given 기간 24개월
+    const form = { ...createCalcForm(), months: 24 }
+    // When
+    const schedule = getSchedule(toScheduleParams(form))
+    // Then
+    expect(schedule.rows).toHaveLength(24)
   })
 
   it('거치 기간이 대출 기간 이상이면 거치 오류가 난다', () => {

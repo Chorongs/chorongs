@@ -32,7 +32,8 @@ import PrepayModeCards from './PrepayModeCards'
 import ScheduleTable from './ScheduleTable'
 
 // CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일, 2026-11-20 사용자 결정)
-// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03) → 금액, 기간 칩, 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
+// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03) → 금액, 기간 칩 + [직접 입력], 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
+// 기간은 칩에서 고르거나 [직접 입력]으로 1-600개월을 적음 (칩 유지 + 직접 입력 추가는 2026-11-25 사용자 결정, 명세서 CA-02 '기간은 선택지 값만'과 다름)
 // 오른쪽 결과: 요약 3칸 → 중도상환 후 방식 카드(CA-04) → 회차별 표(CA-05) → 그래프, 방식별 총이자(CA-06) (좁은 화면은 입력 아래)
 // 처음 값: CalculatorPage가 navigate state에서 골라 Outlet 값(initial)으로 내려줌. 없으면 기본값
 // 계산 시점 (2026-11-20 사용자 결정, 명세서 CA-02 '숫자 바꾸면 바로 다시 계산'과 다름): 입력할 때마다 결과가 바뀌면 정신없어서 [계산하기]을 눌렀을 때만 결과를 새로 계산한다.
@@ -91,6 +92,9 @@ const StaleNotice = styled.p.attrs({ role: 'status' })`
 
 const METHOD_OPTIONS = CALC_METHODS.map((method) => ({ value: method.code, label: method.label }))
 
+// 기간 칩 맨 끝의 [직접 입력] 칩 값 (개월 숫자와 겹치지 않는 글자)
+const CUSTOM_TERM = 'custom'
+
 // 월 상환액 아래 설명: 방식마다 '월 상환액'이 뜻하는 것이 다름 (첫 달 납입액을 보여 줌)
 function getMonthlyNote(method, graceMonths) {
   if (method !== 'BULLET' && graceMonths > 0) return `거치 ${graceMonths}개월은 이자만 내요 (첫 달 기준)`
@@ -110,12 +114,24 @@ function LoanCalculator() {
   const [applied, setApplied] = useState(() => createCalcForm(initial))
   const [hasTried, setHasTried] = useState(false)
   const [termOptions, setTermOptions] = useState(initial.termOptions)
+  // [직접 입력] 칩을 골랐는지: 처음 값의 기간이 칩에 없으면 처음부터 직접 입력
+  const [isCustomTerm, setIsCustomTerm] = useState(() => !initial.termOptions.includes(initial.months))
   const [isSaving, setIsSaving] = useState(false)
   const [historyKey, setHistoryKey] = useState(0)
   const topRef = useRef(null)
   const resultRef = useRef(null)
 
   const handleChange = (patch) => setForm((prev) => ({ ...prev, ...patch }))
+
+  // 기간 칩: [직접 입력]은 입력칸을 열기만 하고 값은 그대로, 개월 칩은 그 값으로 바꾸고 입력칸을 닫음
+  const handleTermChange = (value) => {
+    if (value === CUSTOM_TERM) {
+      setIsCustomTerm(true)
+      return
+    }
+    setIsCustomTerm(false)
+    handleChange({ months: value })
+  }
 
   // 입력 검사: [계산하기]을 한 번 눌러 본 뒤부터 칸마다 오류 문구를 보임
   const formErrors = getCalcErrors(form)
@@ -186,6 +202,7 @@ function LoanCalculator() {
     const loaded = getInitialCalc(item)
     const loadedForm = createCalcForm(loaded)
     setTermOptions(loaded.termOptions)
+    setIsCustomTerm(!loaded.termOptions.includes(loaded.months))
     setForm(loadedForm)
     setHasTried(false)
     if (Object.keys(getCalcErrors(loadedForm)).length === 0) setApplied(loadedForm)
@@ -266,11 +283,25 @@ function LoanCalculator() {
           <FormField>
             <FormLabel>상환 기간</FormLabel>
             <ChipGroup
-              options={termOptions.map((term) => ({ value: term, label: `${term}개월` }))}
-              value={form.months}
-              onChange={(months) => handleChange({ months })}
+              options={[
+                ...termOptions.map((term) => ({ value: term, label: `${term}개월` })),
+                { value: CUSTOM_TERM, label: '직접 입력' },
+              ]}
+              value={isCustomTerm ? CUSTOM_TERM : form.months}
+              onChange={handleTermChange}
               label="상환 기간"
             />
+            {isCustomTerm && (
+              <NumberField
+                label="상환 기간 직접 입력"
+                unit="개월"
+                value={form.months}
+                onChange={(months) => handleChange({ months })}
+                isRequired
+                placeholder="예: 24"
+                error={errors.months}
+              />
+            )}
           </FormField>
 
           <NumberField

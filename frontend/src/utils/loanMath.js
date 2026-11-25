@@ -227,8 +227,9 @@ export function getCompareWinners(productA, productB, resultA, resultB, isSameMe
 // 대출 이자 계산기 (CA-01~07, CHORONG-49)
 // ---------------------------------------------------------------------------
 
-// 계산기 입력 한도 (금액은 만원 단위, 나머지는 %). 금액 위, 수수료율, 증가율 한도는 명세서에 없어 정한 값
-export const CALC_LIMITS = { amountMin: 1, amountMax: 100000, rateMax: 20, feeMax: 5, growthMax: 20 }
+// 계산기 입력 한도 (금액은 만원 단위, 기간은 개월, 나머지는 %). 금액 위, 수수료율, 증가율 한도는 명세서에 없어 정한 값
+// 기간은 칩에 없는 값을 [직접 입력]으로 받을 때의 범위 (1-600개월, 사용자 결정으로 칩 유지 + 직접 입력 추가)
+export const CALC_LIMITS = { amountMin: 1, amountMax: 100000, rateMax: 20, feeMax: 5, growthMax: 20, monthsMin: 1, monthsMax: 600 }
 
 // 계산기 상환 방식 4개 (코드는 API-24 repayMethod와 같게)
 export const CALC_METHODS = [
@@ -259,6 +260,7 @@ export function getCalcTermOptions(months) {
 
 // 다른 화면에서 navigate state로 넘긴 값 → 계산기 처음 값 (CA-01)
 // state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 기본값
+//   기간은 칩에 없어도 1-600개월 정수면 받음 (칩에 없는 기간은 화면이 [직접 입력]으로 보여 줌)
 //   저장한 기록(API-24 한 줄)을 그대로 넘기면 옵션도 복원: graceMonths, growthRate, prepayRound, prepayAmount 원, prepayFeeRate, prepayMode, changeRound, changeRate
 // 결과: { amount 만원, months, rate, method, termOptions } + 옵션이 맞으면 { graceMonths, growth, prepay, rateChange }
 export function getInitialCalc(state) {
@@ -267,9 +269,10 @@ export function getInitialCalc(state) {
   const amount = isNumber(state?.loanAmount) ? Math.round(state.loanAmount / 10000) : null
   if (amount !== null && amount >= CALC_LIMITS.amountMin && amount <= CALC_LIMITS.amountMax) initial.amount = amount
 
-  if (ALL_TERM_MONTHS.includes(state?.loanMonths)) {
-    initial.months = state.loanMonths
-    initial.termOptions = getCalcTermOptions(state.loanMonths)
+  const loanMonths = state?.loanMonths
+  if (Number.isInteger(loanMonths) && isInRange(loanMonths, CALC_LIMITS.monthsMin, CALC_LIMITS.monthsMax)) {
+    initial.months = loanMonths
+    initial.termOptions = getCalcTermOptions(loanMonths)
   }
 
   const rate = state?.interestRate
@@ -597,8 +600,14 @@ export function getCalcErrors(form) {
     errors.rate = `연 이자율은 0% 이상 ${rateMax}% 이하로 입력해 주세요`
   }
 
-  if (!Number.isInteger(form.months) || form.months < 1) {
-    errors.months = '상환 기간을 골라 주세요'
+  // 기간: 칩을 고르면 항상 값이 있으므로 비는 경우는 [직접 입력]뿐
+  const { monthsMin, monthsMax } = CALC_LIMITS
+  if (isEmptyValue(form.months)) {
+    errors.months = '상환 기간을 입력해 주세요'
+    return errors
+  }
+  if (!Number.isInteger(form.months) || !isInRange(form.months, monthsMin, monthsMax)) {
+    errors.months = `상환 기간은 ${monthsMin}개월 이상 ${monthsMax}개월 이하로 입력해 주세요`
     return errors
   }
 
