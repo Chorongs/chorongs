@@ -3,7 +3,7 @@ import * as myApi from '../api/myApi'
 
 // ST-02 찜 목록: 찜한 상품 번호만 (메모리, 새로고침하면 서버에서 다시 받음)
 // 회원만 씀. 로그인할 때 불러오고(useAuthStore.fetchMe), 로그아웃 때는 새로고침으로 비워진다.
-const LIKE_MAX = 30
+export const LIKE_MAX = 30
 
 const useMyStore = create((set, get) => ({
   likedIds: [],

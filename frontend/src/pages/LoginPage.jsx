@@ -40,7 +40,9 @@ function LoginPage() {
   // 관리자로 로그인 중 (SCR-16 비고: 회원 로그인 막음): 화면 상태가 authed면 바로, 아니면 버튼을 누를 때 서버(API-30)에 확인
   const isAdminAuthed = useAdminStore((state) => state.status) === 'authed'
   const [isAdminBlocked, setIsAdminBlocked] = useState(false)
-  const errorText = isAdminAuthed || isAdminBlocked ? ERROR_TEXT.ADMIN_LOGGED_IN : ERROR_TEXT[searchParams.get('error')]
+  // 관리자 세션이 있는 것을 알면 버튼을 잠가 서버에 다시 묻지 않음 (안내 한 줄은 관리자 안내)
+  const isAdminSession = isAdminAuthed || isAdminBlocked
+  const errorText = isAdminSession ? ERROR_TEXT.ADMIN_LOGGED_IN : ERROR_TEXT[searchParams.get('error')]
 
   // 확인하는 동안(checking)에도 로그인 버튼을 보여 줌 (서버 응답이 늦어도 화면이 멈춰 보이지 않게)
   // 누르는 순간 아래 handleLogin이 서버에 다시 확인하므로 이미 로그인 중이면 소셜 로그인으로 보내지 않음
@@ -67,11 +69,11 @@ function LoginPage() {
       isError={Boolean(errorText)}
     >
       <Social>
-        <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking}>
+        <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking || isAdminSession}>
           <img src={kakaoSymbol} alt="" />
           카카오 로그인
         </Button>
-        <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking}>
+        <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking || isAdminSession}>
           <img src={naverSymbol} alt="" />
           네이버 로그인
         </Button>

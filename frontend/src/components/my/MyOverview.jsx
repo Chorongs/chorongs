@@ -9,7 +9,7 @@ import { Button } from '../../styles/common'
 
 // MY-02 프로필, 요약 숫자 (한눈에 보기): 닉네임, 로그인 방법 / 찜, 최근 본, 비교 내역, 계산 기록 개수 (누르면 그 항목)
 // onLogin을 넘기면 비회원 모양: 같은 회색 판에 로그인 안내 + [로그인] (요약 숫자는 안 그림, MY-01 비회원)
-// 개수 불러오기 실패 → 숫자 자리 '-' (E3)
+// 개수 불러오기 실패 → 숫자 자리 '-' (E3) / 불러오는 동안은 빈 자리 (실패 표시 '-'가 먼저 보였다 바뀌지 않게)
 // 로그아웃 → LY-08과 같은 창을 엶 (openLogout. 창은 Layout이 그리는 LogoutDialog 하나를 같이 씀)
 // keys: 더해서 보여 줄 응답 칸. 계산 기록은 서버가 계산기 5종 개수를 따로 주므로 합계
 const COUNTS = [
@@ -101,6 +101,7 @@ function MyOverview({ onLogin }) {
   const user = useAuthStore((state) => state.user)
   const openLogout = useUiStore((state) => state.openLogout)
   const [summary, setSummary] = useState(null)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(true)
   const isGuest = Boolean(onLogin)
 
   useEffect(() => {
@@ -113,6 +114,9 @@ function MyOverview({ onLogin }) {
       })
       .catch(() => {
         // 실패하면 summary가 null 그대로 → 숫자 자리 '-'
+      })
+      .finally(() => {
+        if (!isCancelled) setIsSummaryLoading(false)
       })
     return () => {
       isCancelled = true
@@ -144,12 +148,13 @@ function MyOverview({ onLogin }) {
         </Button>
       </Profile>
 
-      <Tiles>
+      <Tiles aria-busy={isSummaryLoading}>
         {COUNTS.map((count) => (
           <li key={count.to}>
             <Tile to={count.to}>
               <TileLabel>{count.label}</TileLabel>
-              <TileValue>{getCountText(summary, count.keys)}</TileValue>
+              {/* 불러오는 동안 줄 높이가 변하지 않게 빈 칸 하나 */}
+              <TileValue>{isSummaryLoading ? '\u00a0' : getCountText(summary, count.keys)}</TileValue>
             </Tile>
           </li>
         ))}

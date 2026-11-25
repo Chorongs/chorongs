@@ -18,9 +18,10 @@ import { StatusText } from '../styles/common'
 // MY-01 MY 화면 (/my, /my/:section, 회원 전용): 왼쪽 메뉴 9개 / 오른쪽 고른 항목 하나 (useParams)
 // checking 동안은 로딩만 (로그인 안내가 번쩍 보이지 않게) / 비회원 → 로그인 안내만, 항목 숨김 / 없는 section → /my
 // 메뉴 틀은 관리자 화면과 같은 SideNavLayout (900px 미만은 위에 가로 알약 메뉴, 아래 고른 항목)
+// 메뉴 묶음은 SCR-18 나눔대로: 내 기록 (한눈에 보기 + 기록 7개) / 계정 (회원 정보)
 const MENU_GROUPS = [
   {
-    title: 'MY',
+    title: '내 기록',
     items: [
       { key: null, label: '한눈에 보기', component: MyOverview },
       { key: 'liked', label: '찜한 대출', component: LikedList },
@@ -28,13 +29,13 @@ const MENU_GROUPS = [
       { key: 'searches', label: '최근 검색', component: SearchHistoryList },
       { key: 'compares', label: '비교 내역', component: CompareHistoryList },
       { key: 'recommendations', label: '저장한 추천 결과', component: SavedRecList },
+      { key: 'report', label: '내 진단 리포트', component: DiagnosisReport },
+      { key: 'calcs', label: '계산 기록', component: CalcRecords },
     ],
   },
   {
-    title: '관리',
+    title: '계정',
     items: [
-      { key: 'report', label: '내 진단 리포트', component: DiagnosisReport },
-      { key: 'calcs', label: '계산 기록', component: CalcRecords },
       { key: 'profile', label: '회원 정보', component: MemberInfo },
     ],
   },

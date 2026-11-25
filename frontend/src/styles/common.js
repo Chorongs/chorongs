@@ -44,7 +44,7 @@ const buttonVariant = {
       background: var(--mist);
     }
   `,
-  // 소셜 로그인 버튼 (CHORONG-43): 글자 앞에 공식 심볼 <img alt="" />, 글자 --fs-lg (fe_design 카카오/네이버 버튼)
+  // 소셜 로그인 버튼: 글자 앞에 공식 심볼 <img alt="" />, 글자 --fs-lg, 글꼴은 가이드대로 OS 기본 서체 --f-system (fe_design 카카오/네이버 버튼)
   // 가이드가 정한 색 밖으로 바꾸지 않게 마우스 올림 색 변화 없음 / 모서리는 기본 --r-sm(12px) = 카카오 가이드 radius 12
   // 심볼 파일은 둥근 바탕이 버튼과 같은 색이라 바탕은 안 보이고 말풍선, N만 보임
   // 둥근 바탕의 안 보이는 여백만큼 음수 margin으로 당겨, 보이는 심볼 + 글자 묶음이 버튼 가운데에 오고 심볼과 글자 사이가 8px이 되게 함
@@ -54,6 +54,7 @@ const buttonVariant = {
     gap: 0;
     background: var(--kakao);
     color: var(--on-kakao);
+    font-family: var(--f-system);
     font-size: var(--fs-lg);
     font-weight: 600;
     & > img {
@@ -68,6 +69,7 @@ const buttonVariant = {
     gap: 0;
     background: var(--naver);
     color: var(--on-naver);
+    font-family: var(--f-system);
     font-size: var(--fs-lg);
     font-weight: 600;
     & > img {

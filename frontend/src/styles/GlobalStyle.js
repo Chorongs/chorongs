@@ -6,6 +6,7 @@ const GlobalStyle = createGlobalStyle`
     /* 글꼴 */
     --f-ui: Pretendard, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     --f-num: Nunito, Pretendard, 'Malgun Gothic', sans-serif;
+    --f-system: system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 
     /* 글자 크기 */
     --fs-d1: 48px;
