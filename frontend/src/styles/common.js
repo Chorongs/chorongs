@@ -155,7 +155,7 @@ export const Panel = styled.div`
 `
 
 // UI-06 칩: 높이 38 / 작은 32 ($size="sm"), 선택 상태는 aria-pressed
-// 글이 길어도 놓인 칸 폭을 넘지 않음 (넘는 부분은 잘림)
+// 글이 길어도 놓인 칸 폭을 넘지 않음 (넘는 부분은 잘림. 글을 ChipText로 감싸면 '…'로 줄임)
 export const Chip = styled.button.attrs((props) => ({
   type: props.type || 'button',
 }))`
@@ -188,6 +188,13 @@ export const Chip = styled.button.attrs((props) => ({
     font-weight: 800;
   }
   ${disabledStyle}
+`
+
+// 칩 안 글: 칩이 칸 폭에 닿으면 넘는 부분을 '…'로 줄임 (최근 검색 칩처럼 글 길이가 정해지지 않은 칩)
+export const ChipText = styled.span`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 // UI-13 작은 딱지: $variant (default 회색 / acc 주황 강조 / good 충족 / warn 주의 / bad 위험)

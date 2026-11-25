@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import { Chip } from '../../styles/common'
+import { Chip, ChipText } from '../../styles/common'
 
 // SR-05 최근 검색 칩: 최근 상세 검색(FILTER) 조건 4개. 누르면 그 조건을 다시 적용 (적용은 부르는 쪽이 함)
 // 회원만 보임: 비회원이거나 기록이 없으면 아무것도 안 그림 (서버는 10개 보관, 화면은 최근 4개)
@@ -31,7 +31,7 @@ function RecentSearchChips({ items = [], onSelect }) {
       <Title>최근 검색</Title>
       {shown.map((item) => (
         <Chip key={item.searchId} $size="sm" onClick={() => onSelect(item)}>
-          {item.searchLabel}
+          <ChipText>{item.searchLabel}</ChipText>
         </Chip>
       ))}
     </Wrap>

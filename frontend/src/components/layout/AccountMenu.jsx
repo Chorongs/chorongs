@@ -20,7 +20,6 @@ import Popover from '../ui/Popover'
 //   (상단바(z-index 50) 안에서 그리면 하단 탭바(55), 비교함 띠(58) 아래에 깔려서. UI-15 'createPortal 안 쓰고 Layout에서 그림')
 // LogoutDialog: 확인 창 '로그아웃할까요?' → API-16 + sessionStorage 비우기 → 안내 창 → 닫으면 새로고침하며 메인(/)으로
 // (새로고침하면 메모리의 알림이 지워지므로 알림 대신 안내 창을 먼저 띄움)
-// TODO(LY-08): 모바일(900px 미만) 동작은 웹 화면 확인 뒤 사용자 화면 테스트 때 다시 정함
 const MOBILE_QUERY = '(max-width: 899px)'
 
 const NameButton = styled.button.attrs({ type: 'button' })`
@@ -55,7 +54,7 @@ const NameButton = styled.button.attrs({ type: 'button' })`
 const MenuPanel = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 20px;
+  gap: 20px;
   width: 376px;
   max-width: calc(100vw - 76px);
 `
@@ -65,7 +64,6 @@ const Who = styled.div`
   grid-column: 1 / -1;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
   div {
@@ -94,9 +92,10 @@ const MenuGroup = styled.div`
   ${({ $isTop }) => $isTop && 'grid-column: 1 / -1;'}
 `
 
+// 묶음 제목, 링크의 여백은 MY 왼쪽 메뉴(SideNavLayout)와 같음
 const MenuTitle = styled.h4`
-  margin-bottom: 6px;
-  padding: 2px 0 10px;
+  margin-bottom: 4px;
+  padding-bottom: 10px;
   border-bottom: 2px solid var(--ink);
   font-size: var(--fs-base);
   font-weight: 800;
@@ -106,7 +105,8 @@ const MenuLink = styled(Link)`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 0;
+  gap: 8px;
+  padding: 8px 2px;
   color: ${({ $isTop }) => ($isTop ? 'var(--ink)' : 'var(--ink-2)')};
   font-size: ${({ $isTop }) => ($isTop ? 'var(--fs-base)' : 'var(--fs-md)')};
   font-weight: ${({ $isTop }) => ($isTop ? 800 : 500)};
