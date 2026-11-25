@@ -253,7 +253,7 @@ export const KEYWORD_PRESETS = [
 
 // ===== 대출 랭킹 (RK-01~02, CHORONG-60, 글자는 가안 기준) =====
 
-// 금융권 4개: 고른 글자를 cat에 그대로 보냄 (전체는 빈 값, 화면 글은 '금융권 전체')
+// 금융권 4개: 고른 글자를 cat에 그대로 보냄 (전체는 빈 값)
 export const RANKING_CAT_OPTIONS = ['전체', '은행권', '비은행권', '정책금융']
 
 // 기준 탭 4개 (metric). 인기순 = '캐링에서 많이 본 순서' (상세 조회수)
@@ -270,13 +270,11 @@ export const RANKING_DEFAULT_METRIC = 'rate'
 export const RANKING_DEFAULT_DIR = { rate: 'asc', limit: 'desc', term: 'desc', views: 'desc' }
 export const RANKING_MAX = 30 // 목록 최대 개수
 
-// 순서 버튼 글자: [기본 순서, 반대 순서] (기준마다 말이 다름)
-const RANKING_DIR_LABEL = {
-  rate: ['낮은 순', '높은 순'],
-  limit: ['높은 순', '낮은 순'],
-  term: ['긴 순', '짧은 순'],
-  views: ['많은 순', '적은 순'],
-}
+// 순서 버튼 2개 (명세서: 낮은 순 / 높은 순, 기준과 상관없이 같은 글자)
+export const RANKING_DIR_OPTIONS = [
+  { value: 'asc', label: '낮은 순' },
+  { value: 'desc', label: '높은 순' },
+]
 
 // 결과 머리 안내 글: [기본 순서, 반대 순서]
 const RANKING_HINT = {
@@ -288,17 +286,6 @@ const RANKING_HINT = {
 
 // 기준 값이 같으면 조회수 많은 쪽이 먼저 나온다는 안내 (인기순은 해당 없음)
 const RANKING_TIE_NOTE = { rate: '금리가', limit: '한도가', term: '기간이' }
-
-// 순서 버튼 2개 [{ value, label }]: 첫 번째가 그 기준의 기본 순서
-export function getRankingDirOptions(metric) {
-  const labels = RANKING_DIR_LABEL[metric] ?? RANKING_DIR_LABEL[RANKING_DEFAULT_METRIC]
-  const best = RANKING_DEFAULT_DIR[metric] ?? RANKING_DEFAULT_DIR[RANKING_DEFAULT_METRIC]
-  const other = best === 'asc' ? 'desc' : 'asc'
-  return [
-    { value: best, label: labels[0] },
-    { value: other, label: labels[1] },
-  ]
-}
 
 // 결과 머리 안내 글: 기준 + 순서 설명, 기준 값이 같을 때 규칙
 export function getRankingHint(metric, dir) {

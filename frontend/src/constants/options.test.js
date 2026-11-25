@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRankingDirOptions, getRankingHint, getTermOptions, readRankingParams } from './options'
+import { getRankingHint, getTermOptions, readRankingParams } from './options'
 
 describe('getTermOptions', () => {
   it('전월세만 있으면 60, 120, 180개월', () => {
@@ -101,32 +101,6 @@ describe('readRankingParams', () => {
     const result = readRankingParams(params)
     // Then
     expect(result.cat).toBe('')
-  })
-})
-
-describe('getRankingDirOptions', () => {
-  it('금리순은 낮은 순(asc)이 먼저', () => {
-    // Given
-    const metric = 'rate'
-    // When
-    const result = getRankingDirOptions(metric)
-    // Then
-    expect(result).toEqual([
-      { value: 'asc', label: '낮은 순' },
-      { value: 'desc', label: '높은 순' },
-    ])
-  })
-
-  it('기간순은 긴 순(desc)이 먼저', () => {
-    // Given
-    const metric = 'term'
-    // When
-    const result = getRankingDirOptions(metric)
-    // Then
-    expect(result).toEqual([
-      { value: 'desc', label: '긴 순' },
-      { value: 'asc', label: '짧은 순' },
-    ])
   })
 })
 

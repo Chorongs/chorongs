@@ -9,9 +9,9 @@ import SelectField from '../components/ui/SelectField'
 import {
   RANKING_CAT_OPTIONS,
   RANKING_DEFAULT_DIR,
+  RANKING_DIR_OPTIONS,
   RANKING_MAX,
   RANKING_METRIC_OPTIONS,
-  getRankingDirOptions,
   getRankingHint,
   readRankingParams,
 } from '../constants/options'
@@ -27,7 +27,7 @@ import { Button, EmptyBox } from '../styles/common'
 // 목록은 서버 순서 그대로 최대 30개. 쪽 넘김, [더 보기]는 없음
 const CAT_SELECT_OPTIONS = RANKING_CAT_OPTIONS.map((name) => ({
   value: name === '전체' ? '' : name,
-  label: name === '전체' ? '금융권 전체' : name,
+  label: name,
 }))
 const ALL_CAT_TITLE = '금융권 전체'
 
@@ -73,6 +73,9 @@ const Tab = styled.button.attrs({ type: 'button', role: 'tab' })`
     height: 3px;
     border-radius: 3px;
     background: var(--ink);
+  }
+  @media (max-width: 899px) {
+    font-size: var(--fs-lg);
   }
 `
 
@@ -244,7 +247,7 @@ function RankingPage() {
           <SelectField isPill label="금융권" value={cat} onChange={handleCatChange} options={CAT_SELECT_OPTIONS} />
         </CatBox>
         <DirGroup>
-          {getRankingDirOptions(metric).map((option) => (
+          {RANKING_DIR_OPTIONS.map((option) => (
             <DirButton key={option.value} aria-pressed={option.value === dir} onClick={() => handleDirChange(option.value)}>
               {option.label}
             </DirButton>

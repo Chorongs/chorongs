@@ -13,8 +13,8 @@ import RateText from '../common/RateText'
 // 줄 아무 곳 클릭, Enter(Space) → 상품 상세 창 (openProduct(id, 'ranking')). 줄 안에 다른 버튼이 없어 줄 자체를 role="button"으로 둠 (가안과 같게)
 // item: { rankNo, product (ProductSummaryDTO), prepayFeeMax, metricValue } / metric: rate, limit, term, views (기준 값 모양을 정함)
 // 서버 글은 글자로만 출력 (E1). 숨김 상품은 나머지 칸이 null이라 빈 값은 '-'로 보여 줌
-// 기준 값 이름표: 금리순 '최저 금리', 한도순 '최대 한도', 기간순 '최대 기간', 인기순 '상세 조회' / 보조 값: 금리순이면 '최대 한도', 나머지는 '최저 금리' (가안과 같게)
-const METRIC_LABEL = { rate: '최저 금리', limit: '최대 한도', term: '최대 기간', views: '상세 조회' }
+// 기준 값 이름표: 금리순 '최저 금리', 한도순 '최대 한도', 기간순 '최대 기간', 인기순 '조회수' (명세서 글) / 보조 값: 금리순이면 '최대 한도', 나머지는 '최저 금리' (가안과 같게)
+const METRIC_LABEL = { rate: '최저 금리', limit: '최대 한도', term: '최대 기간', views: '조회수' }
 const TOP_RANK = 3
 const TARGET_SHOWN_MAX = 3 // 신청 대상은 3개까지, 나머지는 '외 N'
 
