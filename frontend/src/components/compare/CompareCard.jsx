@@ -11,9 +11,10 @@ import Icon from '../ui/Icon'
 
 // CP-03 비교 카드: 상품 요약 카드 (A 또는 B 칸). 모양은 시안과 같게: A는 주황, B는 파랑 테두리
 // [이자 계산] → 계산기(/calc)에 금액(원), 기간, 금리 중간값, 고른 상환 방식 코드를 넘김 (상세 창 안 열고 바로 연결)
-// [다른 상품으로 비교] → 이 상품만 비교함에 두고 상품 찾기로 (반대 칸을 새로 고름) / X → 이 칸만 빈 칸
+// [다른 상품으로 비교] → 이 칸의 상품을 바꾸러 항상 상품 찾기의 상세 검색(/search)으로 (반대 칸 상품은 그대로) / X → 이 칸만 빈 칸
 // 숨김 상품은 상세 없이 '지금은 볼 수 없는 상품' 안내. 한도, 기간을 넘으면 경고. 금리 기관 문의 상품은 [이자 계산] 대신 안내 글
 // isSummary: 상대 칸이 비어 있어 아직 비교 못 할 때 쓰는 간단한 카드 (자금 용도, 금리 한 줄 + [빼기])
+// isReadOnly: true면 상세 카드의 X, [이자 계산], [다른 상품으로 비교]를 숨기고 정보만 보여 줌 (담긴 상품 확인 팝업에서 씀, 팝업에 따로 선택 버튼이 있어서)
 const Wrap = styled.article`
   display: flex;
   flex-direction: column;
@@ -166,11 +167,10 @@ function getLimitCell(product) {
 }
 
 
-function CompareCard({ slot, product, amountMan, months, method, isSummary = false }) {
+function CompareCard({ slot, product, otherProduct = null, amountMan, months, method, isSummary = false, isReadOnly = false }) {
   const navigate = useNavigate()
   const clearSlot = useCompareStore((state) => state.clearSlot)
-  const startSwap = useCompareStore((state) => state.startSwap)
-  const otherSlot = slot === 'A' ? 'B' : 'A'
+  const setPickSlot = useCompareStore((state) => state.setPickSlot)
   const sector = formatTagValues(product, 'SECTOR')
 
   const info = (
@@ -237,8 +237,10 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
       state: { loanAmount: amountMan * 10000, loanMonths: months, interestRate: midRate, repayMethod },
     })
 
+  // 이 칸의 상품을 다른 상품으로 바꾸러 감 (반대 칸 상품은 그대로). 거기서 [+ 비교]를 누르면 이 칸이 그 상품으로 바뀌고 비교 화면으로 되돌아옴
+  // 반대 칸 상품(otherProduct)은 거기서 용도, 상환 방식이 겹치는 상품만 보이게 거르는 기준 (숨김 상품이면 기준 없음)
   const handleSwap = () => {
-    startSwap(otherSlot, product)
+    setPickSlot(slot, otherProduct?.productStatus === 'HIDDEN' ? null : otherProduct)
     navigate('/search')
   }
 
@@ -247,9 +249,11 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
       <Head>
         <SlotBadge $slot={slot}>{slot}</SlotBadge>
         {info}
-        <RemoveIcon aria-label={`${product.productName} 비교에서 빼기`} title="비교에서 빼기" onClick={() => clearSlot(slot)}>
-          <Icon name="close" />
-        </RemoveIcon>
+        {!isReadOnly && (
+          <RemoveIcon aria-label={`${product.productName} 비교에서 빼기`} title="비교에서 빼기" onClick={() => clearSlot(slot)}>
+            <Icon name="close" />
+          </RemoveIcon>
+        )}
       </Head>
       {overLabels.length > 0 && (
         <Over role="alert">
@@ -301,17 +305,19 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
         <dd>{features.length > 0 ? features.join(', ') : '-'}</dd>
       </List>
       {midRate === null && <Hint>금리는 신청하는 곳에서 안내해요. 이자 계산은 할 수 없어요.</Hint>}
-      <Actions>
-        {midRate !== null && (
-          <Button $size="sm" $variant="outline" onClick={handleCalc}>
-            <Icon name="calc" size={16} />
-            이자 계산
+      {!isReadOnly && (
+        <Actions>
+          {midRate !== null && (
+            <Button $size="sm" $variant="outline" onClick={handleCalc}>
+              <Icon name="calc" size={16} />
+              이자 계산
+            </Button>
+          )}
+          <Button $size="sm" $variant="outline" onClick={handleSwap}>
+            다른 상품으로 비교
           </Button>
-        )}
-        <Button $size="sm" $variant="outline" onClick={handleSwap}>
-          다른 상품으로 비교
-        </Button>
-      </Actions>
+        </Actions>
+      )}
     </Wrap>
   )
 }

@@ -1,7 +1,7 @@
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
-import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage, getCompareBase, getCompareBlock, getPickBaseSlot } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { CompareButton, Tag } from '../../styles/common'
 import Highlight from '../ui/Highlight'
@@ -17,9 +17,9 @@ import RateText from './RateText'
 // 태그: (추천도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (CM-04)
 // 오른쪽 끝 하트: 찜 버튼 LikeButton (CM-06, CHORONG-43에서 연결. 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation)
 //   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
-// [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기, 찜한 대출(MY) 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
+// [+ 비교] (CM-09): 맞춤 추천, 상품 찾기, 찜한 대출(MY) 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
 //   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
-//   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
+//   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 고르는 중 남은 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
 // 상품 찾기 props (선택, CHORONG-64): keyword → 금융사, 상품명에서 검색어 강조 (Highlight, E1) / hits (충족한 키워드 이유 문구 목록), total (고른 키워드 수) → 간편 검색 줄: 태그 맨 앞에 'N/M 일치' 글 + 이유마다 초록 충족 태그 (체크 아이콘). 상세 검색, 맞춤 추천은 안 넘겨서 그대로
 // 줄 전체는 마우스 클릭용이라 role, tabIndex가 없고, 키보드와 화면 낭독기는 '상품명 버튼'으로 연다. (줄을 버튼으로 두면 안의 하트, [+ 비교]가 '버튼 안의 버튼'이 됨)
 //   상품명 버튼은 따로 onClick이 없다: 누르거나 Enter, Space를 누르면 click이 줄까지 퍼져 handleOpen이 한 번 실행됨
@@ -219,29 +219,33 @@ const ACCENT_FEATURES = ['NO_PREPAY_FEE', 'POLICY']
 function ProductRow({ product, from = null, rank = null, matchRate = null, keyword = '', hits = null, total = 0 }) {
   const openProduct = useUiStore((state) => state.openProduct)
   const { pathname } = useLocation()
-  // 비교함에서 A, B 어느 칸인지 (없으면 null) / 비교함 첫 상품과 자금 용도가 안 겹치면 '비교 불가'
-  const trayLabel = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
-  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
-  const addTray = useCompareStore((state) => state.addTray)
+  const navigate = useNavigate()
+  // 비교 화면의 한 칸을 고르러 나온 중이면 남겨 둔 상품은 'A 담음' / 그 상품과 용도, 상환 방식이 안 겹치면 '비교 불가'
+  const slotLabel = useCompareStore((state) => getPickBaseSlot(state, product.productId))
+  const isNo = useCompareStore((state) => {
+    const base = getCompareBase(state)
+    return base !== null && base.productId !== product.productId && getCompareBlock(base, product) !== null
+  })
+  const startCompare = useCompareStore((state) => state.startCompare)
   const hasCompare = getComparePage(pathname) !== null && product.productStatus === 'ON'
   // 비교 안 하는 화면(랭킹 등)에서는 담긴 표시도 안 함
-  const traySlot = hasCompare ? trayLabel : null
+  const pickLabel = hasCompare ? slotLabel : null
   const featureTags = (product.features ?? []).slice(0, 2)
   const sector = (product.tags ?? []).find((tag) => tag.tagType === 'SECTOR')?.tagValue
   const hasHits = Array.isArray(hits) && hits.length > 0
 
   const handleOpen = () => openProduct(product.productId, from)
 
-  // 이미 담긴 상품이면 빼기. 안 맞는 상품이면 addTray가 이유를 알림. 클릭이 줄(상세 창 열기)까지 안 퍼지게 한다.
+  // 이 상품을 비교 화면에 넣고 바로 이동 (바로 넣을 수 없으면 startCompare가 알림이나 확인 팝업). 클릭이 줄(상세 창 열기)까지 안 퍼지게 한다.
   const handleCompare = (event) => {
     event.stopPropagation()
-    addTray(product)
+    if (startCompare(product)) navigate('/compare')
   }
 
   return (
     <Row
       $hasCompare={hasCompare}
-      $isInCmp={Boolean(traySlot)}
+      $isInCmp={Boolean(pickLabel)}
       $isNo={hasCompare && isNo}
       onClick={handleOpen}
     >
@@ -249,7 +253,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null, keywo
         <Org>
           {rank != null && <RankNo>{rank}위</RankNo>}
           <Highlight text={product.companyName} keyword={keyword} />
-          {traySlot && <CompareBadge>비교 {traySlot}에 담음</CompareBadge>}
+          {pickLabel && <CompareBadge>비교 {pickLabel}에 담음</CompareBadge>}
         </Org>
         <NameButton>
           <Name>
@@ -301,12 +305,12 @@ function ProductRow({ product, from = null, rank = null, matchRate = null, keywo
           <CompareButton
             $size="sm"
             $variant="outline"
-            $state={traySlot ? 'in' : isNo ? 'no' : undefined}
-            aria-pressed={Boolean(traySlot)}
+            $state={pickLabel ? 'in' : isNo ? 'no' : undefined}
+            aria-pressed={Boolean(pickLabel)}
             onClick={handleCompare}
           >
-            {traySlot && <Icon name="check" size={15} />}
-            {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+            {pickLabel && <Icon name="check" size={15} />}
+            {pickLabel ? `${pickLabel} 담음` : isNo ? '비교 불가' : '+ 비교'}
           </CompareButton>
         </CompareCell>
       )}

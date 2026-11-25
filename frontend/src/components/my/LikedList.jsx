@@ -6,6 +6,7 @@ import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Tag } from '../../styles/common'
 import ProductRow from '../common/ProductRow'
+import PurposeFilterBanner from '../common/PurposeFilterBanner'
 import MySection from './MySection'
 
 // MY-04 찜한 대출 (최대 30개): 상품 목록, 쪽 나눔 (E7) / 빈 상태 '맞춤 추천 받기'
@@ -78,6 +79,8 @@ function LikedList() {
   }
 
   return (
+    <>
+    <PurposeFilterBanner />
     <MySection
       title="찜한 대출"
       description="찜은 30개까지 할 수 있어요."
@@ -105,6 +108,7 @@ function LikedList() {
       onMore={handleMore}
       isMoreLoading={isMoreLoading}
     />
+    </>
   )
 }
 

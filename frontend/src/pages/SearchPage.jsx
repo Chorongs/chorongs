@@ -5,7 +5,7 @@ import RouteTabs from '../components/common/RouteTabs'
 
 // SR-01 상품 찾기 화면: 제목 + 탭 2개 (간편 검색, 상세 검색 순서) + 탭 내용 (Outlet)
 // /search/simple → 간편 검색 (SimpleSearch), /search → 상세 검색 (DetailSearch). 탭 내용은 App.jsx의 하위 Route가 정한다.
-// 상단 메뉴, 탭바의 '상품 찾기'는 /search/simple로 열린다 (constants/menu.js)
+// 상단 메뉴, 탭바의 '상품 찾기'는 /search(상세 검색)로 열린다 (constants/menu.js)
 // 검색 조건(주소 ? 뒤: 상세 검색의 필터, 간편 검색의 키워드) 기억 (요청서 A15):
 //   - 탭마다 마지막 주소의 ? 뒤를 sessionStorage에 저장해 두고 (탭 닫으면 사라짐, 비교함과 같음)
 //   - 탭을 옮겨 다닐 때 탭 링크에 붙이고, 다른 화면에 갔다가 상품 찾기를 다시 열 때 (주소에 조건이 없으면) 그 조건으로 복원한다.

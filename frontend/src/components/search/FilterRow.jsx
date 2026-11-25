@@ -11,6 +11,7 @@ import Icon from '../ui/Icon'
 //   소속 세분류가 전부 selected에 있을 때 대분류 칩이 선택된 것으로 그림, 일부만 있으면 글자만 주황 (시안 .part)
 // props: label 줄 이름 / chips [{ value, label, count }] / groups [{ value, label, count, members }] / selected 고른 값 목록
 //   hint 줄 아래 작은 안내 (신용점수 'NICE 기준') / onChange(다음 값 목록)
+//   isLocked: true면 칩을 못 누름 + '비교할 상품 기준으로 고정돼 있어요' (비교할 상품을 고르는 중의 자금 용도, 상환 방법 줄, CHORONG-82)
 const Row = styled.div`
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -65,13 +66,19 @@ const Option = styled.button.attrs({ type: 'button' })`
   font-size: var(--fs-base);
   white-space: nowrap;
   cursor: pointer;
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--mist);
     color: var(--ink);
   }
   &[aria-pressed='true'] {
     color: var(--brand-text);
     font-weight: 800;
+  }
+  &:disabled {
+    cursor: default;
+  }
+  &:disabled:not([aria-pressed='true']) {
+    color: var(--muted);
   }
 `
 
@@ -132,7 +139,8 @@ const Hint = styled.p`
   }
 `
 
-function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', onChange }) {
+function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', isLocked = false, onChange }) {
+  const hintText = isLocked ? '비교할 상품 기준으로 고정돼 있어요' : hint
   const showToast = useUiStore((state) => state.showToast)
   const isGrouped = groups.length > 0
 
@@ -161,7 +169,7 @@ function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', o
   }
 
   const renderChip = (chip) => (
-    <Option key={chip.value} aria-pressed={selected.includes(chip.value)} onClick={() => toggle(chip.value)}>
+    <Option key={chip.value} aria-pressed={selected.includes(chip.value)} disabled={isLocked} onClick={() => toggle(chip.value)}>
       {selected.includes(chip.value) && <Icon name="check" size={15} />}
       {chip.label ?? chip.value}
       <Count>{chip.count}</Count>
@@ -173,7 +181,7 @@ function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', o
       <Label>{label}</Label>
       <Cell>
         <Options role="group" aria-label={label}>
-          <Option aria-pressed={selected.length === 0} onClick={() => onChange([])}>
+          <Option aria-pressed={selected.length === 0} disabled={isLocked} onClick={() => onChange([])}>
             전체
           </Option>
           {isGrouped
@@ -182,7 +190,7 @@ function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', o
                 const isOn = members.length > 0 && members.every((value) => selected.includes(value))
                 const isPart = !isOn && members.some((value) => selected.includes(value))
                 return (
-                  <Option key={group.value} $isPart={isPart} aria-pressed={isOn} onClick={() => toggleGroup(group)}>
+                  <Option key={group.value} $isPart={isPart} aria-pressed={isOn} disabled={isLocked} onClick={() => toggleGroup(group)}>
                     {isOn && <Icon name="check" size={15} />}
                     {group.label ?? group.value}
                     {FIN_GROUP_NOTE[group.value] && <Note>{FIN_GROUP_NOTE[group.value]}</Note>}
@@ -203,7 +211,7 @@ function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', o
                 </Options>
               </SubRow>
             ))}
-        {hint && <Hint>{hint}</Hint>}
+        {hintText && <Hint>{hintText}</Hint>}
       </Cell>
     </Row>
   )

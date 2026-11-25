@@ -11,7 +11,7 @@ import {
   MONTHS_UNKNOWN,
   PRIORITY_OPTIONS,
 } from '../../constants/options'
-import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import { getCompareBlock, useCompareItems } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, IconButton, Panel, Tag } from '../../styles/common'
@@ -221,15 +221,15 @@ const getConditionLabels = (input) => {
     - [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '추천 결과 저장은 회원 전용이에요.' (CM-22, CM-17)
     - TODO(RC-07, LOAN-04, CHORONG-45 김채희, CHORONG-43 Tong B): 같은 결과를 누를 때마다 다시 저장됨 (명세서에 중복 규칙 없음, 10개 넘으면 오래된 저장이 밀려 지워짐).
       시연 뒤 A안: 저장 성공하면 버튼을 '저장했어요'로 잠그고, 새로 추천받으면 다시 풀기 (새로고침 뒤에도 막으려면 useRecommendStore에 저장한 결과 표시 추가). 문서_반영_목록 Q12
-    - 비교함 필터 (CM-10, CHORONG-47): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
-      (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
+    - 비교 필터 (CM-10, CHORONG-47, CHORONG-82): 비교할 상품을 고르는 중이면 남겨 둔 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
+      (getCompareBlock이 null이 아닌 상품을 숨김, 남겨 둔 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
 */
 function RecommendResult() {
   const result = useRecommendStore((state) => state.result)
   const lastInput = useRecommendStore((state) => state.lastInput)
   const showToast = useUiStore((state) => state.showToast)
 
-  const tray = useCompareStore((state) => state.tray)
+  const baseItems = useCompareItems() // 거르는 기준 상품 (비교 화면의 한 칸을 고르러 나온 중 남은 상품)
   const [restPage, setRestPage] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   // 새 추천 결과가 오면 쪽 넘김을 1쪽으로 되돌림 (이전 결과의 3쪽이 남아 목록이 비는 것 방지)
@@ -247,12 +247,12 @@ function RecommendResult() {
   const items = result.items ?? []
   // 0건일 때 서버가 notes에 넣는 '찾지 못했어요' 글은 제목과 같아서 뺌 (연체, 기간 모름 같은 다른 안내는 0건에서도 보임)
   const noteLines = (result.notes ?? []).filter((note) => note !== EMPTY_NOTE)
-  // 비교함 필터: 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품은 숨김 (이미 비교함에 담긴 상품은 보임)
-  const isHiddenByTray = (item) =>
-    tray.length > 0 &&
-    !tray.some((trayItem) => trayItem.productId === item.product.productId) &&
-    getCompareBlock(tray[0], item.product) !== null
-  const shownItems = items.filter((item) => !isHiddenByTray(item))
+  // 고르는 중 거르기: 남겨 둔 상품과 용도나 상환 방식이 안 겹치는 상품은 숨김 (남겨 둔 상품은 보임)
+  const isHiddenByPick = (item) =>
+    baseItems.length > 0 &&
+    !baseItems.some((base) => base.productId === item.product.productId) &&
+    getCompareBlock(baseItems[0], item.product) !== null
+  const shownItems = items.filter((item) => !isHiddenByPick(item))
   const hiddenCount = items.length - shownItems.length
   const topItems = shownItems.filter((item) => item.rankNo <= TOP_COUNT)
   const restItems = shownItems.filter((item) => item.rankNo > TOP_COUNT)

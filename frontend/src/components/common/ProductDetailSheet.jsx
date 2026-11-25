@@ -5,7 +5,7 @@ import * as myApi from '../../api/myApi'
 import * as productApi from '../../api/productApi'
 import { CREDIT_BAND_LABEL, FEATURE_LABEL, MONTHS_DEFAULT, REPAY_METHOD_CODE } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore, { getComparePage, getCompareBlock, getTraySlot } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage, getCompareBase, getCompareBlock, getPickBaseSlot } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import ReasonList from '../recommend/ReasonList'
@@ -27,7 +27,7 @@ import RateText from './RateText'
 // 모양은 시안과 같게: 제목 줄 오른쪽 닫기 → 금리·한도·기간 3칸 → 구획(h4 + 표) → 버튼 줄 → 기준일, 고지
 //
 // [찜하기] LikeButton (CM-06)을 버튼 줄 첫 칸에 연결함 (버튼 줄: 찜하기 / + 비교 / 이자 계산)
-// [+ 비교]: 비교함에 담기 (addTray가 true면 창 닫기, false면 그대로). 맞춤 추천, 상품 찾기 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
+// [+ 비교]: 이 상품을 비교 화면에 넣고 바로 이동 (startCompare가 true면 창 닫고 이동, false면 알림만). 맞춤 추천, 상품 찾기, 찜한 대출 화면에서만 보이고, sheetFrom이 'ranking'이면 숨김 (랭킹에서는 비교 안 함)
 // 회원이면 최근 본 대출 기록 myApi.postRecentView (API-21, 실패는 안내 안 함)
 // TODO(MEM-08, CHORONG-42): 최근 본 서버 API가 아직 develop에 없음 (2026-11-17 기준 42번은 로그인, 가입만 합쳐짐: 최근 본 MEM-08, 찜 MEM-04, 비교 내역 MEM-10 없음). 서버가 올라오면 위 기록을 연결한다.
 // TODO(CM-16, CHORONG-52 Tong-B): 버튼 줄 아래 '상품 정보가 이상하면 신고해 주세요' 링크 (게시 상품만). 이미 신고했으면(reported) 신고 완료 문구
@@ -307,10 +307,13 @@ function ProductDetail({ product, onClose }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const sheetFrom = useUiStore((state) => state.sheetFrom)
-  const addTray = useCompareStore((state) => state.addTray)
-  // 비교함에서 A, B 어느 칸인지 / 비교함 첫 상품과 용도가 안 겹치면 '비교 불가' (상품 한 줄과 같은 표시)
-  const traySlot = useCompareStore((state) => getTraySlot(state.tray, state.swapSlot, product.productId))
-  const isNo = useCompareStore((state) => state.tray.length > 0 && !state.tray.some((item) => item.productId === product.productId) && getCompareBlock(state.tray[0], product) !== null)
+  const startCompare = useCompareStore((state) => state.startCompare)
+  // 비교 화면에서 칸을 고르러 나온 중이면 남겨 둔 상품은 'A 담음' / 그 상품과 용도, 상환 방식이 안 겹치면 '비교 불가' (상품 한 줄과 같은 표시)
+  const pickLabel = useCompareStore((state) => getPickBaseSlot(state, product.productId))
+  const isNo = useCompareStore((state) => {
+    const base = getCompareBase(state)
+    return base !== null && base.productId !== product.productId && getCompareBlock(base, product) !== null
+  })
   const hasCompare = getComparePage(pathname) !== null && sheetFrom !== 'ranking' && product.productStatus === 'ON'
   const lastNeed = useRecommendStore((state) => state.lastInput?.need)
   const needMan = lastNeed > 0 ? lastNeed : FALLBACK_AMOUNT_MAN
@@ -344,8 +347,12 @@ function ProductDetail({ product, onClose }) {
 
   const handleCalc = () => navigate('/calc', { state: buildCalcState(product, needMan) })
 
+  // 비교 화면에 넣고 바로 이동 (상품 한 줄의 [+ 비교]와 같음). 용도, 상환 방식이 안 맞으면 알림만 띄우고 그대로
   const handleCompare = () => {
-    if (addTray(product)) onClose()
+    if (startCompare(product)) {
+      onClose()
+      navigate('/compare')
+    }
   }
 
   return (
@@ -425,12 +432,12 @@ function ProductDetail({ product, onClose }) {
         {hasCompare && (
           <CompareButton
             $variant="outline"
-            $state={traySlot ? 'in' : isNo ? 'no' : undefined}
-            aria-pressed={Boolean(traySlot)}
+            $state={pickLabel ? 'in' : isNo ? 'no' : undefined}
+            aria-pressed={Boolean(pickLabel)}
             onClick={handleCompare}
           >
-            {traySlot && <Icon name="check" size={15} />}
-            {traySlot ? `${traySlot} 담음` : isNo ? '비교 불가' : '+ 비교'}
+            {pickLabel && <Icon name="check" size={15} />}
+            {pickLabel ? `${pickLabel} 담음` : isNo ? '비교 불가' : '+ 비교'}
           </CompareButton>
         )}
         <Button onClick={handleCalc}>

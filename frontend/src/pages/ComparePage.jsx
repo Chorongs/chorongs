@@ -273,6 +273,13 @@ function ComparePage() {
   const byId = new Map(result.key === key ? result.products.map((product) => [product.productId, product]) : [])
   const { productA, productB } = getShownProducts(idA, idB, byId)
 
+  // 받아 왔는데도 B를 빈 칸으로 보여 주면(A와 같은 상품, 자금 용도가 안 겹침) 저장에서도 비움
+  // 저장된 상품 수가 화면과 같아야 [+ 비교]의 팝업이 맞게 뜸 (1개: 담긴 상품 카드 팝업 / 2개: 사라진다는 경고 팝업)
+  const isHiddenB = idB !== null && productB === null && byId.has(idB)
+  useEffect(() => {
+    if (isHiddenB) useCompareStore.getState().clearSlot('B')
+  }, [isHiddenB])
+
   // 입력 검사 (E2)
   const isAmountValid = isNumberInRange(amount, 1, MAX_AMOUNT_MAN)
   const termOptions = getTermOptions(getSharedPurposes([productA, productB]))
@@ -384,8 +391,8 @@ function ComparePage() {
     body = (
       <>
         <Slots>
-          <CompareCard slot="A" product={productA} amountMan={amount} months={months} method={methodOf.A} />
-          <CompareCard slot="B" product={productB} amountMan={amount} months={months} method={methodOf.B} />
+          <CompareCard slot="A" product={productA} otherProduct={productB} amountMan={amount} months={months} method={methodOf.A} />
+          <CompareCard slot="B" product={productB} otherProduct={productA} amountMan={amount} months={months} method={methodOf.B} />
         </Slots>
         {isWide ? (
           verdict
