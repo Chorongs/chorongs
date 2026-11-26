@@ -8,6 +8,7 @@ import { Button } from '../../styles/common'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import Popover from '../ui/Popover'
+import { isComparing } from '../../store/useCompareStore'
 
 // LY-08 계정 메뉴: 비회원 [로그인] / 회원 닉네임 버튼 → 작은 메뉴 (MY, 로그아웃)
 // 모바일(900px 미만)은 작은 메뉴 대신 /my 이동 / 바깥 클릭, Esc(Popover), 화면 이동(key=주소) 시 메뉴 닫기
@@ -84,7 +85,14 @@ export function LogoutDialog() {
   const [isPending, setIsPending] = useState(false)
   const [isDone, setIsDone] = useState(false)
 
-  const handleLogout = async () => {
+  const handleLogout = async (event) => {
+    // 대출 비교에 담은 상품이 있으면 확인 창을 먼저. [예]면 상품을 비우고 이 버튼을 다시 눌러 로그아웃 (Layout)
+    // 버튼 속성이 아니라 여기서 확인해, 창 부품이 바뀌어도 남게 함
+    if (isComparing(window.location.pathname)) {
+      event.currentTarget.blur()
+      useUiStore.getState().openCompareLeave('/', null, event.currentTarget)
+      return
+    }
     setIsPending(true)
     await logout()
     setIsPending(false)
@@ -139,6 +147,7 @@ function AccountMenu() {
       <Button
         $size="sm"
         $variant="outline"
+        data-leave-to={isAdminAuthed ? undefined : '/login'}
         onClick={() => (isAdminAuthed ? showToast(ADMIN_LOGGED_IN_TEXT) : navigate('/login'))}
       >
         로그인
@@ -153,6 +162,7 @@ function AccountMenu() {
         <NameButton
           aria-label={`${user.memberNickname} 계정 메뉴`}
           aria-expanded={isOpen}
+          data-leave-to={window.matchMedia(MOBILE_QUERY).matches ? '/my' : undefined}
           onClick={() => (window.matchMedia(MOBILE_QUERY).matches ? navigate('/my') : toggle())}
         >
           <span>{user.memberNickname}</span>
