@@ -176,12 +176,13 @@ export const HOME_RATIOS = {
   REGULATED: { ltv: 40, firstLtv: 70 },
 }
 
-// 다른 대출은 남은 기간 동안 원리금균등으로 갚는다고 보고 1년 상환액을 계산 (DSR에 넣을 값), 남은 기간을 비우면 5년(60개월)
+// 다른 대출의 1년 상환액(DSR에 넣을 값)은 DSR 계산기와 같은 방법(getDsrLoanYearly)으로 계산: 종류, 상환 방식, 잔액을 남은 기간으로 (2026-11-26 사용자 결정)
+// 남은 기간을 비우면 5년(60개월)
 export const HOME_OTHER_MONTHS = 60
 
-// 다른 대출은 여러 건 넣을 수 있다 (최대 10건, DSR 계산기와 같음). 건마다 { balance 원, rate %, months 개월 }, 새 줄의 처음 값
+// 다른 대출은 여러 건 넣을 수 있다 (최대 10건, DSR 계산기와 같음). 건마다 { kind 종류, method 상환 방식, balance 원, rate %, months 개월 }, 새 줄의 처음 값
 export const HOME_MAX_OTHER_LOANS = 10
-export const HOME_OTHER_LOAN_DEFAULT = { balance: 0, rate: 5, months: HOME_OTHER_MONTHS }
+export const HOME_OTHER_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', balance: 0, rate: 5, months: HOME_OTHER_MONTHS }
 
 // 수도권·규제 지역의 집값 구간별 대출 상한 (원, 예시 값, 실제 값은 담당자가 개발 때 정함): 집값 15억 이하 6억, 25억 이하 4억, 그 위 2억
 // maxPrice 이하일 때 그 줄의 maxLoan이 상한 (위에서부터 처음 맞는 줄), 그 외 지역은 상한 없음
@@ -237,11 +238,12 @@ const getHomeOtherInterest = (form) =>
     : 0
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → 내 집 계산기 입력칸 처음 값 (CA-01)
-// state: { housePrice 원, homeRegion, firstHome (Y, N), annualIncome 원, otherInterest 원, interestRate, loanYears, repayMethod, rateType, otherLoans: [{ loanAmount 원, interestRate, loanMonths }] }
+// state: { housePrice 원, homeRegion, firstHome (Y, N), annualIncome 원, otherInterest 원, interestRate, loanYears, repayMethod, rateType, otherLoans: [{ loanKind, repayMethod, loanAmount 원, interestRate, loanMonths }] }
 // 다른 대출은 서버에 건별로 저장된 otherLoans가 있으면 그대로 채우고(모든 건이 범위 안일 때만), 없는 옛 기록은 아래처럼 1년 이자로 맞춘 한 건
 // 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로)
 // 건별 값이 없는 옛 기록은 1년 이자(otherInterest)만 있어서, 이자가 있으면 기본 금리로 잔액을 거꾸로 맞춘 한 건으로 채우고 남은 기간은 기본값(5년)
-// 상환 방식은 원리금균등 하나라 기록의 repayMethod는 쓰지 않음
+// 다른 대출 건의 종류, 상환 방식은 칸마다 따로 검사해서 없거나 이상하면 그 칸만 처음 값 (신용대출, 원리금균등)
+// 내 집 대출의 상환 방식은 원리금균등 하나라 기록의 repayMethod는 쓰지 않음
 function getSavedOtherLoans(loans) {
   if (!Array.isArray(loans) || loans.length < 1 || loans.length > HOME_MAX_OTHER_LOANS) return null
   const { amountMin, amountMax, rateMax, otherMonthsMin, otherMonthsMax } = HOME_LIMITS
@@ -253,7 +255,13 @@ function getSavedOtherLoans(loans) {
       isInRange(loan.loanMonths, otherMonthsMin, otherMonthsMax),
   )
   if (!isValid) return null
-  return loans.map((loan) => ({ balance: Math.round(loan.loanAmount), rate: loan.interestRate, months: loan.loanMonths }))
+  return loans.map((loan) => ({
+    kind: DSR_KIND_CODES.includes(loan.loanKind) ? loan.loanKind : HOME_OTHER_LOAN_DEFAULT.kind,
+    method: REPAY_METHODS.some((method) => method.code === loan.repayMethod) ? loan.repayMethod : HOME_OTHER_LOAN_DEFAULT.method,
+    balance: Math.round(loan.loanAmount),
+    rate: loan.interestRate,
+    months: loan.loanMonths,
+  }))
 }
 
 export function getInitialHome(state) {
@@ -362,7 +370,7 @@ export function calcMaxLoan(method, monthlyWon, annualRate, months) {
 // DSR 한도 = (연소득 x DSR 40% - 다른 대출 1년 상환액)을 12로 나눠 매달 갚을 돈으로 보고, 대출 기간으로 거꾸로 계산 (calcMaxLoan, 원리금균등). 갚을 돈이 없으면 0
 //   이때 쓰는 금리 = 입력한 금리 + 금리 유형의 스트레스 금리 (HOME_RATE_TYPES). 다른 대출에는 스트레스 금리를 더하지 않음
 //   다른 대출은 '다른 대출이 있어요'(isOtherLoan)를 체크했을 때만 반영
-//   다른 대출 1년 상환액 = 건마다 잔액을 연 금리로 남은 기간(비우면 5년) 원리금균등으로 갚는 월 상환액 x 12 를 모두 더함 (잔액이 없는 건은 0)
+//   다른 대출 1년 상환액 = 건마다 DSR 계산기와 같은 1년 상환액(getDsrLoanYearly: 종류, 상환 방식, 잔액, 금리, 남은 기간(비우면 5년))을 모두 더함 (잔액이 없는 건은 0)
 // 결과: { maxLoan, ltvLimit, dsrLimit, ltvRate, dsrRate, priceCap, isPriceCapped, stressRate, limitRate, isLtvLower, firstPayment, ownMoney } / 입력이 이상하거나 계산이 안 되면 null
 // priceCap: 집값 구간별 대출 상한 (그 외 지역은 null) / isPriceCapped: 그 상한 때문에 집값 기준 한도가 줄었는지 / limitRate: DSR 한도에 쓴 금리 (소수 둘째 자리까지)
 // firstPayment: 최대 대출 한도를 입력한 금리로 빌렸을 때 첫 달 납입액 (대출 이자 계산기와 같은 calcPayment, 한도가 0이면 0) / ownMoney: 집값에서 대출을 뺀 내 돈 (0 이상)
@@ -384,9 +392,9 @@ export function getHomeResult(form) {
   for (const loan of otherLoans) {
     if (orZero(loan.balance) <= 0) continue
     const months = isEmptyValue(loan.months) ? HOME_OTHER_MONTHS : loan.months
-    const other = calcPayment('EQUAL_PI', loan.balance, orZero(loan.rate), months)
-    if (!other) return null
-    otherYearly += other.monthly * 12
+    const yearly = getDsrLoanYearly({ kind: loan.kind, method: loan.method, amount: loan.balance, rate: orZero(loan.rate), months })
+    if (yearly === null) return null
+    otherYearly += yearly
   }
   const limitRate = Number((form.rate + rateType.stressRate).toFixed(2))
   const yearlyRoom = (form.annualIncome * dsrRate) / 100 - otherYearly
@@ -414,7 +422,7 @@ export function getHomeResult(form) {
 }
 
 // [결과 저장]으로 보낼 값 (API-59): 화면과 서버가 같은 원 단위라 그대로 보냄
-// 다른 대출은 건별 otherLoans (잔액이 있는 건만, 입력 순서대로, 남은 기간을 비웠으면 5년)와 모든 건의 1년 이자 합계 otherInterest를 같이 보냄 (체크 안 했으면 [] 와 0)
+// 다른 대출은 건별 otherLoans (종류, 상환 방식 포함, 잔액이 있는 건만, 입력 순서대로, 남은 기간을 비웠으면 5년)와 모든 건의 1년 이자 합계 otherInterest를 같이 보냄 (체크 안 했으면 [] 와 0)
 // 상환 방식은 원리금균등 고정, 금리 유형 rateType 저장, 서버 칸 이름 dtiLimit에는 소득 기준(DSR) 한도를 넣음 / LTV, DSR 비율, 스트레스 금리는 저장하지 않음 (금리 유형으로 다시 정해짐)
 export function toHomeRecord(form, result) {
   return {
@@ -431,6 +439,8 @@ export function toHomeRecord(form, result) {
       ? (form.otherLoans ?? [])
           .filter((loan) => orZero(loan.balance) > 0)
           .map((loan) => ({
+            loanKind: loan.kind,
+            repayMethod: loan.method,
             loanAmount: loan.balance,
             interestRate: orZero(loan.rate),
             loanMonths: isEmptyValue(loan.months) ? HOME_OTHER_MONTHS : loan.months,

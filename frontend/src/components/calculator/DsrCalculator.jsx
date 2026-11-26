@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
@@ -224,6 +224,8 @@ const getLoanSummary = (loan) => {
 
 function DsrCalculator() {
   const location = useLocation()
+  // 저장에 성공하면 CalculatorPage 오른쪽 칸의 계산 기록을 다시 받게 함
+  const { onSaved } = useOutletContext()
   const showToast = useUiStore((state) => state.showToast)
   // form: 입력칸 값 / applied: 결과에 쓰는 값 ([계산하기]를 누른 때의 form, 처음엔 처음 값)
   const [form, setForm] = useState(() => withIds(getInitialDsr(location.state)))
@@ -302,8 +304,10 @@ function DsrCalculator() {
       return
     }
     setApplied(form)
-    if (window.matchMedia('(max-width: 899px)').matches) {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    const resultEl = resultRef.current
+    if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -314,6 +318,7 @@ function DsrCalculator() {
     try {
       await myApi.postDsrCalc(toDsrRecord(applied, result))
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
+      onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)

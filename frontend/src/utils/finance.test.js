@@ -386,8 +386,8 @@ describe('toChangeRecord (결과 저장 본문)', () => {
 })
 
 // 손으로 계산하기 쉬운 값: 집값 5억, 그 외 지역 (LTV 70% = 3.5억), 연소득 6,000만원 x DSR 40% = 연 2,400만원 → 매달 200만원, 금리 0%, 10년 → 소득 기준 2.4억
-// 다른 대출은 없음 (한 건, 잔액 0, 금리 5%, 남은 기간 60개월), 금리 유형은 스트레스 금리가 없는 고정형 (계산을 손으로 맞추기 쉽게)
-const makeOther = (patch = {}) => ({ balance: 0, rate: 5, months: 60, ...patch })
+// 다른 대출은 없음 (한 건, 신용대출 원리금균등, 잔액 0, 금리 5%, 남은 기간 60개월), 금리 유형은 스트레스 금리가 없는 고정형 (계산을 손으로 맞추기 쉽게)
+const makeOther = (patch = {}) => ({ kind: 'CREDIT', method: 'EQUAL_PI', balance: 0, rate: 5, months: 60, ...patch })
 
 const makeHome = (patch = {}) => ({
   housePrice: 500000000,
@@ -583,6 +583,44 @@ describe('getHomeResult (집 살 때 대출한도 계산)', () => {
     )
     // Then
     expect(result.dsrLimit).toBe(60000000)
+  })
+
+  it('원금균등 다른 대출은 첫 1년의 원금과 이자를 더한다 (DSR 계산기와 같음)', () => {
+    // Given 1,200만원 연 12% 12개월 원금균등 → 원금 1,200만원 + 이자 78만원 = 연 1,278만원 → 연 2,400만원 - 1,278만원 = 1,122만원 → 10년
+    // When
+    const result = getHomeResult(
+      makeHome({ otherLoans: [makeOther({ method: 'EQUAL_P', balance: 12000000, rate: 12, months: 12 })] }),
+    )
+    // Then
+    expect(result.dsrLimit).toBe(112200000)
+  })
+
+  it('만기일시 신용대출은 남은 기간과 관계없이 원금을 5년에 나눠 갚는다고 본다', () => {
+    // Given 신용대출 6,000만원 금리 0% 남은 12개월 만기일시 → 연 1,200만원 → 연 2,400만원 - 1,200만원 = 1,200만원 → 10년
+    // When
+    const result = getHomeResult(
+      makeHome({ otherLoans: [makeOther({ method: 'BULLET', balance: 60000000, rate: 0, months: 12 })] }),
+    )
+    // Then
+    expect(result.dsrLimit).toBe(120000000)
+  })
+
+  it('만기일시 신용대출이 아니면 원금을 남은 기간에 나눠 갚는다고 본다', () => {
+    // Given 기타 대출 3,600만원 금리 0% 남은 36개월 만기일시 → 연 1,200만원 → 연 2,400만원 - 1,200만원 = 1,200만원 → 10년
+    // When
+    const result = getHomeResult(
+      makeHome({ otherLoans: [makeOther({ kind: 'OTHER', method: 'BULLET', balance: 36000000, rate: 0, months: 36 })] }),
+    )
+    // Then
+    expect(result.dsrLimit).toBe(120000000)
+  })
+
+  it('남은 기간이 12개월보다 짧은 다른 대출은 남은 개월 수만큼만 더한다', () => {
+    // Given 600만원 금리 0% 남은 6개월 원리금균등 → 연 600만원 → 연 2,400만원 - 600만원 = 1,800만원 → 10년
+    // When
+    const result = getHomeResult(makeHome({ otherLoans: [makeOther({ balance: 6000000, rate: 0, months: 6 })] }))
+    // Then
+    expect(result.dsrLimit).toBe(180000000)
   })
 
   it('잔액이 없는 다른 대출 건은 건너뛴다', () => {
@@ -1059,8 +1097,8 @@ describe('getInitialHome (넘어온 값 → 내 집 입력칸 처음 값)', () =
     const state = {
       otherInterest: 4200000,
       otherLoans: [
-        { loanAmount: 60000000, interestRate: 5, loanMonths: 60 },
-        { loanAmount: 40000000, interestRate: 3, loanMonths: 36 },
+        { loanKind: 'MORTGAGE', repayMethod: 'EQUAL_P', loanAmount: 60000000, interestRate: 5, loanMonths: 60 },
+        { loanKind: 'CREDIT', repayMethod: 'BULLET', loanAmount: 40000000, interestRate: 3, loanMonths: 36 },
       ],
     }
     // When
@@ -1069,10 +1107,19 @@ describe('getInitialHome (넘어온 값 → 내 집 입력칸 처음 값)', () =
     expect([form.isOtherLoan, form.otherLoans]).toEqual([
       true,
       [
-        { balance: 60000000, rate: 5, months: 60 },
-        { balance: 40000000, rate: 3, months: 36 },
+        { kind: 'MORTGAGE', method: 'EQUAL_P', balance: 60000000, rate: 5, months: 60 },
+        { kind: 'CREDIT', method: 'BULLET', balance: 40000000, rate: 3, months: 36 },
       ],
     ])
+  })
+
+  it('저장한 다른 대출 건의 종류, 상환 방식이 없거나 이상하면 그 칸만 신용대출, 원리금균등으로 채운다', () => {
+    // Given 종류 ETC, 상환 방식 없음
+    const state = { otherLoans: [{ loanKind: 'ETC', loanAmount: 60000000, interestRate: 5, loanMonths: 60 }] }
+    // When
+    const form = getInitialHome(state)
+    // Then
+    expect(form.otherLoans).toEqual([{ kind: 'CREDIT', method: 'EQUAL_PI', balance: 60000000, rate: 5, months: 60 }])
   })
 
   it('저장한 다른 대출 건 중 범위 밖 값이 있으면 건별 값은 쓰지 않고 1년 이자로 맞춘다', () => {
@@ -1087,7 +1134,7 @@ describe('getInitialHome (넘어온 값 → 내 집 입력칸 처음 값)', () =
     // When
     const form = getInitialHome(state)
     // Then
-    expect(form.otherLoans).toEqual([{ balance: 60000000, rate: 5, months: 60 }])
+    expect(form.otherLoans).toEqual([{ kind: 'CREDIT', method: 'EQUAL_PI', balance: 60000000, rate: 5, months: 60 }])
   })
 
   it('저장한 다른 대출 건이 빈 목록이면 체크하지 않는다', () => {
@@ -1183,17 +1230,20 @@ describe('toHomeRecord (내 집 저장 본문, API-59)', () => {
     expect(record.rateType).toBe('VARIABLE')
   })
 
-  it('다른 대출을 건별로 입력 순서대로 보낸다', () => {
-    // Given 6,000만원 5% 60개월, 4,000만원 3% 36개월
+  it('다른 대출을 건별로 종류, 상환 방식과 함께 입력 순서대로 보낸다', () => {
+    // Given 신용대출 원리금균등 6,000만원 5% 60개월, 주택담보대출 원금균등 4,000만원 3% 36개월
     const form = makeHome({
-      otherLoans: [makeOther({ balance: 60000000, rate: 5 }), makeOther({ balance: 40000000, rate: 3, months: 36 })],
+      otherLoans: [
+        makeOther({ balance: 60000000, rate: 5 }),
+        makeOther({ kind: 'MORTGAGE', method: 'EQUAL_P', balance: 40000000, rate: 3, months: 36 }),
+      ],
     })
     // When
     const record = toHomeRecord(form, getHomeResult(form))
     // Then
     expect(record.otherLoans).toEqual([
-      { loanAmount: 60000000, interestRate: 5, loanMonths: 60 },
-      { loanAmount: 40000000, interestRate: 3, loanMonths: 36 },
+      { loanKind: 'CREDIT', repayMethod: 'EQUAL_PI', loanAmount: 60000000, interestRate: 5, loanMonths: 60 },
+      { loanKind: 'MORTGAGE', repayMethod: 'EQUAL_P', loanAmount: 40000000, interestRate: 3, loanMonths: 36 },
     ])
   })
 

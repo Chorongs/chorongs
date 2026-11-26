@@ -10,7 +10,6 @@ import {
   CALC_METHODS,
   createCalcForm,
   getCalcErrors,
-  getInitialCalc,
   getMethodInterests,
   getPrepayModeResults,
   getSchedule,
@@ -23,7 +22,6 @@ import SummaryCards from '../common/SummaryCards'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
-import CalcHistoryList from './CalcHistoryList'
 import LoanOptions from './LoanOptions'
 import MethodCompare from './MethodCompare'
 import PaymentChart from './PaymentChart'
@@ -31,7 +29,8 @@ import PrepayModeCards from './PrepayModeCards'
 import ScheduleTable from './ScheduleTable'
 
 // CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일, 2026-11-20 사용자 결정)
-// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03, 체크했을 때만 입력칸) → 금액, 상환 기간(직접 입력), 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
+// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03, 체크했을 때만 입력칸) → 금액, 상환 기간(직접 입력), 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장]
+// 계산 기록(CA-07)은 CalculatorPage가 오른쪽 칸에 띄움 (저장한 기록이 있을 때만, 2026-11-26 사용자 결정). 저장에 성공하면 Outlet 값의 onSaved()로 목록을 다시 받게 함
 // 기간은 칩 없이 칸에 1-600개월을 직접 적음, 거치 기간도 체크했을 때만 입력 (2026-11-25 사용자 결정, 명세서 CA-02 '상환 기간 칩', CA-03 '거치기간 항상 보임'과 다름)
 // 오른쪽 결과: 요약 3칸 → 중도상환 후 방식 카드(CA-04) → 회차별 표(CA-05) → 그래프, 방식별 총이자(CA-06) (좁은 화면은 입력 아래)
 // 처음 값: CalculatorPage가 navigate state에서 골라 Outlet 값(initial)으로 내려줌. 없으면 기본값
@@ -49,7 +48,7 @@ const Actions = styled.div`
   }
 `
 
-// 왼쪽 열: 입력 판 + 그 아래 계산 기록 (가안 .stack.g20)
+// 왼쪽 열: 입력 판 (가안 .stack.g20)
 const Left = styled.div`
   display: flex;
   flex-direction: column;
@@ -95,15 +94,13 @@ function getMonthlyNote(method, graceMonths) {
 }
 
 function LoanCalculator() {
-  const { initial } = useOutletContext()
+  const { initial, onSaved } = useOutletContext()
   const showToast = useUiStore((state) => state.showToast)
   // form: 입력칸 값 / applied: 결과에 쓰는 값 ([계산하기]을 누른 때의 form, 처음엔 처음 값)
   const [form, setForm] = useState(() => createCalcForm(initial))
   const [applied, setApplied] = useState(() => createCalcForm(initial))
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [historyKey, setHistoryKey] = useState(0)
-  const topRef = useRef(null)
   const resultRef = useRef(null)
 
   const handleChange = (patch) => setForm((prev) => ({ ...prev, ...patch }))
@@ -129,8 +126,10 @@ function LoanCalculator() {
       return
     }
     setApplied(form)
-    if (window.matchMedia('(max-width: 899px)').matches) {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    const resultEl = resultRef.current
+    if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -147,7 +146,7 @@ function LoanCalculator() {
     try {
       await myApi.postCalc(toCalcRecord(params, schedule))
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
-      setHistoryKey((count) => count + 1)
+      onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
@@ -170,17 +169,6 @@ function LoanCalculator() {
       return
     }
     requireLogin(saveResult, '계산 기록 저장은 회원 전용이에요.')
-  }
-
-  // 기록 불러오기 (CA-07): 입력칸을 기록 값으로 채우고 (값이 맞으면 결과도 그 값으로 계산) 맨 위로
-  const handleLoad = (item) => {
-    const loaded = getInitialCalc(item)
-    const loadedForm = createCalcForm(loaded)
-    setForm(loadedForm)
-    setHasTried(false)
-    if (Object.keys(getCalcErrors(loadedForm)).length === 0) setApplied(loadedForm)
-    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    showToast('기록을 불러왔어요')
   }
 
   let result
@@ -224,7 +212,7 @@ function LoanCalculator() {
   }
 
   return (
-    <CalcLayout ref={topRef}>
+    <CalcLayout>
       <Left>
         <CalcPanel>
           <CalcFormStack>
@@ -308,7 +296,6 @@ function LoanCalculator() {
             </Actions>
           </CalcFormStack>
         </CalcPanel>
-        <CalcHistoryList onLoad={handleLoad} refreshKey={historyKey} />
       </Left>
 
       <Result ref={resultRef}>

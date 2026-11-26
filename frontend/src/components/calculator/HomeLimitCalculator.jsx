@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useUiStore from '../../store/useUiStore'
@@ -18,6 +18,7 @@ import {
 } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import {
+  DSR_KINDS,
   HOME_MAX_OTHER_LOANS,
   HOME_OTHER_LOAN_DEFAULT,
   HOME_RATE_TYPES,
@@ -27,6 +28,7 @@ import {
   getInitialHome,
   toHomeRecord,
 } from '../../utils/finance'
+import { REPAY_METHODS } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
 import Checkbox from '../ui/Checkbox'
 import Disclaimer from '../common/Disclaimer'
@@ -34,6 +36,7 @@ import SummaryCards from '../common/SummaryCards'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
+import SelectField from '../ui/SelectField'
 
 // CA-11 집 살 때 대출한도 계산기 (SCR-25, /calc/home): 집 살 때 최대 대출 한도. 계산은 프론트에서 (utils/finance.js)
 // 이름은 '내 집 대출한도'에서 바꿈 (2026-11-25 사용자 결정): 이미 가진 집을 담보로 빌리는 경우와 헷갈리지 않게.
@@ -65,7 +68,7 @@ const OtherBox = styled.div`
   background: var(--paper);
 `
 
-// 다른 대출 한 줄: 제목 줄 (이름과 [삭제]) + 칸 3개, 두 번째 줄부터는 위에 구분선
+// 다른 대출 한 줄: 제목 줄 (이름과 [삭제]) + 종류, 상환 방식 드롭다운 + 칸 3개, 두 번째 줄부터는 위에 구분선
 const OtherLoan = styled.div`
   display: flex;
   flex-direction: column;
@@ -83,6 +86,13 @@ const OtherHead = styled.div`
   gap: 8px;
   font-size: var(--fs-md);
   font-weight: 800;
+`
+
+// 종류, 상환 방식 드롭다운 두 칸 (DSR 계산기와 같은 모양)
+const Pair = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 `
 
 const Hint = styled.p`
@@ -123,10 +133,15 @@ const RATE_TYPE_OPTIONS = HOME_RATE_TYPES.map((type) => ({ value: type.code, lab
 const money = (value) => formatMoney(value, '원')
 
 // 다른 대출 한 줄마다 id를 붙임 (줄을 지워도 다른 줄의 입력칸이 섞이지 않게). id는 화면용이라 계산과 저장에는 쓰지 않음
+const KIND_OPTIONS = DSR_KINDS.map((kind) => ({ value: kind.code, label: kind.label }))
+const METHOD_OPTIONS = REPAY_METHODS.map((method) => ({ value: method.code, label: method.label }))
+
 const withIds = (form) => ({ ...form, otherLoans: form.otherLoans.map((loan, index) => ({ ...loan, id: index + 1 })) })
 
 function HomeLimitCalculator() {
   const location = useLocation()
+  // 저장에 성공하면 CalculatorPage 오른쪽 칸의 계산 기록을 다시 받게 함
+  const { onSaved } = useOutletContext()
   const showToast = useUiStore((state) => state.showToast)
   // form: 입력칸 값 / applied: 결과에 쓰는 값 ([계산하기]를 누른 때의 form, 처음엔 처음 값)
   const [form, setForm] = useState(() => withIds(getInitialHome(location.state)))
@@ -177,8 +192,10 @@ function HomeLimitCalculator() {
       return
     }
     setApplied(form)
-    if (window.matchMedia('(max-width: 899px)').matches) {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    const resultEl = resultRef.current
+    if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -189,6 +206,7 @@ function HomeLimitCalculator() {
     try {
       await myApi.postHomeCalc(toHomeRecord(applied, result))
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
+      onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
@@ -377,6 +395,22 @@ function HomeLimitCalculator() {
                         </CalcLinkButton>
                       )}
                     </OtherHead>
+                    <Pair>
+                      <SelectField
+                        isLabelHidden
+                        label={`다른 대출 ${index + 1} 종류`}
+                        options={KIND_OPTIONS}
+                        value={loan.kind}
+                        onChange={(kind) => handleOtherLoanChange(loan.id, { kind })}
+                      />
+                      <SelectField
+                        isLabelHidden
+                        label={`다른 대출 ${index + 1} 상환 방식`}
+                        options={METHOD_OPTIONS}
+                        value={loan.method}
+                        onChange={(method) => handleOtherLoanChange(loan.id, { method })}
+                      />
+                    </Pair>
                     <NumberField
                       isLabelInside
                       isCompact
@@ -421,7 +455,8 @@ function HomeLimitCalculator() {
                 {form.otherLoans.length >= HOME_MAX_OTHER_LOANS
                   ? `다른 대출은 최대 ${HOME_MAX_OTHER_LOANS}건까지 넣을 수 있어요. `
                   : ''}
-                다른 대출은 남은 기간 동안 나눠 갚는 것으로 계산해요. 남은 기간을 비우면 5년으로 봐요.
+                다른 대출은 DSR 계산기와 같은 방법으로 1년 상환액을 계산해요. 만기일시 신용대출은 5년에 나눠 갚는
+                것으로 보고, 남은 기간을 비우면 5년으로 봐요.
               </Hint>
             </OtherBox>
           )}
