@@ -26,6 +26,7 @@ import RateText from './RateText'
 // 랭킹(RK-02, CHORONG-60)은 순위 숫자 칸, 1~3위 메달 카드, '최저 금리' 이름표가 달라 이 줄을 쓰지 않고 components/ranking/RankingItem.jsx로 따로 만듦
 // 비교함은 없어짐 (CHORONG-82): 위 [+ 비교] 설명의 '비교함'은 지금 비교 화면. 누르면 담고 /compare로 이동하며,
 //   '비교 불가'는 한 칸을 고르는 중 남겨 둔 상품과 용도나 상환 방식이 안 겹칠 때
+//   남겨 둔 상품이 B 칸이면 '비교 B에 담음' 딱지만 파랑 (줄 바탕, 버튼은 A, B 모두 주황)
 const Row = styled.article`
   display: grid;
   grid-template-columns: minmax(0, 1fr) 168px 128px auto${({ $hasCompare }) => ($hasCompare ? ' auto' : '')};
@@ -186,7 +187,7 @@ const CompareBadge = styled.span`
   margin-left: 8px;
   padding: 4px 8px;
   border-radius: var(--r-pill);
-  background: var(--brand);
+  background: ${({ $isB }) => ($isB ? 'var(--viz-1)' : 'var(--brand)')};
   color: var(--on-brand);
   font-size: var(--fs-2xs);
   font-weight: 800;
@@ -255,7 +256,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null, keywo
         <Org>
           {rank != null && <RankNo>{rank}위</RankNo>}
           <Highlight text={product.companyName} keyword={keyword} />
-          {pickLabel && <CompareBadge>비교 {pickLabel}에 담음</CompareBadge>}
+          {pickLabel && <CompareBadge $isB={pickLabel === 'B'}>비교 {pickLabel}에 담음</CompareBadge>}
         </Org>
         <NameButton>
           <Name>
