@@ -135,8 +135,9 @@ export function getLoanResult(product, amountMan, months, method) {
 }
 
 // 비교 화면을 처음 열 때 넣어 둘 금액(만원), 기간(개월)과 그 근거
-// 금액: ① 맞춤 추천에서 입력한 필요 금액 → ② 두 상품이 모두 빌려 주는 최대 한도(한도 중 작은 값) → ③ 한도 정보가 없으면 1,000만원
-//   (③은 상세 창 [이자 계산]의 기본 금액과 같은 값). 추천 금액이 한도보다 크면 한도로 줄이고 근거는 '한도'
+// 금액: ① 맞춤 추천에서 입력한 필요 금액 → ② 없으면 1,000만원 (상세 창 [이자 계산]의 기본 금액과 같은 값)
+//   ①, ②가 두 상품이 모두 빌려 주는 최대 한도(한도 중 작은 값)보다 크면 그 한도로 줄이고 근거는 '한도'
+//   (한도를 처음 금액으로 쓰지 않음: 한도가 아주 큰 상품은 120억원처럼 입력 범위를 넘는 값이 들어가서)
 // 기간: ① 맞춤 추천에서 입력한 기간(0은 '잘 모르겠어요'라 제외, 선택지 안이고 두 상품 최대 기간 이내일 때) → ② 두 상품 최대 기간 안에서 가장 긴 선택지 → ③ 맞는 선택지가 없으면 첫 선택지
 // recommend: { need 만원, months 개월 } 또는 없음 / 근거: 'recommend' 맞춤 추천 입력, 'limit' 최대 한도, 'term' 최대 기간, 'fallback' 기본값
 export const FALLBACK_AMOUNT_MAN = 1000
@@ -152,9 +153,6 @@ export function getCompareDefaults(productA, productB, termOptions, recommend) {
   if (isNumber(recommend?.need) && recommend.need > 0) {
     amount = recommend.need
     amountSource = 'recommend'
-  } else if (minLimit !== null) {
-    amount = minLimit
-    amountSource = 'limit'
   }
   if (minLimit !== null && amount > minLimit) {
     amount = minLimit
