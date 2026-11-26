@@ -100,6 +100,9 @@ function ReverseCalculator() {
   // form: 입력칸 값 / applied: 결과에 쓰는 값 ([계산하기]를 누른 때의 form, 처음엔 처음 값)
   const [form, setForm] = useState(() => getInitialReverse(location.state))
   const [applied, setApplied] = useState(() => getInitialReverse(location.state))
+  // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
+  const [isCalculated, setIsCalculated] = useState(() => Object.keys(getReverseErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   // 저장했거나 서버가 '이미 저장한 기록'이라고 알려 준 계산 값 (applied를 JSON으로, 없으면 null)
@@ -119,10 +122,10 @@ function ReverseCalculator() {
   const saveKey = JSON.stringify(applied)
   const isStale = JSON.stringify(form) !== saveKey
   // 이미 저장한 계산인지 (저장했거나 409를 받은 그 계산 값이 지금 결과와 같고, 입력도 바꾸지 않았을 때)
-  const isSaved = savedKey === saveKey && !isStale
+  const isSaved = isCalculated && savedKey === saveKey && !isStale
   const isMember = useAuthStore((state) => state.status === 'member')
   // 저장 본문 (계산이 안 되면 null)을 글로: 서버에 물어볼 때 씀 (글을 기준으로 해야 그릴 때마다 다시 묻지 않음)
-  const recordKey = result ? JSON.stringify(toReverseRecord(applied, result)) : null
+  const recordKey = isCalculated && result ? JSON.stringify(toReverseRecord(applied, result)) : null
 
   // 회원이면 이 계산을 이미 저장했는지 서버에 한 번 물어봄 (API-58 check, 추천 결과 저장과 같은 방식): 화면이 열릴 때, 로그인했을 때, 새로 계산했을 때
   // true면 '저장했어요'로 잠금. 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
@@ -148,6 +151,7 @@ function ReverseCalculator() {
       return
     }
     setApplied(form)
+    setIsCalculated(true)
     // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
     const resultEl = resultRef.current
     if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
@@ -193,6 +197,10 @@ function ReverseCalculator() {
   }
 
   const handleSave = () => {
+    if (!isCalculated) {
+      showToast('값을 넣고 [계산하기]를 먼저 눌러 주세요')
+      return
+    }
     if (!checkReady()) return
     requireLogin(saveResult, '계산 기록 저장은 회원 전용이에요.')
   }
@@ -204,7 +212,9 @@ function ReverseCalculator() {
   }
 
   let resultView
-  if (!result) {
+  if (!isCalculated) {
+    resultView = <EmptyBox>값을 넣고 [계산하기]를 누르면 결과가 보여요.</EmptyBox>
+  } else if (!result) {
     resultView = <EmptyBox>이 조건으로는 계산할 수 없어요. 이자율과 기간을 확인해 주세요.</EmptyBox>
   } else {
     const summaryItems = [
@@ -317,7 +327,7 @@ function ReverseCalculator() {
       </CalcPanel>
 
       <Result ref={resultRef}>
-        {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
+        {isCalculated && isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {resultView}
       </Result>
     </CalcLayout>

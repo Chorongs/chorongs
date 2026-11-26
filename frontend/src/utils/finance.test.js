@@ -144,13 +144,13 @@ describe('getChangeResult (갈아타기 계산)', () => {
 })
 
 describe('getChangeErrors (갈아타기 입력 검사)', () => {
-  it('처음 값은 오류가 없다', () => {
-    // Given
+  it('처음 값은 남은 대출금이 빈칸이라 입력 안내가 난다', () => {
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     const form = getInitialChange()
     // When
     const errors = getChangeErrors(form)
     // Then
-    expect(errors).toEqual({})
+    expect(errors.balance).toBe('남은 대출금을 입력해 주세요')
   })
 
   it('남은 대출금이 비어 있으면 입력 안내를 돌려준다', () => {
@@ -805,12 +805,12 @@ describe('getHomeResult (집 살 때 대출한도 계산)', () => {
 })
 
 describe('getHomeErrors (내 집 입력 검사)', () => {
-  it('기본값은 오류가 없다', () => {
-    // Given 처음 값
+  it('처음 값은 집값이 빈칸이라 입력 안내가 난다', () => {
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getHomeErrors(HOME_DEFAULTS)
     // Then
-    expect(errors).toEqual({})
+    expect(errors.housePrice).toBe('집값을 입력해 주세요')
   })
 
   it('집값이 비면 입력 안내를 보인다', () => {
@@ -1486,12 +1486,12 @@ describe('getReverseResult (상환능력 기반 대출 계산)', () => {
 })
 
 describe('getReverseErrors (상환능력 입력 검사)', () => {
-  it('기본값은 오류가 없다', () => {
-    // Given 처음 값
+  it('처음 값은 매달 갚을 돈이 빈칸이라 입력 안내가 난다', () => {
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getReverseErrors(REVERSE_DEFAULTS)
     // Then
-    expect(errors).toEqual({})
+    expect(errors.monthly).toBe('매달 갚을 돈을 입력해 주세요')
   })
 
   it('매달 갚을 돈이 비면 입력 안내를 보인다', () => {
@@ -1904,12 +1904,12 @@ describe('getDsrResult (DSR 계산)', () => {
 })
 
 describe('getDsrErrors (DSR 입력 검사)', () => {
-  it('기본값은 오류가 없다', () => {
-    // Given 처음 값
+  it('처음 값은 연소득이 빈칸이라 입력 안내가 난다', () => {
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getDsrErrors(DSR_DEFAULTS)
     // Then
-    expect(errors).toEqual({})
+    expect(errors.annualIncome).toBe('연소득을 입력해 주세요')
   })
 
   it('연소득이 비면 입력 안내를 보인다', () => {
@@ -2322,5 +2322,43 @@ describe('금액 입력은 원 단위 (갈아타기, 내 집, 상환능력, DSR)
     const record = toDsrRecord(form, getDsrResult(form))
     // Then
     expect([record.annualIncome, record.loans[0].loanAmount]).toEqual([45678901, 12345678])
+  })
+})
+
+describe('처음 값(빈칸)으로 열었을 때 결과 계산', () => {
+  it('집 살 때 대출한도는 멈추지 않고 null이다', () => {
+    // Given 숫자 칸이 빈칸인 처음 값 (빈칸 + 스트레스 금리가 글자가 되어 화면이 멈추던 것)
+    const form = getInitialHome()
+    // When
+    const result = getHomeResult(form)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('갈아타기는 멈추지 않고 null이다', () => {
+    // Given
+    const form = getInitialChange()
+    // When
+    const result = getChangeResult(form)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('DSR은 멈추지 않고 null이다', () => {
+    // Given
+    const form = getInitialDsr()
+    // When
+    const result = getDsrResult(form)
+    // Then
+    expect(result).toBeNull()
+  })
+
+  it('상환능력 기반 대출은 멈추지 않고 null이다', () => {
+    // Given
+    const form = getInitialReverse()
+    // When
+    const result = getReverseResult(form)
+    // Then
+    expect(result).toBeNull()
   })
 })

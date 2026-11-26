@@ -241,7 +241,8 @@ export const CALC_METHODS = [
 ]
 
 // 바로 열었을 때 처음 값 (금액 원, 기간 개월, 연 이자율 %)
-export const CALC_DEFAULTS = { amount: FALLBACK_AMOUNT_MAN * 10000, months: 36, rate: 5, method: 'EQUAL_PI' }
+// 숫자 칸은 빈칸으로 열고 [계산하기]를 눌러야 결과가 나옴 (2026-11-26 사용자 결정, 상환 방식은 원리금균등 그대로)
+export const CALC_DEFAULTS = { amount: '', months: '', rate: '', method: 'EQUAL_PI' }
 
 // 중도상환 후 방식 코드 (API-24 prepayMode와 같게): 월 납입액 줄이기, 기간 줄이기
 const PREPAY_MODES = ['REDUCE_PAYMENT', 'SHORTEN_TERM']
@@ -260,7 +261,7 @@ export function getCalcTermOptions(months) {
 }
 
 // 다른 화면에서 navigate state로 넘긴 값 → 계산기 처음 값 (CA-01)
-// state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 기본값
+// state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 처음 값 (숫자 칸은 빈칸)
 //   기간은 칩에 없어도 1-600개월 정수면 받음 (칩에 없는 기간은 화면이 [직접 입력]으로 보여 줌)
 //   저장한 기록(API-24 한 줄)을 그대로 넘기면 옵션도 복원: graceMonths, growthRate, prepayRound, prepayAmount 원, prepayFeeRate, prepayMode, changeRound, changeRate
 // 결과: { amount 원, months, rate, method, termOptions } + 옵션이 맞으면 { graceMonths, growth, prepay, rateChange }
@@ -296,7 +297,7 @@ export function createCalcForm(initial = getInitialCalc()) {
     rate: initial.rate,
     isGrace: (initial.graceMonths ?? 0) > 0,
     graceMonths: initial.graceMonths ?? 0,
-    growth: initial.growth ?? 5,
+    growth: initial.growth ?? '',
     isPrepay: Boolean(prepay),
     prepayRound: prepay?.round ?? '',
     prepayAmount: prepay?.amount ?? '',

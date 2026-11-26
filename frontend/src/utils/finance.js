@@ -16,16 +16,16 @@ const isInRange = (value, min, max) => isNumber(value) && value >= min && value 
 // 갈아타기 입력 한도: 기간 1-600개월, 금리 0-20%, 수수료 0-5% (명세서). 금액은 대출 이자 계산기와 같은 1만원-10억원, 원 단위 (위쪽 한도는 명세서에 없어 정한 값)
 export const CHANGE_LIMITS = { ...CALC_LIMITS, monthsMin: 1, monthsMax: 600 }
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리와 수수료는 %
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 선택 사항인 수수료율과 기타 비용은 0, 상환 방식은 원리금균등 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const CHANGE_DEFAULTS = {
   currentMethod: 'EQUAL_PI',
-  balance: 50000000,
-  currentRate: 5.5,
-  currentMonths: 36,
+  balance: '',
+  currentRate: '',
+  currentMonths: '',
   newMethod: 'EQUAL_PI',
-  newRate: 4.5,
-  newMonths: 36,
-  feeRate: 1,
+  newRate: '',
+  newMonths: '',
+  feeRate: 0,
   etcCost: 0,
 }
 
@@ -181,8 +181,12 @@ export const HOME_RATIOS = {
 export const HOME_OTHER_MONTHS = 60
 
 // 다른 대출은 여러 건 넣을 수 있다 (최대 10건, DSR 계산기와 같음). 건마다 { kind 종류, method 상환 방식, balance 원, rate %, months 개월 }, 새 줄의 처음 값
+// 숫자 칸은 빈칸 (잔액을 비우면 0, 남은 기간을 비우면 5년으로 봄, 2026-11-26 사용자 결정)
 export const HOME_MAX_OTHER_LOANS = 10
-export const HOME_OTHER_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', balance: 0, rate: 5, months: HOME_OTHER_MONTHS }
+export const HOME_OTHER_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', balance: '', rate: '', months: '' }
+
+// 건별 값 없이 1년 이자만 있는 옛 기록을 한 건으로 맞출 때 쓰는 금리 (%): 잔액 = 이자 / 이 금리
+const HOME_OTHER_FALLBACK_RATE = 5
 
 // 수도권·규제 지역의 집값 구간별 대출 상한 (원, 예시 값, 실제 값은 담당자가 개발 때 정함): 집값 15억 이하 6억, 25억 이하 4억, 그 위 2억
 // maxPrice 이하일 때 그 줄의 maxLoan이 상한 (위에서부터 처음 맞는 줄), 그 외 지역은 상한 없음
@@ -216,17 +220,17 @@ export const HOME_RATE_TYPES = [
   },
 ]
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 년, 금리는 %
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 고르는 칸(지역, 생애 첫 집, 금리 유형)은 그대로 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const HOME_DEFAULTS = {
-  housePrice: 500000000,
+  housePrice: '',
   region: 'OTHER',
   isFirstHome: false,
-  annualIncome: 60000000,
+  annualIncome: '',
   isOtherLoan: false,
   otherLoans: [{ ...HOME_OTHER_LOAN_DEFAULT }],
-  rate: 4.5,
+  rate: '',
   rateType: 'VARIABLE',
-  years: 30,
+  years: '',
 }
 
 const HOME_REGION_CODES = HOME_REGIONS.map((region) => region.code)
@@ -281,9 +285,9 @@ export function getInitialHome(state) {
     form.otherLoans = savedLoans
     form.isOtherLoan = true
   } else if (isInRange(state?.otherInterest, 0, amountMax)) {
-    const balance = Math.round((state.otherInterest * 100) / HOME_OTHER_LOAN_DEFAULT.rate)
+    const balance = Math.round((state.otherInterest * 100) / HOME_OTHER_FALLBACK_RATE)
     if (isInRange(balance, 0, amountMax)) {
-      form.otherLoans = [{ ...HOME_OTHER_LOAN_DEFAULT, balance }]
+      form.otherLoans = [{ ...HOME_OTHER_LOAN_DEFAULT, balance, rate: HOME_OTHER_FALLBACK_RATE, months: HOME_OTHER_MONTHS }]
       form.isOtherLoan = balance > 0
     }
   }
@@ -378,6 +382,8 @@ export function getHomeResult(form) {
   const ratios = HOME_RATIOS[form.region]
   const rateType = HOME_RATE_TYPES.find((type) => type.code === form.rateType)
   if (!ratios || !rateType) return null
+  // 숫자 칸이 비어 있으면 계산하지 않음 (빈칸 + 스트레스 금리가 글자 이어 붙이기가 되어 멈추던 것 방지, 처음 값이 빈칸이 된 2026-11-26부터)
+  if (![form.housePrice, form.annualIncome, form.rate, form.years].every(isNumber)) return null
 
   const ltvRate = form.isFirstHome ? ratios.firstLtv : ratios.ltv
   const ltvByRatio = Math.round((form.housePrice * ltvRate) / 100)
@@ -462,8 +468,8 @@ export const REVERSE_LIMITS = { amountMin: 10000, amountMax: 9999990000, rateMax
 // 기간별 표에 보일 기간 (개월): 12, 36, 60, 120, 180 (입력한 기간이 이 안에 없으면 표에 끼워 넣음)
 export const REVERSE_TERMS = [...new Set([...MONTHS_OPTIONS_DEFAULT, ...MONTHS_OPTIONS_HOUSING])].sort((a, b) => a - b)
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리는 %
-export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: 1000000, rate: 5, months: 36 }
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 상환 방식은 원리금균등 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
+export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: '', rate: '', months: '' }
 
 const REVERSE_METHOD_CODES = REPAY_METHODS.map((method) => method.code)
 
@@ -568,13 +574,13 @@ export const DSR_BASELINES = { bank: 40, second: 50 }
 // 만기일시 신용대출은 원금을 5년(60개월)에 나눠 갚는다고 봄 (명세서)
 const DSR_CREDIT_BULLET_MONTHS = 60
 
-// [+ 대출 추가]로 새로 생기는 대출 한 줄의 처음 값 (명세서에 없어 정한 값). 금액은 원, 기간은 개월, 금리는 %
-export const DSR_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', amount: 10000000, rate: 6, months: 36 }
+// 대출 한 줄의 처음 값 (처음 한 줄과 [+ 대출 추가]): 종류 신용대출, 원리금균등, 숫자 칸은 빈칸 (2026-11-26 사용자 결정)
+export const DSR_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', amount: '', rate: '', months: '' }
 
-// 바로 열었을 때 처음 값 (명세서에 없어 정한 값): 연소득 5,000만원, 대출 1건 (주택담보대출 2억원)
+// 바로 열었을 때 처음 값: 연소득 빈칸, 빈 대출 1건 ([계산하기]를 눌러야 결과가 나옴)
 export const DSR_DEFAULTS = {
-  annualIncome: 50000000,
-  loans: [{ kind: 'MORTGAGE', method: 'EQUAL_PI', amount: 200000000, rate: 4.5, months: 360 }],
+  annualIncome: '',
+  loans: [{ ...DSR_LOAN_DEFAULT }],
 }
 
 const DSR_KIND_CODES = DSR_KINDS.map((kind) => kind.code)

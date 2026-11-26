@@ -23,6 +23,10 @@ import {
   toScheduleParams,
 } from './loanMath'
 
+
+// 테스트용 입력칸 묶음: 처음 값은 숫자 칸이 빈칸이라(2026-11-26) 계산할 수 있는 값(1,000만원, 36개월, 연 5%, 원리금균등)을 채운 모양 (체증식 증가율은 처음처럼 빈칸)
+const filledForm = () => ({ ...createCalcForm(getInitialCalc()), amount: 10000000, months: 36, rate: 5 })
+
 describe('getMidRate', () => {
   it('최저, 최고 금리의 가운데 값을 돌려준다', () => {
     // Given
@@ -1294,13 +1298,13 @@ describe('getCalcTermOptions', () => {
 })
 
 describe('getInitialCalc', () => {
-  it('넘어온 값이 없으면 기본값이다', () => {
+  it('넘어온 값이 없으면 숫자 칸은 빈칸이고 상환 방식은 원리금균등이다', () => {
     // Given
     const state = null
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result).toMatchObject({ amount: 10000000, months: 36, rate: 5, method: 'EQUAL_PI' })
+    expect(result).toMatchObject({ amount: '', months: '', rate: '', method: 'EQUAL_PI' })
   })
 
   it('넘어온 금액(원)을 그대로 넣는다', () => {
@@ -1348,49 +1352,49 @@ describe('getInitialCalc', () => {
     expect(result.months).toBe(600)
   })
 
-  it('600개월을 넘는 기간은 무시한다', () => {
+  it('600개월을 넘는 기간은 무시한다 (빈칸)', () => {
     // Given
     const state = { loanMonths: 601 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.months).toBe(36)
+    expect(result.months).toBe('')
   })
 
-  it('1개월보다 작은 기간은 무시한다', () => {
+  it('1개월보다 작은 기간은 무시한다 (빈칸)', () => {
     // Given
     const state = { loanMonths: 0 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.months).toBe(36)
+    expect(result.months).toBe('')
   })
 
-  it('소수 기간은 무시한다', () => {
+  it('소수 기간은 무시한다 (빈칸)', () => {
     // Given
     const state = { loanMonths: 2.5 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.months).toBe(36)
+    expect(result.months).toBe('')
   })
 
-  it('범위 밖 금리는 무시한다', () => {
+  it('범위 밖 금리는 무시한다 (빈칸)', () => {
     // Given
     const state = { interestRate: 35 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.rate).toBe(5)
+    expect(result.rate).toBe('')
   })
 
-  it('1만원보다 작은 금액은 무시한다', () => {
+  it('1만원보다 작은 금액은 무시한다 (빈칸)', () => {
     // Given
     const state = { loanAmount: 9999 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.amount).toBe(10000000)
+    expect(result.amount).toBe('')
   })
 
   it('모르는 상환 방식은 무시한다', () => {
@@ -1594,13 +1598,13 @@ describe('createCalcForm 저장한 기록의 옵션', () => {
     expect(form).toMatchObject({ isRateChange: true, changeRound: 12, changeRate: 7.5 })
   })
 
-  it('옵션이 없으면 증가율 5%, 중도상환과 금리 변동은 꺼진 처음 모양이다', () => {
+  it('옵션이 없으면 증가율은 빈칸, 중도상환과 금리 변동은 꺼진 처음 모양이다', () => {
     // Given
     const initial = getInitialCalc(savedRecord)
     // When
     const form = createCalcForm(initial)
     // Then
-    expect(form).toMatchObject({ growth: 5, isPrepay: false, isRateChange: false })
+    expect(form).toMatchObject({ growth: '', isPrepay: false, isRateChange: false })
   })
 })
 
@@ -1610,7 +1614,7 @@ describe('toCalcRecord', () => {
 
   it('금액을 원 단위로 바꿔 기본 입력값을 담는다', () => {
     // Given
-    const form = createCalcForm()
+    const form = filledForm()
     // When
     const result = record(form)
     // Then
@@ -1625,7 +1629,7 @@ describe('toCalcRecord', () => {
 
   it('계산 결과(총이자, 첫 달 납입액)를 같이 담는다', () => {
     // Given
-    const form = createCalcForm()
+    const form = filledForm()
     // When
     const result = record(form)
     // Then
@@ -1634,7 +1638,7 @@ describe('toCalcRecord', () => {
 
   it('만기일시는 거치 기간을 0으로 보낸다', () => {
     // Given
-    const form = { ...createCalcForm(), method: 'BULLET', graceMonths: 6 }
+    const form = { ...filledForm(), method: 'BULLET', graceMonths: 6 }
     // When
     const result = record(form)
     // Then
@@ -1643,7 +1647,7 @@ describe('toCalcRecord', () => {
 
   it('체증식이 아니면 증가율을 null로 보낸다', () => {
     // Given
-    const form = { ...createCalcForm(), growth: 8 }
+    const form = { ...filledForm(), growth: 8 }
     // When
     const result = record(form)
     // Then
@@ -1652,7 +1656,7 @@ describe('toCalcRecord', () => {
 
   it('체증식이면 증가율을 담는다', () => {
     // Given
-    const form = { ...createCalcForm(), method: 'GRADUATED', growth: 8 }
+    const form = { ...filledForm(), method: 'GRADUATED', growth: 8 }
     // When
     const result = record(form)
     // Then
@@ -1661,7 +1665,7 @@ describe('toCalcRecord', () => {
 
   it('중도상환을 안 쓰면 중도상환 4칸이 모두 null이다', () => {
     // Given
-    const form = createCalcForm()
+    const form = filledForm()
     // When
     const result = record(form)
     // Then
@@ -1671,7 +1675,7 @@ describe('toCalcRecord', () => {
   it('중도상환을 쓰면 금액 그대로 4칸을 담는다', () => {
     // Given
     const form = {
-      ...createCalcForm(),
+      ...filledForm(),
       isPrepay: true,
       prepayRound: 12,
       prepayAmount: 3000000,
@@ -1691,7 +1695,7 @@ describe('toCalcRecord', () => {
 
   it('중도상환 수수료율 칸이 비어 있으면 0으로 보낸다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 12, prepayAmount: 3000000, prepayFee: '' }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 12, prepayAmount: 3000000, prepayFee: '' }
     // When
     const result = record(form)
     // Then
@@ -1700,7 +1704,7 @@ describe('toCalcRecord', () => {
 
   it('변동 회차가 0이면 금리 변동 2칸이 모두 null이다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: 7.5 }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 0, changeRate: 7.5 }
     // When
     const result = record(form)
     // Then
@@ -1709,7 +1713,7 @@ describe('toCalcRecord', () => {
 
   it('금리 변동을 쓰면 회차와 변동 후 금리를 담는다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 12, changeRate: 7.5 }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 12, changeRate: 7.5 }
     // When
     const result = record(form)
     // Then
@@ -1728,7 +1732,7 @@ describe('저장한 기록을 불러오면 같은 계산 입력이 된다', () =
   it('옵션을 모두 쓴 체증식 입력을 그대로 되돌린다', () => {
     // Given
     const form = {
-      ...createCalcForm(),
+      ...filledForm(),
       method: 'GRADUATED',
       growth: 8,
       graceMonths: 6,
@@ -1749,7 +1753,7 @@ describe('저장한 기록을 불러오면 같은 계산 입력이 된다', () =
 
   it('옵션이 없는 처음 입력을 그대로 되돌린다', () => {
     // Given
-    const form = createCalcForm()
+    const form = filledForm()
     // When
     const { params, restored } = roundTrip(form)
     // Then
@@ -1758,7 +1762,7 @@ describe('저장한 기록을 불러오면 같은 계산 입력이 된다', () =
 
   it('만기일시 입력을 그대로 되돌린다', () => {
     // Given
-    const form = { ...createCalcForm(), method: 'BULLET', amount: 50000000, months: 60, rate: 4.35 }
+    const form = { ...filledForm(), method: 'BULLET', amount: 50000000, months: 60, rate: 4.35 }
     // When
     const { params, restored } = roundTrip(form)
     // Then
@@ -1767,18 +1771,27 @@ describe('저장한 기록을 불러오면 같은 계산 입력이 된다', () =
 })
 
 describe('getCalcErrors', () => {
-  it('처음 값은 오류가 없다', () => {
+  it('계산할 수 있는 값을 채우면 오류가 없다', () => {
     // Given
-    const form = createCalcForm()
+    const form = filledForm()
     // When
     const errors = getCalcErrors(form)
     // Then
     expect(errors).toEqual({})
   })
 
+  it('처음 값은 금액이 빈칸이라 입력 안내가 난다', () => {
+    // Given 아무것도 넘어오지 않은 처음 모양
+    const form = createCalcForm(getInitialCalc())
+    // When
+    const errors = getCalcErrors(form)
+    // Then
+    expect(errors.amount).toBe('빌릴 금액을 입력해 주세요')
+  })
+
   it('금액이 비면 금액 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: '' }
+    const form = { ...filledForm(), amount: '' }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1787,7 +1800,7 @@ describe('getCalcErrors', () => {
 
   it('금액이 0이면 금액 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: 0 }
+    const form = { ...filledForm(), amount: 0 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1796,7 +1809,7 @@ describe('getCalcErrors', () => {
 
   it('이자율이 20%를 넘으면 이자율 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), rate: 21 }
+    const form = { ...filledForm(), rate: 21 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1805,7 +1818,7 @@ describe('getCalcErrors', () => {
 
   it('이자율 0%는 오류가 아니다', () => {
     // Given
-    const form = { ...createCalcForm(), rate: 0 }
+    const form = { ...filledForm(), rate: 0 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1814,7 +1827,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간이 비면 기간 입력 안내가 난다', () => {
     // Given 기간 빈 칸
-    const form = { ...createCalcForm(), months: '' }
+    const form = { ...filledForm(), months: '' }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1823,7 +1836,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간이 0이면 기간 범위 안내가 난다', () => {
     // Given 기간 0개월
-    const form = { ...createCalcForm(), months: 0 }
+    const form = { ...filledForm(), months: 0 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1832,7 +1845,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간이 601개월이면 기간 범위 안내가 난다', () => {
     // Given 기간 601개월
-    const form = { ...createCalcForm(), months: 601 }
+    const form = { ...filledForm(), months: 601 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1841,7 +1854,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간 600개월은 오류가 아니다', () => {
     // Given 기간 600개월
-    const form = { ...createCalcForm(), months: 600 }
+    const form = { ...filledForm(), months: 600 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1850,7 +1863,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간 1개월은 오류가 아니다', () => {
     // Given 기간 1개월 (거치는 0)
-    const form = { ...createCalcForm(), months: 1 }
+    const form = { ...filledForm(), months: 1 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1859,7 +1872,7 @@ describe('getCalcErrors', () => {
 
   it('칩에 없는 기간(24개월)도 오류가 아니다', () => {
     // Given 기간 24개월
-    const form = { ...createCalcForm(), months: 24 }
+    const form = { ...filledForm(), months: 24 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1868,7 +1881,7 @@ describe('getCalcErrors', () => {
 
   it('직접 입력한 기간이 짧으면 거치 기간 한도도 그 기간으로 준다', () => {
     // Given 기간 24개월에 거치 24개월
-    const form = { ...createCalcForm(), months: 24, graceMonths: 24 }
+    const form = { ...filledForm(), months: 24, graceMonths: 24 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1877,7 +1890,7 @@ describe('getCalcErrors', () => {
 
   it('칩에 없는 기간(24개월)도 상환 스케줄이 24회차로 계산된다', () => {
     // Given 기간 24개월
-    const form = { ...createCalcForm(), months: 24 }
+    const form = { ...filledForm(), months: 24 }
     // When
     const schedule = getSchedule(toScheduleParams(form))
     // Then
@@ -1886,7 +1899,7 @@ describe('getCalcErrors', () => {
 
   it('거치 기간이 대출 기간 이상이면 거치 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), graceMonths: 36 }
+    const form = { ...filledForm(), graceMonths: 36 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1895,7 +1908,7 @@ describe('getCalcErrors', () => {
 
   it('만기일시는 거치 기간을 검사하지 않는다', () => {
     // Given
-    const form = { ...createCalcForm(), method: 'BULLET', graceMonths: 99 }
+    const form = { ...filledForm(), method: 'BULLET', graceMonths: 99 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1904,7 +1917,7 @@ describe('getCalcErrors', () => {
 
   it('체증식이 아니면 증가율을 검사하지 않는다', () => {
     // Given
-    const form = { ...createCalcForm(), growth: 99 }
+    const form = { ...filledForm(), growth: 99 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1913,7 +1926,7 @@ describe('getCalcErrors', () => {
 
   it('체증식 증가율이 범위 밖이면 증가율 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), method: 'GRADUATED', growth: 25 }
+    const form = { ...filledForm(), method: 'GRADUATED', growth: 25 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1922,7 +1935,7 @@ describe('getCalcErrors', () => {
 
   it('중도상환을 체크만 하고 비워 두면 오류가 아니다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true }
+    const form = { ...filledForm(), isPrepay: true }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1931,7 +1944,7 @@ describe('getCalcErrors', () => {
 
   it('중도상환 회차가 대출 기간을 넘으면 회차 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 40, prepayAmount: 1000000 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 40, prepayAmount: 1000000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1940,7 +1953,7 @@ describe('getCalcErrors', () => {
 
   it('중도상환 금액만 적고 회차가 비면 회차 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayAmount: 1000000 }
+    const form = { ...filledForm(), isPrepay: true, prepayAmount: 1000000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1949,7 +1962,7 @@ describe('getCalcErrors', () => {
 
   it('중도상환액이 그때 남은 원금보다 크면 금액 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 10000000 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 6, prepayAmount: 10000000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1958,7 +1971,7 @@ describe('getCalcErrors', () => {
 
   it('중도상환액이 남은 원금 이하면 오류가 없다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 5000000 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 6, prepayAmount: 5000000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1967,7 +1980,7 @@ describe('getCalcErrors', () => {
 
   it('수수료율이 5%를 넘으면 수수료율 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 1000000, prepayFee: 6 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 6, prepayAmount: 1000000, prepayFee: 6 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1976,7 +1989,7 @@ describe('getCalcErrors', () => {
 
   it('변동 회차가 0이면 금리 변동을 적용하지 않고 오류도 없다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: '' }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 0, changeRate: '' }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1985,7 +1998,7 @@ describe('getCalcErrors', () => {
 
   it('변동 회차를 적었는데 변동 후 금리가 비면 금리 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 12 }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 12 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -1994,7 +2007,7 @@ describe('getCalcErrors', () => {
 
   it('변동 회차가 대출 기간을 넘으면 회차 오류가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 40, changeRate: 7 }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 40, changeRate: 7 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2005,7 +2018,7 @@ describe('getCalcErrors', () => {
 describe('toScheduleParams', () => {
   it('금액은 원 단위 그대로 계산 값에 담는다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: 20000000 }
+    const form = { ...filledForm(), amount: 20000000 }
     // When
     const params = toScheduleParams(form)
     // Then
@@ -2014,7 +2027,7 @@ describe('toScheduleParams', () => {
 
   it('중도상환을 체크하지 않으면 중도상환 값이 없다', () => {
     // Given
-    const form = { ...createCalcForm(), prepayRound: 6, prepayAmount: 1000000 }
+    const form = { ...filledForm(), prepayRound: 6, prepayAmount: 1000000 }
     // When
     const params = toScheduleParams(form)
     // Then
@@ -2023,7 +2036,7 @@ describe('toScheduleParams', () => {
 
   it('중도상환액은 원 단위 그대로 계산 값에 담는다', () => {
     // Given
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 3000000, prepayFee: 1.2 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 6, prepayAmount: 3000000, prepayFee: 1.2 }
     // When
     const params = toScheduleParams(form)
     // Then
@@ -2032,7 +2045,7 @@ describe('toScheduleParams', () => {
 
   it('변동 회차가 0이면 금리 변동 값이 없다', () => {
     // Given
-    const form = { ...createCalcForm(), isRateChange: true, changeRound: 0, changeRate: 8 }
+    const form = { ...filledForm(), isRateChange: true, changeRound: 0, changeRate: 8 }
     // When
     const params = toScheduleParams(form)
     // Then
@@ -2059,13 +2072,13 @@ describe('금액 입력은 원 단위 (계산기)', () => {
     expect(result.amount).toBe(1000000000)
   })
 
-  it('넘어온 금액이 10억원을 넘으면 무시한다', () => {
+  it('넘어온 금액이 10억원을 넘으면 무시한다 (빈칸)', () => {
     // Given
     const state = { loanAmount: 1000000001 }
     // When
     const result = getInitialCalc(state)
     // Then
-    expect(result.amount).toBe(10000000)
+    expect(result.amount).toBe('')
   })
 
   it('넘어온 1만원은 받는다', () => {
@@ -2088,7 +2101,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('금액이 9,999원이면 최소 금액 안내가 난다', () => {
     // Given 1만원 미만
-    const form = { ...createCalcForm(), amount: 9999 }
+    const form = { ...filledForm(), amount: 9999 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2097,7 +2110,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('금액이 1만원이면 오류가 아니다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: 10000 }
+    const form = { ...filledForm(), amount: 10000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2106,7 +2119,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('금액이 10억원이면 오류가 아니다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: 1000000000 }
+    const form = { ...filledForm(), amount: 1000000000 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2115,7 +2128,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('금액이 10억 1원이면 최대 금액 안내가 난다', () => {
     // Given
-    const form = { ...createCalcForm(), amount: 1000000001 }
+    const form = { ...filledForm(), amount: 1000000001 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2124,7 +2137,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('중도상환액이 9,999원이면 중도상환액 안내가 난다', () => {
     // Given 1만원 미만
-    const form = { ...createCalcForm(), isPrepay: true, prepayRound: 6, prepayAmount: 9999 }
+    const form = { ...filledForm(), isPrepay: true, prepayRound: 6, prepayAmount: 9999 }
     // When
     const errors = getCalcErrors(form)
     // Then
@@ -2133,7 +2146,7 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('입력한 원 단위 금액이 그대로 계산 값의 원금이 된다', () => {
     // Given 12,345,678원
-    const form = { ...createCalcForm(), amount: 12345678 }
+    const form = { ...filledForm(), amount: 12345678 }
     // When
     const params = toScheduleParams(form)
     // Then
@@ -2142,11 +2155,22 @@ describe('금액 입력은 원 단위 (계산기)', () => {
 
   it('저장 본문의 대출 금액은 입력한 원 그대로이다', () => {
     // Given 12,345,678원
-    const form = { ...createCalcForm(), amount: 12345678 }
+    const form = { ...filledForm(), amount: 12345678 }
     const params = toScheduleParams(form)
     // When
     const result = toCalcRecord(params, getSchedule(params))
     // Then
     expect(result.loanAmount).toBe(12345678)
+  })
+})
+
+describe('처음 값(빈칸)으로 열었을 때 상환 계산', () => {
+  it('대출 이자 계산기는 멈추지 않고 null이다', () => {
+    // Given 숫자 칸이 빈칸인 처음 값
+    const params = toScheduleParams(createCalcForm(getInitialCalc()))
+    // When
+    const result = getSchedule(params)
+    // Then
+    expect(result).toBeNull()
   })
 })
