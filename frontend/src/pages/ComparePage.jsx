@@ -34,7 +34,7 @@ import requireLogin from '../utils/requireLogin'
 //   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
 // 화면을 열면 비교함 스토어의 pair(A, B)로 상품을 받는다 (API-03). 두 상품이 들어오면 금액, 기간을 두 상품에 맞게 조정하고 알림.
 // [결과 저장] → API-23 (회원). 같은 조합은 409 '이미 저장한 조합' 안내, 요청 중 버튼 잠금 (E5)
-// A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌
+// A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌 (둘 다 비었으면 A 빈 칸만 정사각형으로 가운데에)
 // 금액, 기간이 비면 오류 문구 + 결과(카드, 판정, 비교표) 숨김
 // [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '비교 결과 저장은 회원 전용이에요.' (CM-17, CM-22, CHORONG-43에서 연결)
 // 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
@@ -87,6 +87,7 @@ const Desc = styled.p`
   margin-top: 16px;
   color: var(--cocoa);
   font-size: var(--fs-md);
+  text-align: ${({ $isCenter }) => ($isCenter ? 'center' : 'left')};
 `
 
 // 계산 기준 안내 + 시작 값 근거: 카드 바로 위, 줄마다 따로 (상환 방식을 정한 줄만 강조)
@@ -105,13 +106,18 @@ const CalcLine = styled.p`
   `}
 `
 
+// $isSingle: 칸이 하나뿐이면(비교 화면이 비어 있음) 440 정사각형으로 가운데에 (좁은 화면은 화면 폭에 맞춘 정사각형)
 const Slots = styled.div`
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: ${({ $isSingle }) => ($isSingle ? 'minmax(0, 440px)' : 'repeat(2, minmax(0, 1fr))')};
+  justify-content: center;
   gap: 16px;
   margin-top: 28px;
+  & > * {
+    aspect-ratio: ${({ $isSingle }) => ($isSingle ? '1' : 'auto')};
+  }
   @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: ${({ $isSingle }) => ($isSingle ? 'minmax(0, 440px)' : 'minmax(0, 1fr)')};
     gap: 8px;
   }
 `
@@ -145,6 +151,7 @@ const SaveHint = styled.span`
 
 const NoteBox = styled.div`
   margin-top: 20px;
+  text-align: ${({ $isCenter }) => ($isCenter ? 'center' : 'left')};
 `
 
 const StatusBox = styled.div`
@@ -380,9 +387,10 @@ function ComparePage() {
   } else if (!isComparable) {
     body = (
       <>
-        <Slots>
+        <Slots $isSingle={!productA && !productB}>
           {renderSlot('A', productA, keepForA)}
-          {renderSlot('B', productB, keepForB)}
+          {/* 완전히 비어 있으면 A 칸만 가운데에 (B만 담기는 일이 없게) */}
+          {(productA || productB) && renderSlot('B', productB, keepForB)}
         </Slots>
         {!isWide && sidebar}
       </>
@@ -437,7 +445,8 @@ function ComparePage() {
         onMonthsChange={handleMonthsChange}
         onMethodChange={handleMethodChange}
       />
-      <Desc>자금 용도와 상환 방식이 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
+      {/* 비어 있으면 A 칸이 가운데라 위아래 안내 글도 가운데 */}
+      <Desc $isCenter={!hasIds}>자금 용도와 상환 방식이 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
       {isComparable && (
         <CalcNote>
           {getCalcLines(plan).map((line) => (
@@ -449,7 +458,7 @@ function ComparePage() {
         </CalcNote>
       )}
       {body}
-      <NoteBox>
+      <NoteBox $isCenter={!hasIds}>
         <Disclaimer>
           금리만 보고 고르지 마세요. 실제 금리는 신용점수와 심사에 따라 달라지고, 중도상환수수료와 신청 자격도 함께 봐야
           해요.
