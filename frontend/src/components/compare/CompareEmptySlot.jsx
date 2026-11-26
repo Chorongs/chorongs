@@ -5,7 +5,9 @@ import { Button, SlotBadge } from '../../styles/common'
 import Icon from '../ui/Icon'
 
 // CP-04 빈 비교 칸: 상품 없는 칸 (점선 카드, 시안과 같게)
-// [비교 상품 고르기] → 상품 찾기로. 남은 상품이 있으면 그 상품만 비교함에 두고 바꿀 칸을 기억(startSwap), 없으면 비교함을 비움(clearTray)
+// [비교 상품 고르기] → 항상 상품 찾기의 상세 검색(/search)으로 보냄. 이 칸과 남은 상품을 기억(setPickSlot)해서 거기서 [+ 비교]를 누르면 이 칸에 들어감
+const SEARCH_PATH = '/search'
+
 // 상품 찾기에서 용도와 상환 방식이 겹치는 상품만 보이게 거르는 일은 상품 찾기 화면이 한다 (CM-10, getCompareBlock)
 const Wrap = styled.div`
   display: flex;
@@ -44,13 +46,14 @@ const PickButton = styled(Button)`
 // slot: 'A' 또는 'B' (이 빈 칸) / keepProduct: 남은 상품 상세 (없거나 숨김 상품이면 null)
 function CompareEmptySlot({ slot, keepProduct = null }) {
   const navigate = useNavigate()
-  const startSwap = useCompareStore((state) => state.startSwap)
-  const clearTray = useCompareStore((state) => state.clearTray)
+  const setPickSlot = useCompareStore((state) => state.setPickSlot)
 
+  // 어디서 비교를 시작했든 항상 상품 찾기의 상세 검색으로 보냄
+  // 거기서 [+ 비교]를 누르면 이 빈 칸에 들어가고 비교 화면으로 되돌아옴. 맞춤 추천, 찜한 대출의 상품은 비교 화면 옆의 고르기 칸에서 넣음
+  // (담은 상품이 있으면 상품 찾기와 대출 비교 밖으로 나갈 때 Layout이 확인 창을 띄움)
   const handlePick = () => {
-    if (keepProduct) startSwap(slot, keepProduct)
-    else clearTray()
-    navigate('/search')
+    setPickSlot(slot, keepProduct)
+    navigate(SEARCH_PATH)
   }
 
   return (

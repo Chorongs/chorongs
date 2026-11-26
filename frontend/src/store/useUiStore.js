@@ -46,6 +46,14 @@ const useUiStore = create(
       openLogout: () => set({ logoutOpen: true }),
       closeLogout: () => set({ logoutOpen: false }),
 
+      // 대출 비교를 벗어나기 전 확인 창: 가려던 주소 (null이면 닫힘), 그 화면에 넘길 값, 눌렀던 링크나 버튼. Layout이 그림 (CHORONG-82, 명세서 ST-05에 없는 값)
+      compareLeaveTo: null,
+      compareLeaveState: null,
+      compareLeaveElement: null,
+      openCompareLeave: (to, state = null, element = null) =>
+        set({ compareLeaveTo: to, compareLeaveState: state, compareLeaveElement: element }),
+      closeCompareLeave: () => set({ compareLeaveTo: null, compareLeaveState: null, compareLeaveElement: null }),
+
       // 알림: { id, message } / 같은 글이 다시 와도 id가 달라 시간을 다시 셈
       toast: null,
       showToast: (message) => {

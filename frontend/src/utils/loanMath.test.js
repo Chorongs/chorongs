@@ -657,13 +657,32 @@ describe('getCompareDefaults', () => {
     expect(result.amountSource).toBe('limit')
   })
 
-  it('맞춤 추천 입력이 없으면 두 상품 한도 중 작은 값이다', () => {
+  it('맞춤 추천 입력이 없으면 한도가 커도 1,000만원이다', () => {
     // Given
     const recommend = null
     // When
     const result = getCompareDefaults(productA, productB, shortOptions, recommend)
     // Then
-    expect(result.amount).toBe(3000)
+    expect(result.amount).toBe(1000)
+  })
+
+  it('한도가 120억원인 상품이 있어도 처음 금액은 1,000만원이다', () => {
+    // Given
+    const hugeLimit = { limitAmount: 1200000, termMax: 60 }
+    const noLimit = { limitAmount: null, termMax: 60 }
+    // When
+    const result = getCompareDefaults(hugeLimit, noLimit, shortOptions, null)
+    // Then
+    expect(result.amount).toBe(1000)
+  })
+
+  it('한도가 1,000만원보다 작으면 그 한도로 줄인다', () => {
+    // Given
+    const smallLimit = { limitAmount: 300, termMax: 60 }
+    // When
+    const result = getCompareDefaults(smallLimit, productB, shortOptions, null)
+    // Then
+    expect(result.amount).toBe(300)
   })
 
   it('한도가 숫자가 아닌 두 상품이고 추천 입력도 없으면 1,000만원이다', () => {

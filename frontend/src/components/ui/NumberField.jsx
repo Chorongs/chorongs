@@ -9,6 +9,7 @@ import { formatWonReadable } from '../../utils/format'
 // showReadable: 원 단위 금액 칸에서 입력칸 바로 아래 오른쪽 끝에 읽기 쉬운 금액 글을 보임 (12345678 → '1,234만 5,678원', 1만원 이상일 때만)
 // isLabelInside: 이름을 입력칸 위가 아니라 칸 안 왼쪽 회색 칸에 보임 (계산기 모양, 가안 .inp .lab) / isCompact: 칸 높이 48 (상자 안 입력칸)
 // error: 서버가 400으로 돌려준 문구
+// capMessage: 주면 max를 넘는 값은 아예 입력되지 않고, 넘기려 하면 이 경고를 보여 줌 (대출 비교 빌릴 금액)
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -136,6 +137,7 @@ function NumberField({
   unit,
   min = 0,
   max,
+  capMessage,
   decimals = 0,
   hasComma = false,
   quickValues = [],
@@ -151,6 +153,7 @@ function NumberField({
   const [text, setText] = useState(toText(value))
   const [prevValue, setPrevValue] = useState(value)
   const [isTouched, setIsTouched] = useState(false)
+  const [isOverCap, setIsOverCap] = useState(false) // 방금 max를 넘기려 했는지
 
   // 부모가 값을 바꾸면 (예: 초기화) 입력 글자도 맞춤
   if (value !== prevValue) {
@@ -164,7 +167,10 @@ function NumberField({
   }
 
   const handleChange = (event) => {
-    applyText(cleanText(event.target.value, decimals, min < 0))
+    const nextText = cleanText(event.target.value, decimals, min < 0)
+    const isOver = Boolean(capMessage) && max !== undefined && toNumber(nextText) > max
+    setIsOverCap(isOver)
+    if (!isOver) applyText(nextText)
   }
 
   const handleQuick = (quickValue) => {
@@ -182,7 +188,7 @@ function NumberField({
   } else if (max !== undefined && number > max) {
     localError = `${max.toLocaleString('ko-KR')}${unit ?? ''} 이하로 입력해 주세요`
   }
-  const message = error || (isTouched ? localError : '')
+  const message = error || (isOverCap ? capMessage : '') || (isTouched ? localError : '')
   const isReadableShown = showReadable && number !== '' && number >= 10000
 
   return (
@@ -200,7 +206,10 @@ function NumberField({
           aria-invalid={Boolean(message)}
           aria-describedby={message ? errorId : undefined}
           onChange={handleChange}
-          onBlur={() => setIsTouched(true)}
+          onBlur={() => {
+            setIsTouched(true)
+            setIsOverCap(false)
+          }}
         />
         {unit && <Unit>{unit}</Unit>}
       </Box>
