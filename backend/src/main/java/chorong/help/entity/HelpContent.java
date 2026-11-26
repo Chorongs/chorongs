@@ -14,7 +14,8 @@ public class HelpContent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long helpId;
     @NotNull
-    private String helpType;
+    @Enumerated(EnumType.STRING)
+    private HelpType helpType;
     @NotNull
     private int helpNo;
     private String category;
