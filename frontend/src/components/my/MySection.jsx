@@ -15,13 +15,15 @@ import Icon from '../ui/Icon'
 // title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
 // onRemove, onClearAll을 안 넘기면 X, [선택 삭제], [전체 삭제]를 안 그림 (찜한 대출)
 // status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
-//   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 흐리게 두고 누르기, 키보드를 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
+//   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
+//   흐리게는 0.3초가 넘게 걸릴 때만 (응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
 
-// 다시 받는 중 흐리게 (목록, 제목 줄 버튼)
+// 다시 받는 중 흐리게 (목록, 제목 줄 버튼): 흐려질 때만 0.3초 뒤에 시작 (LoadingText와 같은 기다림), 돌아올 때는 바로
+// 0.3초 안에 다 받으면 흐려지기 전에 끝나서 화면이 바뀌지 않음
 const busyStyle = css`
   opacity: ${({ $isBusy }) => ($isBusy ? 0.45 : 1)};
-  transition: opacity 0.15s;
+  transition: ${({ $isBusy }) => ($isBusy ? 'opacity 0.15s 0.3s' : 'opacity 0.15s')};
 `
 
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
