@@ -232,7 +232,7 @@ function RecommendCard({ item }) {
     navigate(CALC_PATH, { state: calcState })
   }
 
-  // 이 상품을 비교 화면에 넣고 바로 이동 (바로 넣을 수 없으면 startCompare가 알림이나 확인 팝업). 상세 창은 열지 않음
+  // 이 상품을 비교 화면에 넣고 바로 이동 (넣을 수 없거나 담기를 취소하면 startCompare가 false). 상세 창은 열지 않음
   const handleCompare = (event) => {
     event.stopPropagation()
     if (startCompare(product)) navigate('/compare')

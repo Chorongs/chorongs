@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { getCompareProducts } from '../../api/productApi'
-import useCompareStore, { getCompareBlock, getComparePage } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
 import LoginRequiredDialog from '../common/LoginRequiredDialog'
 import ProductDetailSheet from '../common/ProductDetailSheet'
-import CompareCard from '../compare/CompareCard'
 import RecommendDialog from '../recommend/RecommendDialog'
 import Modal from '../ui/Modal'
 import Toast from '../ui/Toast'
@@ -19,7 +18,7 @@ import MobileTabBar from './MobileTabBar'
 
 // LY-03 공통 틀: 상단바, 본문(Outlet), 푸터, 하단 탭바(모바일) 배치
 // 화면 위에 뜨는 것(전체 메뉴, 알림)은 여기서 한 번만 그린다. (화면마다 따로 만들지 않음)
-// 비교 화면의 한 칸 고르기(pickSlot)를 켜고 끄는 일, [+ 비교] 때의 확인 팝업(CompareConflictDialog)도 여기서 함
+// 비교 화면의 한 칸 고르기(pickSlot)를 끄는 일, 비교 화면을 벗어날 때 담긴 상품을 비우는 일도 여기서 함
 // 로그인 안내 창(CM-17)도 여기서 그림 (열려 있을 때 뒤 화면 스크롤 잠금은 LoginRequiredDialog가 함)
 // 로그아웃 창(LY-08, MY-02 같이 씀)도 여기서 그림 (상단바 안에서 그리면 하단 탭바 아래에 깔림. UI-15 Layout에서 그림)
 // 맞춤 추천 창(RC-14)도 여기서 그림 (열림 상태는 useUiStore의 recommendOpen, recommendSkipGate)
@@ -90,81 +89,58 @@ const Side = styled.aside`
   }
 `
 
+// $isThin: 상품 찾기에서 뜨는 확인 창은 제목을 덜 굵게
 const DialogText = styled.p`
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  font-size: var(--fs-h4);
+  font-weight: ${({ $isThin }) => ($isThin ? 700 : 800)};
+  line-height: 1.45;
+  word-break: keep-all;
+`
+
+const DialogNote = styled.p`
+  margin: -12px 0 24px;
+  color: var(--cocoa);
   font-size: var(--fs-lg);
-  font-weight: 700;
-  white-space: pre-line;
+  word-break: keep-all;
 `
 
 const DialogActions = styled.div`
   display: flex;
-  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 `
 
-const DialogNote = styled.p`
-  margin: -12px 0 16px;
-  color: var(--cocoa);
-  font-size: var(--fs-sm);
-`
-
-const DialogCard = styled.div`
-  margin-bottom: 20px;
-`
-
-const CONFLICT_REASON = {
-  purpose: '방금 고른 상품은 자금 용도가 겹치지 않아 함께 비교할 수 없어요.',
-  method: '방금 고른 상품은 상환 방식이 겹치지 않아 함께 비교할 수 없어요.',
+// 화면을 옮겨도 비교 화면 상품을 남기는 경우: 비교 화면으로 감 / 고르러 나간 중 상품 찾기(상세 검색, 간편 검색) 안
+// (맞춤 추천, 찜한 대출, 계산기 등은 모두 벗어나는 것)
+function keepsCompare(to, isPicking) {
+  return to === '/compare' || (isPicking && getComparePage(to) === 'search')
 }
 
-// 담긴 상품이 있는데(고르는 중 아님) 다른 상품의 [+ 비교]를 눌렀을 때 (useCompareStore의 pending). 담긴 A 상품(A가 비었으면 B)을 받아 옴
-//   하나만 담김: 비교할 수 있으면 팝업 없이 빈 칸에 담고 비교 화면으로 / 자금 용도나 상환 방식이 안 맞으면 팝업
-//   두 상품이 다 담김(pending.isFull): 맞든 안 맞든 같은 팝업 (A 상품 기준)
-//   두 상품이 다 담긴 상태에서 B 상품을 누름(pending.isSameB): B 상품 카드 팝업, [이 상품 기준으로 새로 비교]만 → 그 상품을 A로 옮기고(지금 A는 빠짐) B를 고르는 중
-// 팝업: 담긴 상품 카드 + [새로 담기] → 담긴 상품을 모두 빼고 방금 누른 상품을 A에 담아 비교 화면으로
-//   [이 상품으로 비교] → 그 상품은 두고, 그 상품 기준으로 거른 상세 검색(고르는 중)으로. 두 개 담겼으면 거기서 고른 상품이 B를 바꿈
-//   우측 상단 X, Esc, 바깥 클릭 → 닫기만 (아무것도 안 바뀜)
-function CompareConflictDialog() {
-  const navigate = useNavigate()
-  const pending = useCompareStore((state) => state.pending)
-  const resolvePending = useCompareStore((state) => state.resolvePending)
-  const clearPending = useCompareStore((state) => state.clearPending)
-  const closeProduct = useUiStore((state) => state.closeProduct)
-  // 팝업을 띄울 때만 채움: { pending, product(담긴 상품), slot, block(안 맞는 이유, 맞으면 null) }
-  const [conflict, setConflict] = useState(null)
-  const isOpen = pending !== null && conflict?.pending === pending
+// 담은 상품이 있는 대출 비교 중인 화면: 비교 화면, 또는 비교할 상품을 고르러 나온 상품 찾기
+function isComparing(pathname) {
+  const { pair, pickSlot } = useCompareStore.getState()
+  const isOnCompare = pathname === '/compare' || (pickSlot !== null && getComparePage(pathname) === 'search')
+  return isOnCompare && pair.some((id) => id !== null)
+}
 
-  useEffect(() => {
-    if (!pending) return undefined
-    let isCancelled = false
-    const { pair } = useCompareStore.getState()
-    // 카드에 보여 줄 칸: B 상품을 눌렀거나 B만 담겼으면 B, 나머지는 A
-    const slot = pending.isSameB || pair[0] === null ? 'B' : 'A'
-    getCompareProducts([pair[slot === 'A' ? 0 : 1]])
-      .then(([stored]) => {
-        if (isCancelled) return
-        // 담긴 상품을 더는 볼 수 없으면 비교할 수 없으니 새 상품으로 바꿈
-        const isGone = !stored || stored.productStatus === 'HIDDEN'
-        const block = isGone || pending.isSameB ? null : getCompareBlock(stored, pending.item)
-        if (block === null && !pending.isFull && !pending.isSameB) {
-          resolvePending(!isGone)
-          navigate('/compare')
-          return
-        }
-        closeProduct()
-        setConflict({ pending, product: stored, slot, block })
-      })
-      .catch(() => {
-        if (isCancelled) return
-        useUiStore.getState().showToast('담긴 상품을 확인하지 못했어요. 다시 눌러 주세요')
-        clearPending()
-      })
-    return () => {
-      isCancelled = true
-    }
-  }, [pending, navigate, resolvePending, clearPending, closeProduct])
+// 담은 상품이 사라지는 곳으로 가려 하면 먼저 확인
+function needsLeaveConfirm(from, to) {
+  return isComparing(from) && !keepsCompare(to, useCompareStore.getState().pickSlot !== null)
+}
+
+// 대출 비교 벗어나기 확인 창: [아니오], X, Esc, 바깥 클릭 → 그대로 / [예] → 담은 상품을 비우고 하려던 동작(이동, 추천 창, 로그아웃)을 이어서 함
+// 비교 화면에서 두 상품이 다 담겼고 아직 저장 전이면 [결과 저장] 안내도 함께 보여 줌 (고르러 나온 화면에는 그 버튼이 없음)
+function CompareLeaveDialog() {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const leaveTo = useUiStore((state) => state.compareLeaveTo)
+  const leaveState = useUiStore((state) => state.compareLeaveState)
+  const closeCompareLeave = useUiStore((state) => state.closeCompareLeave)
+  const canSave = useCompareStore(
+    (state) => state.pair.every((id) => id !== null) && state.savedKey !== `${state.pair[0]}-${state.pair[1]}`,
+  )
+  const isOpen = leaveTo !== null
 
   // 팝업이 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
@@ -176,45 +152,39 @@ function CompareConflictDialog() {
     }
   }, [isOpen])
 
-  const handleRemove = () => {
-    resolvePending(false)
-    navigate('/compare')
-  }
-  // 담긴 상품은 두고, 그 상품과 비교할 상품을 고르러 상세 검색으로 (비교 화면의 [비교 상품 고르기]와 같음: 담긴 상품 기준으로 거름)
-  const handleKeep = () => {
-    // B 상품을 누른 경우: 그 상품을 A로 옮기고 B를 고름
-    if (conflict.pending.isSameB) useCompareStore.getState().setPair(conflict.product.productId, null)
-    useCompareStore.getState().setPickSlot(conflict.pending.isSameB || conflict.slot === 'A' ? 'B' : 'A', conflict.product)
-    clearPending()
-    navigate('/search')
+  const handleLeave = () => {
+    const { compareLeaveElement } = useUiStore.getState()
+    useCompareStore.getState().setPickSlot(null)
+    useCompareStore.getState().setPair(null, null)
+    closeCompareLeave()
+    // 눌렀던 것이 아직 있으면 다시 눌러 원래 동작을 그대로 하고, 없으면(뒤로 가기, 닫힌 메뉴) 주소로 이동
+    if (compareLeaveElement?.isConnected) compareLeaveElement.click()
+    else navigate(leaveTo, { state: leaveState })
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={clearPending} label="담긴 상품 확인" width={480}>
+    <Modal isOpen={isOpen} onClose={closeCompareLeave} label="대출 비교 벗어나기 확인" width={pathname.startsWith('/search') ? 480 : 420}>
       {isOpen && (
         <>
-          <DialogText>{conflict.pending.isSameB ? '이미 상품이 B에 담겨 있어요' : '이미 담겨 있는 상품이 있어요'}</DialogText>
-          {conflict.block && <DialogNote>{CONFLICT_REASON[conflict.block]}</DialogNote>}
-          {conflict.pending.isSameB && (
-            <DialogNote>
-              A에 있던 상품은 빠지고 이 상품이 A가 돼요.
-              <br />
-              그다음 B에 넣을 상품을 새로 골라요.
-            </DialogNote>
+          <DialogText $isThin={pathname.startsWith('/search')}>
+            {pathname.startsWith('/search') ? (
+              <>
+                페이지를 벗어나면 비교 중이던 상품이 사라져요.
+                <br />
+                이동하시겠어요?
+              </>
+            ) : (
+              '비교 중인 상품이 사라져요. 이동할까요?'
+            )}
+          </DialogText>
+          {canSave && pathname === '/compare' && (
+            <DialogNote>내역을 저장하려면 [아니오]를 누른 뒤 [결과 저장]을 눌러 주세요.</DialogNote>
           )}
-          <DialogCard>
-            <CompareCard slot={conflict.slot} product={conflict.product} isReadOnly />
-          </DialogCard>
           <DialogActions>
-            {!conflict.pending.isSameB && (
-              <Button $variant="outline" onClick={handleRemove}>
-                새로 담기
-              </Button>
-            )}
-            {/* 담긴 상품을 더는 볼 수 없으면 기준이 못 돼서 빼기만 */}
-            {conflict.product?.productStatus !== 'HIDDEN' && (
-              <Button onClick={handleKeep}>{conflict.pending.isSameB ? '이 상품 기준으로 새로 비교' : '이 상품으로 비교'}</Button>
-            )}
+            <Button onClick={handleLeave}>예</Button>
+            <Button $variant="outline" onClick={closeCompareLeave}>
+              아니오
+            </Button>
           </DialogActions>
         </>
       )}
@@ -224,18 +194,66 @@ function CompareConflictDialog() {
 
 function Layout() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const closeMenu = useUiStore((state) => state.closeMenu)
   const closeProduct = useUiStore((state) => state.closeProduct)
   const closeRecommend = useUiStore((state) => state.closeRecommend)
-  // 비교 화면의 한 칸을 고르는 중(pickSlot)은 버튼([비교 상품 고르기], [다른 상품으로 비교], 팝업의 [이 상품으로 비교])을 눌렀을 때만 켜짐
-  // (메뉴로 이동해서는 켜지지 않음: 직전 화면에 따라 켜지면 같은 메뉴를 눌러도 결과가 달라져서 헷갈림)
-  // 켜진 뒤에는 비교할 수 있는 화면(상품 찾기, 맞춤 추천, 찜한 대출) 안에서만 이어짐
-  // (자금 용도와 상환 방식이 맞으면 어느 화면의 상품이든 비교할 수 있어서 이 세 화면 사이는 끊지 않음)
-  // 그 밖 화면(랭킹, 계산기, 마이페이지, 비교 화면 등)으로 가면 팝업 없이 끝냄(풀림). 비교 화면 상품은 그대로라 잃는 게 없음. 안 끝내면 나중에 그 화면을 열 때 'A 담음' 표시와 거르기가 남아 있음
-  // 풀린 뒤에는 거르지 않고 전부 보이며, 안 맞는 상품의 [+ 비교]는 담긴 상품 확인 팝업 (CompareConflictDialog)
+  const openCompareLeave = useUiStore((state) => state.openCompareLeave)
+
+  // 링크(메뉴, 탭바, 푸터 등)와 data-leave-to를 붙인 버튼(로그인, 로그아웃)은 누른 순간 멈추고 확인 창을 띄움
+  // (새 탭으로 여는 클릭은 벗어나는 것이 아니라 그대로, 다른 사이트 링크는 아래 beforeunload가 맡음)
   useEffect(() => {
-    if (getComparePage(pathname) === null) useCompareStore.getState().setPickSlot(null)
+    const handleClick = (event) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+      const target = event.target.closest?.('a[href], [data-leave-to]')
+      if (!target || target.target === '_blank') return
+      const isLink = target.matches('a[href]')
+      if (isLink && target.origin !== window.location.origin) return
+      const to = isLink ? `${target.pathname}${target.search}` : target.dataset.leaveTo
+      if (!needsLeaveConfirm(pathname, to.split('?')[0])) return
+      event.preventDefault()
+      event.stopPropagation() // 추천 창 열기, 로그아웃 같은 원래 동작은 [예] 뒤에
+      // 포커스를 풀지 않으면 창이 닫힐 때 눌렀던 메뉴로 포커스가 돌아가 상단 하위 메뉴가 펼쳐짐
+      target.blur()
+      openCompareLeave(to, null, target)
+    }
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
+  }, [pathname, openCompareLeave])
+
+  // 탭 닫기, 새로고침, 주소창 이동은 브라우저 기본 확인 창 (문구는 바꿀 수 없음)
+  // 로그인 안내 창에서 소셜 로그인으로 가는 길([결과 저장])은 돌아와서 이어 하므로 묻지 않음
+  useEffect(() => {
+    const handleUnload = (event) => {
+      if (!isComparing(pathname) || useUiStore.getState().loginDialogOpen) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
   }, [pathname])
+
+  // 비교 화면의 한 칸을 고르는 중(pickSlot)은 버튼([비교 상품 고르기], [다른 상품으로 비교])을 눌렀을 때만 켜지고,
+  // 상품 찾기(상세 검색, 간편 검색) 안에서만 이어짐. 그 밖 화면으로 가면 끝
+  // 비교 화면 상품은 벗어나면 사라짐 (남기는 경우는 keepsCompare). 남기고 싶으면 [결과 저장]
+  // 주소창으로 다른 화면을 새로 연 것도 벗어난 것. 새로고침(/compare)과 소셜 로그인에서 돌아오는 길(/oauth, /login)은 남김
+  const prevPathRef = useRef(null)
+  useEffect(() => {
+    const from = prevPathRef.current
+    prevPathRef.current = pathname
+    const isMoved = from !== null && from !== pathname
+    // 뒤로 가기처럼 링크가 아닌 이동은 막을 수 없어서, 있던 화면으로 되돌린 뒤 확인 창을 띄움
+    // (상품 상세 창의 [이자 계산]처럼 값을 넘기는 이동은 [예] 뒤에도 그 값을 넘김. 상품 찾기의 조건은 SearchPage가 복원)
+    if (isMoved && needsLeaveConfirm(from, pathname)) {
+      openCompareLeave(`${window.location.pathname}${window.location.search}`, window.history.state?.usr ?? null)
+      navigate(from, { replace: true })
+      return
+    }
+    const { pickSlot, setPickSlot, setPair } = useCompareStore.getState()
+    if (getComparePage(pathname) !== 'search') setPickSlot(null)
+    const isLoginReturn = from === null && (pathname.startsWith('/oauth') || pathname.startsWith('/login'))
+    if (from !== pathname && !isLoginReturn && !keepsCompare(pathname, pickSlot !== null)) setPair(null, null)
+  }, [pathname, navigate, openCompareLeave])
 
   // 고르는 중이면 남겨 둔 상품의 상세를 받아 둠 (상품 찾기가 검색 결과 맨 위에 고정해 보여 줌)
   const pickBaseId = useCompareStore((state) => (state.pickSlot !== null ? (state.pickBase?.productId ?? null) : null))
@@ -258,7 +276,6 @@ function Layout() {
     closeMenu()
     closeProduct()
     closeRecommend()
-    useCompareStore.getState().clearPending()
     window.scrollTo(0, 0)
   }, [pathname, closeMenu, closeProduct, closeRecommend])
 
@@ -278,7 +295,7 @@ function Layout() {
       <ProductDetailSheet />
       <LoginRequiredDialog />
       <LogoutDialog />
-      <CompareConflictDialog />
+      <CompareLeaveDialog />
       <RecommendDialog />
       <Toast />
     </Shell>

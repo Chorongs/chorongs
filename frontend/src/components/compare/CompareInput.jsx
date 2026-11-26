@@ -6,6 +6,7 @@ import NumberField from '../ui/NumberField'
 // CP-06 금액, 기간, 상환 방식 입력: 비교 기준 (빌릴 금액 만원 + 상환 기간 칩 + 상환 방식 칩). 모양은 시안과 같게 회색 판 없이 한 줄
 // 값은 부모(ComparePage)가 들고 있고, 바꾸면 바로 부모가 다시 계산한다.
 // 오류 문구(amountError, monthsError)도 부모가 검사해서 내려준다 (E2): 금액은 0보다 큰 숫자, 기간은 선택지 값만
+// maxAmount(만원)를 넘는 금액은 입력 자체가 안 되고, 넘기려 하면 칸 아래에 경고
 // 계산 기준 안내와 시작 값 근거는 카드 바로 위(ComparePage)에 있다.
 // termOptions: 두 상품이 겹치는 용도 기준 기간 선택지 (개월 배열)
 // methodOptions: 두 상품이 모두 가능한 상환 방식 ({ value 코드, label 글 } 배열). 2개 이상일 때만 칩을 보여 주고(1개 이하면 빈 배열이라 칩 숨김), 고른 방식으로 두 상품을 똑같이 계산
@@ -42,6 +43,7 @@ const Label = styled.span`
 
 function CompareInput({
   amount,
+  maxAmount,
   months,
   method,
   termOptions,
@@ -63,6 +65,8 @@ function CompareInput({
           value={amount}
           onChange={onAmountChange}
           min={1}
+          max={maxAmount}
+          capMessage="10억원(100,000만원)까지만 입력할 수 있어요"
           hasComma
           isRequired
           placeholder="예: 2,000"

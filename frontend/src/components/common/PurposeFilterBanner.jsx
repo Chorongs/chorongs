@@ -5,8 +5,8 @@ import Icon from '../ui/Icon'
 
 // CM-10 같은 용도 필터 띠: 비교할 상품의 용도, 상환 방식 필터 안내 (맞춤 추천, 상품 찾기, 찜한 대출에 표시)
 // 비교 화면의 한 칸을 고르러 나온 중(pickSlot)이면 거르기 띠 위에 따로 '고르는 중 안내 띠'를 하나 더 둠 (두 띠는 서로 안 섞임)
-//   고르는 중 띠: 맨 왼쪽에 전구(16, 거르기 띠 아이콘과 같은 크기) +'{남겨 둔 상품} 상품과 비교할 상품을 골라 주세요' + '상품 찾기, 맞춤 추천, 찜한 대출 밖으로 이동하면 고르기가 끝나요' (상품명과 화면 이름만 굵은 검정)
-//   (남은 상품을 모르는 숨김 상품 경우는 거르기 띠 없이 고르는 중 띠만)
+//   고르는 중 띠: 맨 왼쪽에 전구(16, 거르기 띠 아이콘과 같은 크기) +'{남겨 둔 상품} 상품과 비교할 상품을 골라 주세요' (상품명만 굵은 검정). 벗어날 때의 안내는 Layout의 확인 창이 맡음
+//   남겨 둔 상품이 없으면(비교 화면이 비어 있거나 남은 쪽이 숨김 상품) 두 띠 모두 없음
 // '자금 용도와 상환 방식이 겹치는 상품만 보여요' + 기준 상품(비교 화면의 한 칸을 고르러 나온 중 남은 상품)의 용도 + 숨긴 개수. 기준이 없으면 띠도 같이 사라진다.
 // 실제 목록 거르기는 쓰는 화면이 한다. (canCompare 또는 getCompareBlock 사용: 용도와 상환 방식을 함께 봄). hiddenCount: 거르면서 숨긴 상품 수
 // 띠가 둘일 수 있어서(고르는 중 안내 띠, 거르기 안내 띠) 세로로 쌓음
@@ -33,7 +33,7 @@ const Wrap = styled.div`
   }
 `
 
-// 고르는 중 안내 띠: 맨 왼쪽에 전구, 오른쪽에 두 줄 글
+// 고르는 중 안내 띠: 맨 왼쪽에 전구, 오른쪽에 안내 글
 const PickWrap = styled.div`
   display: flex;
   align-items: center;
@@ -76,11 +76,8 @@ const ChipGroup = styled.span`
   }
 `
 
-// 고르는 중 안내 글 두 줄. 글자는 보통 굵기이고, 상품명과 화면 이름('상품 찾기, 맞춤 추천, 찜한 대출')(b)만 굵은 검정으로 강조
-const PickLine = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+// 고르는 중 안내 글. 글자는 보통 굵기이고, 상품명(b)만 굵은 검정으로 강조
+const PickLine = styled.p`
   min-width: 0;
   & b {
     color: var(--ink);
@@ -100,49 +97,41 @@ function PurposeFilterBanner({ hiddenCount = 0 }) {
   const pickBase = useCompareStore((state) => state.pickBase)
   const hasFilter = Boolean(first?.purposes)
 
-  if (!hasFilter && pickSlot === null) return null
+  if (!hasFilter) return null
   // 상환 방식 칩: 첫 상품이 지원하는 방식 (세 방식 모두인 상품은 거르는 조건이 아니라서 칩 없음)
-  const methodLabels = hasFilter ? getMethodLabels(first) : []
+  const methodLabels = getMethodLabels(first)
 
   return (
     <Stack>
-      {pickSlot !== null && (
+      {pickSlot !== null && pickBase && (
         <PickWrap role="status">
           <Icon name="bulb" size={16} />
           <PickLine>
-            <span>
-              {pickBase ? <b>{pickBase.productName}</b> : `비교 화면 ${pickSlot} 칸에`}
-              {pickBase ? ' 상품과 비교할 상품을 골라 주세요' : ' 넣을 상품을 골라 주세요'}
-            </span>
-            <span>
-              <b>상품 찾기, 맞춤 추천, 찜한 대출</b> 밖으로 이동하면 고르기가 끝나요
-            </span>
+            <b>{pickBase.productName}</b> 상품과 비교할 상품을 골라 주세요
           </PickLine>
         </PickWrap>
       )}
-      {hasFilter && (
-        <Wrap role="status">
-          <Icon name="alert" size={16} />
-          자금 용도와 상환 방식이 겹치는 상품만 보여요
+      <Wrap role="status">
+        <Icon name="alert" size={16} />
+        자금 용도와 상환 방식이 겹치는 상품만 보여요
+        <ChipGroup>
+          {first.purposes.map((purpose) => (
+            <ConditionChip key={purpose}>
+              {purpose}
+            </ConditionChip>
+          ))}
+        </ChipGroup>
+        {methodLabels.length > 0 && (
           <ChipGroup>
-            {first.purposes.map((purpose) => (
-              <ConditionChip key={purpose}>
-                {purpose}
+            {methodLabels.map((label) => (
+              <ConditionChip key={label}>
+                {label}
               </ConditionChip>
             ))}
           </ChipGroup>
-          {methodLabels.length > 0 && (
-            <ChipGroup>
-              {methodLabels.map((label) => (
-                <ConditionChip key={label}>
-                  {label}
-                </ConditionChip>
-              ))}
-            </ChipGroup>
-          )}
-          {hiddenCount > 0 && <Count>숨긴 상품 {hiddenCount}개</Count>}
-        </Wrap>
-      )}
+        )}
+        {hiddenCount > 0 && <Count>숨긴 상품 {hiddenCount}개</Count>}
+      </Wrap>
     </Stack>
   )
 }

@@ -236,7 +236,7 @@ function ProductRow({ product, from = null, rank = null, matchRate = null, keywo
 
   const handleOpen = () => openProduct(product.productId, from)
 
-  // 이 상품을 비교 화면에 넣고 바로 이동 (바로 넣을 수 없으면 startCompare가 알림이나 확인 팝업). 클릭이 줄(상세 창 열기)까지 안 퍼지게 한다.
+  // 이 상품을 비교 화면에 넣고 바로 이동 (넣을 수 없거나 담기를 취소하면 startCompare가 false). 클릭이 줄(상세 창 열기)까지 안 퍼지게 한다.
   const handleCompare = (event) => {
     event.stopPropagation()
     if (startCompare(product)) navigate('/compare')

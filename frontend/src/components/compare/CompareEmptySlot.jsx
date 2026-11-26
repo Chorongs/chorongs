@@ -49,8 +49,8 @@ function CompareEmptySlot({ slot, keepProduct = null }) {
   const setPickSlot = useCompareStore((state) => state.setPickSlot)
 
   // 어디서 비교를 시작했든 항상 상품 찾기의 상세 검색으로 보냄
-  // 거기서 [+ 비교]를 누르면 이 빈 칸에 들어가고 비교 화면으로 되돌아옴. 자금 용도와 상환 방식이 맞으면 맞춤 추천, 찜한 대출의 상품도 고를 수 있음
-  // (고르는 중 표시는 상품 찾기, 맞춤 추천, 찜한 대출 밖으로 나가면 Layout이 끔)
+  // 거기서 [+ 비교]를 누르면 이 빈 칸에 들어가고 비교 화면으로 되돌아옴. 맞춤 추천, 찜한 대출의 상품은 비교 화면 옆의 고르기 칸에서 넣음
+  // (담은 상품이 있으면 상품 찾기와 대출 비교 밖으로 나갈 때 Layout이 확인 창을 띄움)
   const handlePick = () => {
     setPickSlot(slot, keepProduct)
     navigate(SEARCH_PATH)

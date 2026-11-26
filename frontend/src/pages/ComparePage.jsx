@@ -10,7 +10,6 @@ import CompareInput from '../components/compare/CompareInput'
 import CompareSidebar from '../components/compare/CompareSidebar'
 import CompareTable from '../components/compare/CompareTable'
 import CompareVerdict from '../components/compare/CompareVerdict'
-import Disclaimer from '../components/common/Disclaimer'
 import PageHeader from '../components/common/PageHeader'
 import Icon from '../components/ui/Icon'
 import { getTermOptions, MONTHS_DEFAULT } from '../constants/options'
@@ -31,14 +30,16 @@ import {
 import requireLogin from '../utils/requireLogin'
 
 // CP-01 대출 비교 화면 (SCR-04, /compare): 자금 용도와 상환 방식이 겹치는 상품 2개 비교. 모양과 순서는 시안과 같게
-//   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → [결과 저장] → 안내 글 / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
+//   금액/기간 입력 → 카드 A, B → 판정 요약 → 비교표 → / [결과 저장]은 계산 기준 안내 오른쪽(B 카드 위) / 오른쪽(좁은 화면은 아래) 비교할 상품 고르기
 // 화면을 열면 비교함 스토어의 pair(A, B)로 상품을 받는다 (API-03). 두 상품이 들어오면 금액, 기간을 두 상품에 맞게 조정하고 알림.
 // [결과 저장] → API-23 (회원). 같은 조합은 409 '이미 저장한 조합' 안내, 요청 중 버튼 잠금 (E5)
-// A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌 (둘 다 비었으면 A 빈 칸만 정사각형으로 가운데에)
+//   저장했거나 409면 버튼이 체크 표시 '저장했어요'로 잠김 (조합이 바뀌면 다시 풀림, useCompareStore savedKey)
+// A, B가 같거나 자금 용도가 하나도 안 겹치면 B를 빈 칸 카드로 (E15). 두 칸이 다 차기 전에는 간단한 카드 + 빈 칸만 보여 줌 (둘 다 비었으면 A, B 빈 칸)
 // 금액, 기간이 비면 오류 문구 + 결과(카드, 판정, 비교표) 숨김
 // [결과 저장]은 requireLogin으로 감쌈: 비회원이면 로그인 안내 창 '비교 결과 저장은 회원 전용이에요.' (CM-17, CM-22, CHORONG-43에서 연결)
-// 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 맞춤 추천에서 입력한 값 → 없으면 두 상품이 모두 되는 최대 한도, 최대 기간
-// 상품을 받기 전에 잠깐 보이는 값만 아래 기본값
+// 처음 넣을 금액, 기간은 상품을 받은 뒤 정함 (utils/loanMath.js getCompareDefaults): 금액은 맞춤 추천 입력값 → 없으면 1,000만원(한도가 더 작으면 한도), 기간은 맞춤 추천 입력값 → 없으면 두 상품이 모두 되는 최대 기간
+// 두 상품이 다 담기기 전에 금액 칸에 보이는 값: 맞춤 추천에서 입력한 필요 금액 → 없으면 1,000만원
+// 금액을 직접 바꾸면(useCompareStore userAmount) 비교하는 동안 그 값을 그대로 둠: 상품을 바꾸러 갔다 와도, 한도를 넘어도 자동으로 안 바꿈
 const MAX_AMOUNT_MAN = 100000
 
 // 처음 넣은 금액, 기간의 근거 글 (사용자가 값을 바꾸면 사라짐)
@@ -87,12 +88,23 @@ const Desc = styled.p`
   margin-top: 16px;
   color: var(--cocoa);
   font-size: var(--fs-md);
-  text-align: ${({ $isCenter }) => ($isCenter ? 'center' : 'left')};
+`
+
+// 계산 기준 안내 줄과 [결과 저장]을 한 덩어리로: 안내는 왼쪽, 버튼은 오른쪽 아래 (B 카드 바로 위, 좁은 화면도 옆에 나란히)
+const CalcRow = styled.div`
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 12px;
+  & > button {
+    flex: none;
+  }
 `
 
 // 계산 기준 안내 + 시작 값 근거: 카드 바로 위, 줄마다 따로 (상환 방식을 정한 줄만 강조)
 const CalcNote = styled.div`
-  margin-top: 12px;
+  flex: 1;
+  min-width: 0;
   color: var(--cocoa);
   font-size: var(--fs-md);
 `
@@ -106,52 +118,19 @@ const CalcLine = styled.p`
   `}
 `
 
-// $isSingle: 칸이 하나뿐이면(비교 화면이 비어 있음) 440 정사각형으로 가운데에 (좁은 화면은 화면 폭에 맞춘 정사각형)
 const Slots = styled.div`
   display: grid;
-  grid-template-columns: ${({ $isSingle }) => ($isSingle ? 'minmax(0, 440px)' : 'repeat(2, minmax(0, 1fr))')};
-  justify-content: center;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-top: 28px;
-  & > * {
-    aspect-ratio: ${({ $isSingle }) => ($isSingle ? '1' : 'auto')};
-  }
   @media (max-width: 899px) {
-    grid-template-columns: ${({ $isSingle }) => ($isSingle ? 'minmax(0, 440px)' : 'minmax(0, 1fr)')};
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
 `
 
 const VerdictBox = styled.div`
   margin: 28px 0 8px;
-`
-
-const SaveRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-  @media (max-width: 899px) {
-    justify-content: stretch;
-    & > button {
-      flex: 1;
-    }
-  }
-`
-
-const SaveHint = styled.span`
-  order: -1;
-  margin-right: auto;
-  color: var(--cocoa);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-`
-
-const NoteBox = styled.div`
-  margin-top: 20px;
-  text-align: ${({ $isCenter }) => ($isCenter ? 'center' : 'left')};
 `
 
 const StatusBox = styled.div`
@@ -196,7 +175,12 @@ function ComparePage() {
   const [idA, idB] = pair
 
   const lastInput = useRecommendStore((state) => state.lastInput)
-  const [amount, setAmount] = useState(FALLBACK_AMOUNT_MAN)
+  const setUserAmount = useCompareStore((state) => state.setUserAmount)
+  const savedKey = useCompareStore((state) => state.savedKey)
+  const markSaved = useCompareStore((state) => state.markSaved)
+  const [amount, setAmount] = useState(
+    () => useCompareStore.getState().userAmount ?? (lastInput?.need > 0 ? lastInput.need : FALLBACK_AMOUNT_MAN),
+  )
   const [months, setMonths] = useState(MONTHS_DEFAULT)
   const [basis, setBasis] = useState(null)
   const [method, setMethod] = useState(null)
@@ -223,6 +207,7 @@ function ComparePage() {
     hasStartedRef.current = true
     setBasis(null)
     setAmount(value)
+    setUserAmount(value)
   }
   const handleMethodChange = (value) => {
     setMethod(value)
@@ -250,21 +235,24 @@ function ComparePage() {
         if (!isOpen(productA) || !isOpen(productB)) return
         const current = inputRef.current
         const options = getTermOptions(getSharedPurposes([productA, productB]))
+        const keptAmount = useCompareStore.getState().userAmount // 직접 바꾼 금액이 있으면 자동으로 안 바꿈
         // 처음 두 상품이 들어왔을 때: 맞춤 추천 입력값 → 없으면 최대 한도, 최대 기간으로 시작 (알림 없이 근거 글만)
         if (!hasStartedRef.current) {
           hasStartedRef.current = true
           const start = getCompareDefaults(productA, productB, options, recommendRef.current)
-          setAmount(start.amount)
+          setAmount(keptAmount ?? start.amount)
           setMonths(start.months)
-          setBasis({ amount: start.amountSource, months: start.monthsSource })
+          // 근거 글은 금액과 기간이 모두 자동으로 들어갔을 때만
+          setBasis(keptAmount === null ? { amount: start.amountSource, months: start.monthsSource } : null)
           return
         }
         // 그 뒤 상품이 바뀌면 입력값을 한도, 기간에 맞게만 조정 (utils/loanMath.js, 테스트 있음)
         const next = adjustCompareInput(current, productA, productB, options)
-        if (next.amount !== current.amount || next.months !== current.months) {
-          setAmount(next.amount)
+        const nextAmount = keptAmount === null ? next.amount : current.amount
+        if (nextAmount !== current.amount || next.months !== current.months) {
+          setAmount(nextAmount)
           setMonths(next.months)
-          showToast('금액과 기간을 두 상품에 맞게 조정했어요')
+          showToast(keptAmount === null ? '금액과 기간을 두 상품에 맞게 조정했어요' : '기간을 두 상품에 맞게 조정했어요')
         }
       })
       .catch(() => {
@@ -281,7 +269,7 @@ function ComparePage() {
   const { productA, productB } = getShownProducts(idA, idB, byId)
 
   // 받아 왔는데도 B를 빈 칸으로 보여 주면(A와 같은 상품, 자금 용도가 안 겹침) 저장에서도 비움
-  // 저장된 상품 수가 화면과 같아야 [+ 비교]의 팝업이 맞게 뜸 (1개: 담긴 상품 카드 팝업 / 2개: 사라진다는 경고 팝업)
+  // 화면에 없는 상품이 저장에 남지 않게 함
   const isHiddenB = idB !== null && productB === null && byId.has(idB)
   useEffect(() => {
     if (isHiddenB) useCompareStore.getState().clearSlot('B')
@@ -321,19 +309,27 @@ function ComparePage() {
     }
   }
 
+  // 지금 조합을 이미 저장했는지 (RC-07 [결과 저장]과 같은 방식)
+  const saveKey = isComparable ? `${productA.productId}-${productB.productId}` : null
+  const isSaved = saveKey !== null && saveKey === savedKey
+
   // [결과 저장] (API-23): 같은 조합은 409
   const saveResult = async () => {
-    if (isSaving || !isComparable) return
+    if (isSaving || isSaved || !isComparable) return
     setIsSaving(true)
     try {
       await myApi.postCompare(productA.productId, productB.productId)
+      markSaved(saveKey)
       showToast('비교 결과를 저장했어요. MY의 비교 내역에서 다시 볼 수 있어요')
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
       if (error.isPreparing) showToast(PREPARING_TEXT)
-      else if (status === 409) showToast('이미 저장한 조합이에요')
+      else if (status === 409) {
+        markSaved(saveKey)
+        showToast('이미 저장한 조합이에요')
+      }
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
@@ -387,10 +383,9 @@ function ComparePage() {
   } else if (!isComparable) {
     body = (
       <>
-        <Slots $isSingle={!productA && !productB}>
+        <Slots>
           {renderSlot('A', productA, keepForA)}
-          {/* 완전히 비어 있으면 A 칸만 가운데에 (B만 담기는 일이 없게) */}
-          {(productA || productB) && renderSlot('B', productB, keepForB)}
+          {renderSlot('B', productB, keepForB)}
         </Slots>
         {!isWide && sidebar}
       </>
@@ -419,13 +414,6 @@ function ComparePage() {
           amountMan={amount}
           months={months}
         />
-        <SaveRow>
-          <SaveHint>[결과 저장]을 눌러야 MY의 비교 내역에 남아요. 저장은 회원만 할 수 있어요.</SaveHint>
-          <Button $size="sm" $variant="outline" disabled={isSaving} onClick={handleSave}>
-            <Icon name="doc" size={16} />
-            결과 저장
-          </Button>
-        </SaveRow>
       </>
     )
   }
@@ -435,6 +423,7 @@ function ComparePage() {
       <PageHeader crumbs={['대출 비교']} title="대출 비교" />
       <CompareInput
         amount={amount}
+        maxAmount={MAX_AMOUNT_MAN}
         months={months}
         method={chosenMethod}
         termOptions={termOptions}
@@ -445,25 +434,26 @@ function ComparePage() {
         onMonthsChange={handleMonthsChange}
         onMethodChange={handleMethodChange}
       />
-      {/* 비어 있으면 A 칸이 가운데라 위아래 안내 글도 가운데 */}
-      <Desc $isCenter={!hasIds}>자금 용도와 상환 방식이 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
+      <Desc>자금 용도와 상환 방식이 겹치는 두 상품을 항목마다 비교해요. 추천·찜한 상품은 바로 골라 넣을 수 있어요.</Desc>
       {isComparable && (
-        <CalcNote>
-          {getCalcLines(plan).map((line) => (
-            <CalcLine key={line.text} $strong={line.strong}>
-              {line.text}
-            </CalcLine>
-          ))}
-          {basis && <CalcLine>{getBasisText(basis)}</CalcLine>}
-        </CalcNote>
+        <CalcRow>
+          <CalcNote>
+            {getCalcLines(plan).map((line) => (
+              <CalcLine key={line.text} $strong={line.strong}>
+                {line.text}
+              </CalcLine>
+            ))}
+            {basis && <CalcLine>{getBasisText(basis)}</CalcLine>}
+          </CalcNote>
+          {isReady && (
+            <Button $size="sm" $variant="outline" disabled={isSaving || isSaved} onClick={handleSave}>
+              <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+              {isSaved ? '저장했어요' : '결과 저장'}
+            </Button>
+          )}
+        </CalcRow>
       )}
       {body}
-      <NoteBox $isCenter={!hasIds}>
-        <Disclaimer>
-          금리만 보고 고르지 마세요. 실제 금리는 신용점수와 심사에 따라 달라지고, 중도상환수수료와 신청 자격도 함께 봐야
-          해요.
-        </Disclaimer>
-      </NoteBox>
       {/* 넓은 화면(1180 이상): Layout 오른쪽 칸(도우미 위)에 끼워 넣음 */}
       {isWide && sideEl && createPortal(sidebar, sideEl)}
     </div>

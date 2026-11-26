@@ -102,7 +102,8 @@ export function LogoutDialog() {
           <Button $variant="outline" onClick={closeLogout}>
             취소
           </Button>
-          <Button onClick={handleLogout} disabled={isPending}>
+          {/* data-leave-to: 대출 비교에 상품이 있으면 벗어나기 확인 창을 먼저 (Layout) */}
+          <Button data-leave-to="/" onClick={handleLogout} disabled={isPending}>
             로그아웃
           </Button>
         </DialogActions>
@@ -139,6 +140,7 @@ function AccountMenu() {
       <Button
         $size="sm"
         $variant="outline"
+        data-leave-to={isAdminAuthed ? undefined : '/login'}
         onClick={() => (isAdminAuthed ? showToast(ADMIN_LOGGED_IN_TEXT) : navigate('/login'))}
       >
         로그인
@@ -153,6 +155,7 @@ function AccountMenu() {
         <NameButton
           aria-label={`${user.memberNickname} 계정 메뉴`}
           aria-expanded={isOpen}
+          data-leave-to={window.matchMedia(MOBILE_QUERY).matches ? '/my' : undefined}
           onClick={() => (window.matchMedia(MOBILE_QUERY).matches ? navigate('/my') : toggle())}
         >
           <span>{user.memberNickname}</span>
