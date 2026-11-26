@@ -11,7 +11,7 @@ import {
   SEARCH_SORT_OPTIONS,
 } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore from '../../store/useCompareStore'
+import useCompareStore, { getMethodLabels, getPinnedProduct, useCompareItems } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, Panel } from '../../styles/common'
 import ProductList from '../common/ProductList'
@@ -32,8 +32,8 @@ import ResultBar from './ResultBar'
     - 검색어는 입력 멈춘 뒤 0.3초 뒤 요청 (E8, SearchField), 결과는 20개씩 번호 쪽 나눔 (이전, 다음 + '1 / 70' + 쪽 번호 입력 이동, 요청서 D7). 조건이 바뀌면 1쪽으로
     - 회원: 조건이 바뀌고 0.7초 뒤 최근 검색 기록 (API-22 POST, FILTER). 실패해도 안내 안 함 (서버 CHORONG-42가 올라오기 전에는 '준비 중')
     - 조건이 없으면 (검색어 없음, 필터 전부 [전체]) 전체 상품 목록 (CHORONG-86)
-    - 비교함에 상품이 있으면 그 상품 번호를 cmp(쉼표, 첫 상품이 기준)로 같이 보내 서버가 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
-      → 목록, 건수, 쪽 수는 거른 뒤 값. 위 띠에는 응답의 hiddenCount (숨긴 개수, 지금 금리 탭 기준)를 넘김. 프론트는 목록을 따로 거르지 않음. 비교함이 바뀌면 다시 검색
+    - 비교할 상품을 고르는 중이면 남겨 둔 상품 번호를 cmp로 같이 보내 서버가 그 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
+      → 목록, 건수, 쪽 수는 거른 뒤 값. 위 띠에는 응답의 hiddenCount (숨긴 개수, 지금 금리 탭 기준)를 넘김. 프론트는 목록을 따로 거르지 않음. 기준 상품이 바뀌면 다시 검색
     - 서버 응답 칸 이름은 CHORONG-65 DTO가 올라올 때 맞춘다 (지금은 아래처럼 가정, docs/history/CHORONG-64/fe_search_history.md)
       API-01: { list, total, page, size, numCount (금리 표시 상품 수), memoCount (금리 기관 문의 상품 수) }
       API-52: { filters: [{ key, chips: [{ value, label, count }], groups (금융권만): [{ value, label, count, members: [세분류 값] }] }] }
@@ -192,7 +192,7 @@ function DetailSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
   const showToast = useUiStore((state) => state.showToast)
   const authStatus = useAuthStore((state) => state.status)
-  const tray = useCompareStore((state) => state.tray)
+  const baseItems = useCompareItems() // 거르는 기준 상품 (비교 화면의 한 칸을 고르러 나온 중 남은 상품)
   const raw = readParams(searchParams)
 
   // 검색칸 글자: 입력 중인 글을 지우지 않으려고 따로 둠. 주소의 검색어가 바뀌면 (최근 검색, 초기화) 맞춤
@@ -236,6 +236,21 @@ function DetailSearch() {
   })
   const baseLists = isChipsDone ? applied : raw.lists
   const hasConditions = Boolean(raw.q) || SEARCH_FILTERS.some(({ key }) => baseLists[key].length > 0)
+
+  // 비교 화면의 한 칸을 고르는 중에는 자금 용도, 상환 방법 줄을 남겨 둔 상품의 칩으로 고정 (못 누름)
+  // 사용자가 그 줄에 골라 둔 값은 지우지 않고 주소에 둔 채 잠시 안 씀 → 고르기가 풀리면 다시 켜짐
+  // 고정한 칩은 주소에 안 적음. 목록 거르기는 서버가 cmp로 함 (상환 방식 정보가 없는 상품도 남게)
+  const isPicking = useCompareStore((state) => state.pickSlot !== null)
+  const pickBase = useCompareStore((state) => state.pickBase)
+  const pickChips = pickBase ? { purpose: pickBase.purposes, repay: getMethodLabels(pickBase) } : {}
+  const locked = {} // 고정한 줄: 줄 이름 -> 켜 보일 값
+  const used = {} // 사용자가 고른 값 중 지금 쓰는 것 (고정한 줄은 뺌)
+  SEARCH_FILTERS.forEach(({ key }) => {
+    const values = new Set((getFilter(key)?.chips ?? []).map((chip) => chip.value))
+    const fixed = (pickChips[key] ?? []).filter((value) => values.has(value))
+    if (fixed.length > 0) locked[key] = fixed
+    used[key] = fixed.length > 0 ? [] : applied[key]
+  })
 
   // 주소 바꾸기 (바꿀 것만 넘김). 조건을 바꾸면 1쪽으로, 쪽만 바꿀 때는 page를 같이 넘김
   const writeParams = (changes) => {
@@ -326,10 +341,11 @@ function DetailSearch() {
   // 상품 목록 (API-01): 칩 목록 확인이 끝나면 검색 (조건이 없으면 전체 상품)
   const canSearch = chipsState.status !== 'loading'
   const params = { rt: raw.rt, sort: raw.sort, size: SEARCH_PAGE_SIZE, page: raw.page }
-  if (tray.length > 0) params.cmp = tray.map((item) => item.productId).join(',') // 비교함 상품 번호 (첫 상품이 기준)
+  if (baseItems.length > 0) params.cmp = baseItems.map((item) => item.productId).join(',') // 거르는 기준 상품 번호
   if (raw.q) params.q = raw.q
+  // 고정한 줄의 값은 안 보냄: 남겨 둔 상품 기준 거르기는 cmp가 함
   SEARCH_FILTERS.forEach(({ key }) => {
-    if (applied[key].length > 0) params[key] = applied[key].join(',')
+    if (used[key].length > 0) params[key] = used[key].join(',')
   })
   const [attempt, setAttempt] = useState(0)
   const requestKey = canSearch ? JSON.stringify({ params, attempt }) : ''
@@ -365,6 +381,19 @@ function DetailSearch() {
   // 쪽 넘김 (요청서 D7): 지금 금리 탭의 건수로 전체 쪽 수를 셈. 쪽을 넘기면 결과 바 위로 스크롤
   const tabCount = raw.rt === 'NUM' ? view.numCount : view.memoCount
   const pageCount = Math.max(1, Math.ceil(tabCount / SEARCH_PAGE_SIZE))
+  // 비교 화면의 한 칸을 고르는 중이면 거르기로 결과가 줄어 지금 쪽이 없어질 수 있음: 없는 쪽이 되면 알아서 1쪽으로 (평소에는 '없는 쪽이에요' 안내와 [1쪽으로] 버튼)
+  const isEmptyPage = view.status === 'done' && view.items.length === 0 && tabCount > 0 && raw.page > 1
+  useEffect(() => {
+    if (!isPicking || !isEmptyPage) return
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('page')
+        return next
+      },
+      { replace: true },
+    )
+  }, [isPicking, isEmptyPage, setSearchParams])
   const resultsRef = useRef(null)
   const goPage = (page) => {
     writeParams({ page })
@@ -383,6 +412,29 @@ function DetailSearch() {
     if (number !== raw.page) goPage(number)
   }
 
+  // 고르는 중에는 남겨 둔 상품을 1쪽 맨 위에 고정 (칩, 검색어, 쪽에 상관없이). 다른 쪽에서는 중복으로 안 보이게 뺌
+  const pinned = useCompareStore(getPinnedProduct)
+  const pinnedRow = pinned && raw.page === 1 ? (view.items.find((item) => item.productId === pinned.productId) ?? pinned) : null
+  const otherItems = pinned ? view.items.filter((item) => item.productId !== pinned.productId) : view.items
+  const listItems = pinnedRow ? [pinnedRow, ...otherItems] : otherItems
+
+  // 보여 줄 상품이 없는 이유 안내: 거르는 기준 때문에 모두 빠졌으면(서버가 알려 준 숨긴 개수가 있음) 그 안내, 아니면 조건 안내
+  const renderNoMatch = () => {
+    if (view.hiddenCount > 0) {
+      return <EmptyBox>비교할 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>
+    }
+    return (
+      <EmptyBox>
+        조건에 맞는 상품이 없어요. 위의 조건 칩에서 X를 눌러 하나씩 빼 보세요.
+        {hasConditions && (
+          <Button $variant="outline" $size="sm" onClick={handleReset}>
+            필터 초기화
+          </Button>
+        )}
+      </EmptyBox>
+    )
+  }
+
   const renderResults = () => {
     if (view.status === 'loading') return <EmptyBox role="status">상품을 불러오는 중이에요</EmptyBox>
     if (view.status === 'error') {
@@ -395,8 +447,9 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
+    // 고정한 상품이 있으면 조건에 맞는 다른 상품이 없어도 그 상품은 보여 주고, 아래에 이유를 안내
     // 건수는 있는데 이 쪽이 비었으면 없는 쪽 (주소의 page를 직접 고쳤을 때 등)
-    if (view.items.length === 0 && tabCount > 0) {
+    if (listItems.length === 0 && tabCount > 0) {
       return (
         <EmptyBox>
           없는 쪽이에요 (전체 {pageCount}쪽)
@@ -406,23 +459,17 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
-    // 비교함 기준 때문에 모두 빠진 경우 (서버가 알려 준 숨긴 개수가 있음)
-    if (view.items.length === 0 && view.hiddenCount > 0) {
-      return <EmptyBox>비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>
-    }
-    if (view.items.length === 0) {
+    if (listItems.length === 0) return renderNoMatch()
+    const list = <ProductList items={listItems} getRowProps={() => ({ keyword: raw.q })} />
+    if (pinnedRow && otherItems.length === 0) {
       return (
-        <EmptyBox>
-          조건에 맞는 상품이 없어요. 위의 조건 칩에서 X를 눌러 하나씩 빼 보세요.
-          {hasConditions && (
-            <Button $variant="outline" $size="sm" onClick={handleReset}>
-              필터 초기화
-            </Button>
-          )}
-        </EmptyBox>
+        <>
+          {list}
+          {renderNoMatch()}
+        </>
       )
     }
-    return <ProductList items={view.items} getRowProps={() => ({ keyword: raw.q })} />
+    return list
   }
 
   return (
@@ -465,7 +512,8 @@ function DetailSearch() {
                   label={label}
                   chips={getFilter(key)?.chips ?? []}
                   groups={getFilter(key)?.groups ?? []}
-                  selected={applied[key]}
+                  selected={locked[key] ?? applied[key]}
+                  isLocked={Boolean(locked[key])}
                   hint={FILTER_HINT[key] ?? ''}
                   onChange={(values) => handleFilterChange(key, values)}
                 />
@@ -475,7 +523,8 @@ function DetailSearch() {
         <Foot>
           <ActiveFilterChips
             q={raw.q}
-            selected={applied}
+            selected={used}
+            locked={locked}
             groups={getFilter('fin')?.groups ?? []}
             onRemove={handleRemove}
             onReset={handleReset}

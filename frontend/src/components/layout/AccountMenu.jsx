@@ -11,6 +11,7 @@ import { Button, CountBadge } from '../../styles/common'
 import ConfirmDialog from '../common/ConfirmDialog'
 import Icon from '../ui/Icon'
 import Popover from '../ui/Popover'
+import { isComparing } from '../../store/useCompareStore'
 
 // LY-08 계정 메뉴: 비회원 [로그인] / 회원 '{닉네임}님' 버튼 → 작은 메뉴
 //   윗줄 '{닉네임}님', '{카카오|네이버} 로그인' + [로그아웃] / 아래 MY 메뉴 링크 (MY 왼쪽 메뉴와 같은 MY_MENU_GROUPS)
@@ -126,7 +127,14 @@ export function LogoutDialog() {
   const [isPending, setIsPending] = useState(false)
   const [isDone, setIsDone] = useState(false)
 
-  const handleLogout = async () => {
+  const handleLogout = async (event) => {
+    // 대출 비교에 담은 상품이 있으면 확인 창을 먼저. [예]면 상품을 비우고 이 버튼을 다시 눌러 로그아웃 (Layout)
+    // 버튼 속성이 아니라 여기서 확인해, 창 부품이 바뀌어도 남게 함
+    if (isComparing(window.location.pathname)) {
+      event.currentTarget.blur()
+      useUiStore.getState().openCompareLeave('/', null, event.currentTarget)
+      return
+    }
     setIsPending(true)
     await logout()
     setIsPending(false)
@@ -185,6 +193,7 @@ function AccountMenu() {
       <Button
         $size="sm"
         $variant="outline"
+        data-leave-to={isAdminAuthed ? undefined : '/login'}
         onClick={() => (isAdminAuthed ? showToast(ADMIN_LOGGED_IN_TEXT) : navigate('/login'))}
       >
         로그인
@@ -199,6 +208,7 @@ function AccountMenu() {
         <NameButton
           aria-label={`${user.memberNickname} 계정 메뉴`}
           aria-expanded={isOpen}
+          data-leave-to={window.matchMedia(MOBILE_QUERY).matches ? '/my' : undefined}
           onClick={() => (window.matchMedia(MOBILE_QUERY).matches ? navigate('/my') : toggle())}
         >
           <span>{user.memberNickname}님</span>
