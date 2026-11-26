@@ -33,6 +33,13 @@ export async function getProducts(params) {
   return response.data.data
 }
 
+// API-04 대출 랭킹 (RK-01): { cat (금융권, 빈 값 = 전체), metric (rate, limit, term, views), dir (asc, desc) }
+// 받는 값: { items (최대 30: rankNo, product, prepayFeeMax, metricValue), total, baseDate }
+export async function getRankings({ cat, metric, dir }) {
+  const response = await api.get('/api/rankings', { params: { cat, metric, dir } })
+  return response.data.data
+}
+
 // API-52 상품 필터 칩 목록 (SR-02): 화면을 열 때 한 번
 export async function getFilterChips() {
   const response = await api.get('/api/products/filters')
