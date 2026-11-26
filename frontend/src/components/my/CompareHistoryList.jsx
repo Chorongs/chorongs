@@ -90,8 +90,9 @@ function CompareHistoryList() {
     }
   }, [attempt])
 
+  // 다시 받을 때 이전 줄을 남김 (받는 동안 MySection이 흐리게 둠)
   const reload = () => {
-    setResult({ status: 'loading', items: [] })
+    setResult((prev) => ({ ...prev, status: 'loading' }))
     setAttempt((count) => count + 1)
   }
 

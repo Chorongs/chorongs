@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
+import styled, { css } from 'styled-components'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, StatusText, Tag } from '../../styles/common'
 import ConfirmDialog from '../common/ConfirmDialog'
@@ -15,7 +15,15 @@ import Icon from '../ui/Icon'
 // title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
 // onRemove, onClearAll을 안 넘기면 X, [선택 삭제], [전체 삭제]를 안 그림 (찜한 대출)
 // status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
+//   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 흐리게 두고 누르기, 키보드를 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
+
+// 다시 받는 중 흐리게 (목록, 제목 줄 버튼)
+const busyStyle = css`
+  opacity: ${({ $isBusy }) => ($isBusy ? 0.45 : 1)};
+  transition: opacity 0.15s;
+`
+
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
 const List = styled.ul`
   display: flex;
@@ -23,6 +31,7 @@ const List = styled.ul`
   border-top: 1px solid var(--line);
   container-type: inline-size;
   container-name: plist;
+  ${busyStyle}
 `
 
 // 고르는 중 줄 앞 체크칸 자리 (체크칸은 공통 Checkbox(UI-12), 칸 이름은 화면 낭독기용으로만)
@@ -45,6 +54,7 @@ const ScreenReaderText = styled.span`
 const HeadActions = styled.div`
   display: flex;
   gap: 4px;
+  ${busyStyle}
 `
 
 const Item = styled.li`
@@ -258,8 +268,11 @@ function MySection({
     }
   }
 
+  // 다시 받는 중 (이전 줄이 남아 있음). 이전 줄이 없으면(처음 열 때, 실패 뒤 다시 시도) LoadingText
+  const isBusy = status === 'loading' && items.length > 0
+
   let body
-  if (status === 'loading') {
+  if (status === 'loading' && !isBusy) {
     body = <LoadingText />
   } else if (status === 'error') {
     body = (
@@ -274,7 +287,7 @@ function MySection({
     body = <EmptyBox>{emptyContent}</EmptyBox>
   } else {
     body = (
-      <List>
+      <List $isBusy={isBusy} inert={isBusy} aria-busy={isBusy}>
         {items.map((item) => (
           <Item key={getKey(item)}>
             {isSelecting && (
@@ -306,8 +319,8 @@ function MySection({
   return (
     <section>
       <SectionHeader title={title} description={description} size="md">
-        {(onRemove || onClearAll) && status === 'done' && items.length > 0 && (
-          <HeadActions>
+        {(onRemove || onClearAll) && (status === 'done' || isBusy) && items.length > 0 && (
+          <HeadActions $isBusy={isBusy} inert={isBusy}>
             {isSelecting ? (
               <>
                 <Button $size="sm" $variant="ghost" onClick={stopSelecting}>
