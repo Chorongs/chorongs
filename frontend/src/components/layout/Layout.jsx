@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import useCompareStore, { getComparePage } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
+import { reopenRememberedProduct } from '../../utils/requireLogin'
 import CompareTray from '../common/CompareTray'
 import LoginRequiredDialog from '../common/LoginRequiredDialog'
 import ProductDetailSheet from '../common/ProductDetailSheet'
@@ -114,10 +115,12 @@ function Layout() {
   }, [pathname, search, navigate, showToast])
 
   // 화면 이동 시 열린 메뉴, 상품 상세 창, 추천 창 닫기, 스크롤 맨 위로
+  // 상품 상세 창에서 소셜 로그인을 다녀왔으면 닫은 뒤 그 상세를 한 번 다시 엶 (CM-17)
   useEffect(() => {
     closeMenu()
     closeProduct()
     closeRecommend()
+    reopenRememberedProduct()
     window.scrollTo(0, 0)
   }, [pathname, closeMenu, closeProduct, closeRecommend])
 

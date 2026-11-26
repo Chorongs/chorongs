@@ -6,7 +6,13 @@ import kakaoSymbol from '../../assets/images/kakao_symbol.svg'
 import naverSymbol from '../../assets/images/naver_symbol.png'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
-import { ADMIN_SESSION_TEXT, ALREADY_LOGGED_IN_TEXT, LOGIN_OFFLINE_TEXT, checkSocialLogin } from '../../utils/requireLogin'
+import {
+  ADMIN_SESSION_TEXT,
+  ALREADY_LOGGED_IN_TEXT,
+  LOGIN_OFFLINE_TEXT,
+  checkSocialLogin,
+  rememberOpenProduct,
+} from '../../utils/requireLogin'
 import { lockScroll, unlockScroll } from '../../utils/scrollLock'
 import Modal from '../ui/Modal'
 
@@ -67,6 +73,8 @@ function LoginRequiredDialog() {
       showToast(check === 'member' ? ALREADY_LOGGED_IN_TEXT : ADMIN_SESSION_TEXT)
       return
     }
+    // 상품 상세 창 위에서 열렸으면 돌아온 뒤 그 상세를 다시 열도록 적어 둠 (다시 여는 쪽은 Layout)
+    rememberOpenProduct(pathname)
     authApi.getLoginUrl(provider, `${pathname}${search}`)
   }
 
