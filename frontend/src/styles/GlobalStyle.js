@@ -146,8 +146,10 @@ const GlobalStyle = createGlobalStyle`
 
   html {
     -webkit-text-size-adjust: 100%;
-    /* 화면 스크롤바 틀을 늘 보임: 창이 열려 뒤 화면을 잠가도(utils/scrollLock.js) 막대가 사라지며 화면이 밀리지 않게 */
-    overflow-y: scroll;
+    /* 화면 스크롤바 자리를 늘 비워 둠 (스크롤이 필요 없는 쪽에서는 틀을 그리지 않고 자리만): 쪽을 옮기거나 창이 열려 뒤 화면을 잠가도(utils/scrollLock.js) 화면이 옆으로 밀리지 않게 */
+    /* overflow-y를 auto로 따로 적어 둠: 비워 두면 잠글 때 body의 overflow가 화면 전체로 옮겨 가 잠금 방식이 달라짐 */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   body {
