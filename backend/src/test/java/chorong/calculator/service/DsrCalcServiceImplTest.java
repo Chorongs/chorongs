@@ -2,6 +2,7 @@ package chorong.calculator.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.inOrder;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
+import org.springframework.beans.BeanUtils;
 
 import chorong.calculator.dto.DsrCalcRequestDTO;
 import chorong.calculator.dto.DsrCalcResponseDTO;
@@ -31,6 +33,8 @@ import chorong.calculator.repository.DsrCalcHistoryRepository;
 import chorong.calculator.repository.DsrLoanRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.entity.Member;
+import chorong.member.repository.MemberRepository;
 
 /*
  * DsrCalcServiceImpl 테스트 (CAL-06)
@@ -44,12 +48,16 @@ class DsrCalcServiceImplTest {
 	private DsrCalcHistoryRepository dsrCalcHistoryRepository;
 	private DsrLoanRepository dsrLoanRepository;
 	private DsrCalcServiceImpl dsrCalcService;
+	private MemberRepository memberRepository;
 
 	@BeforeEach
 	void setUp() {
 		dsrCalcHistoryRepository = mock(DsrCalcHistoryRepository.class);
 		dsrLoanRepository = mock(DsrLoanRepository.class);
-		dsrCalcService = new DsrCalcServiceImpl(dsrCalcHistoryRepository, dsrLoanRepository);
+		memberRepository = mock(MemberRepository.class);
+		// 회원 행 잠금은 늘 회원을 찾음 (B9)
+		when(memberRepository.findLockedByMemberId(MEMBER_ID)).thenReturn(Optional.of(BeanUtils.instantiateClass(Member.class)));
+		dsrCalcService = new DsrCalcServiceImpl(dsrCalcHistoryRepository, dsrLoanRepository, memberRepository);
 		// 저장하면 번호 100이 붙은 계산이 돌아옴 (IDENTITY)
 		when(dsrCalcHistoryRepository.save(any(DsrCalcHistory.class))).thenReturn(calc(100, MEMBER_ID));
 	}
@@ -313,5 +321,114 @@ class DsrCalcServiceImplTest {
 		InOrder order = inOrder(dsrLoanRepository, dsrCalcHistoryRepository);
 		order.verify(dsrLoanRepository).deleteByMemberId(MEMBER_ID);
 		order.verify(dsrCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+	}
+
+	// ---- 같은 기록 다시 저장 (409, B9) ----
+
+	/** 이미 저장된 대출 행: loanItem(kind, method, amount)와 같은 입력 (금리는 소수 2자리로 저장된 4.50) */
+	private static DsrLoan sameInputLoan(long dsrId, int sortNo, LoanKind kind, RepayMethod method, long amount) {
+		return DsrLoan.builder()
+				.dsrLoanId(dsrId * 100 + sortNo)
+				.dsrId(dsrId)
+				.sortNo(sortNo)
+				.loanKind(kind)
+				.repayMethod(method)
+				.loanAmount(amount)
+				.interestRate(new BigDecimal("4.50"))
+				.loanMonths(120)
+				.build();
+	}
+
+	/** 두 건 요청: 신용대출 1천만원, 주택담보대출 2억원 (입력 순서대로) */
+	private static DsrCalcRequestDTO twoLoanRequest() {
+		return request(List.of(
+				loanItem(LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L),
+				loanItem(LoanKind.MORTGAGE, RepayMethod.EQUAL_P, 200000000L)));
+	}
+
+	/** 저장된 기록 1번(연소득이 요청과 같음)의 대출 행을 돌려주게 함 */
+	private void givenSavedLoans(DsrLoan... loans) {
+		when(dsrCalcHistoryRepository.findByMemberIdOrderByDsrIdDesc(MEMBER_ID)).thenReturn(calcs(1));
+		when(dsrLoanRepository.findByDsrIdInOrderByDsrIdAscSortNoAsc(List.of(1L))).thenReturn(List.of(loans));
+	}
+
+	@Test
+	void 연소득과_대출_목록이_같은_기록이_있으면_409다() {
+		// Given
+		givenSavedLoans(sameInputLoan(1, 1, LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L),
+				sameInputLoan(1, 2, LoanKind.MORTGAGE, RepayMethod.EQUAL_P, 200000000L));
+		DsrCalcRequestDTO request = twoLoanRequest();
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> dsrCalcService.saveDsrCalc(MEMBER_ID, request));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 같은_기록이_있으면_계산_행을_저장하지_않는다() {
+		// Given
+		givenSavedLoans(sameInputLoan(1, 1, LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L),
+				sameInputLoan(1, 2, LoanKind.MORTGAGE, RepayMethod.EQUAL_P, 200000000L));
+		DsrCalcRequestDTO request = twoLoanRequest();
+
+		// When
+		assertThrows(BusinessException.class, () -> dsrCalcService.saveDsrCalc(MEMBER_ID, request));
+
+		// Then
+		verify(dsrCalcHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	void 대출_순서만_달라도_저장한다() {
+		// Given 저장된 기록은 주택담보대출이 먼저
+		givenSavedLoans(sameInputLoan(1, 1, LoanKind.MORTGAGE, RepayMethod.EQUAL_P, 200000000L),
+				sameInputLoan(1, 2, LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L));
+
+		// When
+		dsrCalcService.saveDsrCalc(MEMBER_ID, twoLoanRequest());
+
+		// Then
+		verify(dsrCalcHistoryRepository).save(any(DsrCalcHistory.class));
+	}
+
+	@Test
+	void 대출_건수가_다르면_저장한다() {
+		// Given 저장된 기록은 신용대출 1건만
+		givenSavedLoans(sameInputLoan(1, 1, LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L));
+
+		// When
+		dsrCalcService.saveDsrCalc(MEMBER_ID, twoLoanRequest());
+
+		// Then
+		verify(dsrCalcHistoryRepository).save(any(DsrCalcHistory.class));
+	}
+
+	@Test
+	void 회원_행을_잠근_뒤에_기록을_비교한다() {
+		// Given
+		when(dsrCalcHistoryRepository.findByMemberIdOrderByDsrIdDesc(MEMBER_ID)).thenReturn(calcs(1));
+		InOrder order = inOrder(memberRepository, dsrCalcHistoryRepository);
+
+		// When
+		dsrCalcService.saveDsrCalc(MEMBER_ID, twoLoanRequest());
+
+		// Then
+		order.verify(memberRepository).findLockedByMemberId(MEMBER_ID);
+		order.verify(dsrCalcHistoryRepository).findByMemberIdOrderByDsrIdDesc(MEMBER_ID);
+	}
+
+	@Test
+	void 저장_여부_확인은_같은_기록이_있으면_true다() {
+		// Given
+		givenSavedLoans(sameInputLoan(1, 1, LoanKind.CREDIT, RepayMethod.EQUAL_PI, 10000000L),
+				sameInputLoan(1, 2, LoanKind.MORTGAGE, RepayMethod.EQUAL_P, 200000000L));
+
+		// When
+		boolean saved = dsrCalcService.hasSavedDsrCalc(MEMBER_ID, twoLoanRequest());
+
+		// Then
+		assertTrue(saved);
 	}
 }

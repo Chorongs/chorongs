@@ -3,8 +3,10 @@ package chorong.calculator.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,6 +21,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.beans.BeanUtils;
 
 import chorong.calculator.dto.CalcHistoryRequestDTO;
 import chorong.calculator.dto.CalcHistoryResponseDTO;
@@ -28,6 +32,8 @@ import chorong.calculator.entity.RepayMethod;
 import chorong.calculator.repository.CalcHistoryRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.entity.Member;
+import chorong.member.repository.MemberRepository;
 
 /*
  * CalcHistoryServiceImpl 테스트 (CAL-04)
@@ -40,11 +46,15 @@ class CalcHistoryServiceImplTest {
 
 	private CalcHistoryRepository calcHistoryRepository;
 	private CalcHistoryServiceImpl calcHistoryService;
+	private MemberRepository memberRepository;
 
 	@BeforeEach
 	void setUp() {
 		calcHistoryRepository = mock(CalcHistoryRepository.class);
-		calcHistoryService = new CalcHistoryServiceImpl(calcHistoryRepository);
+		memberRepository = mock(MemberRepository.class);
+		// 회원 행 잠금은 늘 회원을 찾음 (B9)
+		when(memberRepository.findLockedByMemberId(MEMBER_ID)).thenReturn(Optional.of(BeanUtils.instantiateClass(Member.class)));
+		calcHistoryService = new CalcHistoryServiceImpl(calcHistoryRepository, memberRepository);
 	}
 
 	// ---- 테스트 데이터 ----
@@ -75,11 +85,12 @@ class CalcHistoryServiceImplTest {
 		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
 	}
 
+	// 이미 저장된 기록 예시: 금액이 request와 달라 같은 기록이 아님 (같은 기록 409를 피해 10개 정리 등을 확인)
 	private static CalcHistory calc(long calcId, long memberId) {
 		return CalcHistory.builder()
 				.calcId(calcId)
 				.memberId(memberId)
-				.loanAmount(10000000L)
+				.loanAmount(20000000L)
 				.loanMonths(36)
 				.interestRate(new BigDecimal("4.50"))
 				.repayMethod(RepayMethod.EQUAL_PI)
@@ -116,9 +127,27 @@ class CalcHistoryServiceImplTest {
 	}
 
 	@Test
-	void 목록에_없는_기간이면_400이고_저장하지_않는다() {
+	void 직접_입력한_24개월도_저장한다() {
+		// Given 예전 기간 목록(12, 36, 60, 120, 180)에 없던 값
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of());
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request(24));
+
+		// Then
+		assertEquals(24, saved().getLoanMonths());
+	}
+
+	@Test
+	void 기간이_1개월보다_짧으면_400이다() {
+		// Given, When, Then
+		assertRejected(request(0));
+	}
+
+	@Test
+	void 기간이_600개월을_넘으면_400이고_저장하지_않는다() {
 		// Given
-		CalcHistoryRequestDTO request = request(24);
+		CalcHistoryRequestDTO request = request(601);
 
 		// When
 		BusinessException e = assertThrows(BusinessException.class, () -> calcHistoryService.saveCalc(MEMBER_ID, request));
@@ -424,5 +453,133 @@ class CalcHistoryServiceImplTest {
 
 		// Then
 		verify(calcHistoryRepository).deleteByMemberId(MEMBER_ID);
+	}
+
+	// ---- 같은 기록 다시 저장 (409, B9) ----
+
+	/** 이미 저장된 기록: request(36)과 입력 12칸이 같음 (결과 칸, 계산 시각은 다름) */
+	private static CalcHistory sameInputCalc(long calcId) {
+		return CalcHistory.builder()
+				.calcId(calcId)
+				.memberId(MEMBER_ID)
+				.loanAmount(10000000L)
+				.loanMonths(36)
+				.interestRate(new BigDecimal("4.50"))
+				.repayMethod(RepayMethod.EQUAL_PI)
+				.graceMonths(0)
+				.totalInterest(999L)
+				.firstPayment(1L)
+				.calcAt(LocalDateTime.of(2026, 11, 1, 9, 0))
+				.build();
+	}
+
+	/** 이미 저장된 기록: prepayRequest(36)과 중도상환 방식 1칸만 다름 (기간 줄이기) */
+	private static CalcHistory prepayModeOnlyDiffCalc(long calcId) {
+		return CalcHistory.builder()
+				.calcId(calcId)
+				.memberId(MEMBER_ID)
+				.loanAmount(10000000L)
+				.loanMonths(36)
+				.interestRate(new BigDecimal("4.50"))
+				.repayMethod(RepayMethod.EQUAL_PI)
+				.graceMonths(0)
+				.totalInterest(1234567L)
+				.firstPayment(860000L)
+				.prepayRound(6)
+				.prepayAmount(3000000L)
+				.prepayFeeRate(new BigDecimal("1.20"))
+				.prepayMode(PrepayMode.SHORTEN_TERM)
+				.calcAt(LocalDateTime.of(2026, 11, 1, 9, 0))
+				.build();
+	}
+
+	@Test
+	void 입력이_같은_기록이_있으면_409다() {
+		// Given
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+		CalcHistoryRequestDTO request = request(36);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> calcHistoryService.saveCalc(MEMBER_ID, request));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 입력이_같은_기록이_있으면_저장하지_않는다() {
+		// Given
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+		CalcHistoryRequestDTO request = request(36);
+
+		// When
+		assertThrows(BusinessException.class, () -> calcHistoryService.saveCalc(MEMBER_ID, request));
+
+		// Then
+		verify(calcHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	void 옵션_1칸만_달라도_저장한다() {
+		// Given 중도상환 방식만 다름 (월 납입액 줄이기 / 저장된 기록은 기간 줄이기)
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(prepayModeOnlyDiffCalc(1)));
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, prepayRequest(36));
+
+		// Then
+		verify(calcHistoryRepository).save(any(CalcHistory.class));
+	}
+
+	@Test
+	void 이자율_5_5와_5_50은_같은_기록이다() {
+		// Given 저장된 기록 5.50, 요청 5.5 (equals면 다르다고 나옴)
+		CalcHistory savedCalc = CalcHistory.builder()
+				.calcId(1L)
+				.memberId(MEMBER_ID)
+				.loanAmount(10000000L)
+				.loanMonths(36)
+				.interestRate(new BigDecimal("5.50"))
+				.repayMethod(RepayMethod.EQUAL_PI)
+				.graceMonths(0)
+				.totalInterest(1L)
+				.firstPayment(1L)
+				.calcAt(LocalDateTime.of(2026, 11, 1, 9, 0))
+				.build();
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(savedCalc));
+		CalcHistoryRequestDTO request = request(36);
+		request.setInterestRate(new BigDecimal("5.5"));
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> calcHistoryService.saveCalc(MEMBER_ID, request));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 회원_행을_잠근_뒤에_기록을_비교한다() {
+		// Given
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(calcs(1));
+		InOrder order = inOrder(memberRepository, calcHistoryRepository);
+
+		// When
+		calcHistoryService.saveCalc(MEMBER_ID, request(36));
+
+		// Then
+		order.verify(memberRepository).findLockedByMemberId(MEMBER_ID);
+		order.verify(calcHistoryRepository).findByMemberIdOrderByCalcIdDesc(MEMBER_ID);
+	}
+
+	@Test
+	void 저장_여부_확인은_입력이_같은_기록이_있으면_true다() {
+		// Given
+		when(calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+
+		// When
+		boolean saved = calcHistoryService.hasSavedCalc(MEMBER_ID, request(36));
+
+		// Then
+		assertTrue(saved);
 	}
 }

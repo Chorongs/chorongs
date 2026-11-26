@@ -67,6 +67,10 @@ public class HomeLimitCalcHistory {
 	@Column(name = "repay_method")
 	private RepayMethod repayMethod;	// EQUAL_PI, EQUAL_P만
 
+	@Enumerated(EnumType.STRING)
+	@Column(name = "rate_type")
+	private HomeRateType rateType;		// 금리 유형 (예전 기록은 null)
+
 	@Column(name = "max_loan")
 	private Long maxLoan;				// 최대 대출 한도 (원)
 

@@ -2,8 +2,10 @@ package chorong.calculator.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,6 +20,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
+import org.springframework.beans.BeanUtils;
 
 import chorong.calculator.dto.ReverseCalcHistoryRequestDTO;
 import chorong.calculator.dto.ReverseCalcHistoryResponseDTO;
@@ -26,6 +30,8 @@ import chorong.calculator.entity.ReverseCalcHistory;
 import chorong.calculator.repository.ReverseCalcHistoryRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.entity.Member;
+import chorong.member.repository.MemberRepository;
 
 /*
  * ReverseCalcHistoryServiceImpl 테스트 (CAL-07)
@@ -38,11 +44,15 @@ class ReverseCalcHistoryServiceImplTest {
 
 	private ReverseCalcHistoryRepository reverseCalcHistoryRepository;
 	private ReverseCalcHistoryServiceImpl reverseCalcHistoryService;
+	private MemberRepository memberRepository;
 
 	@BeforeEach
 	void setUp() {
 		reverseCalcHistoryRepository = mock(ReverseCalcHistoryRepository.class);
-		reverseCalcHistoryService = new ReverseCalcHistoryServiceImpl(reverseCalcHistoryRepository);
+		memberRepository = mock(MemberRepository.class);
+		// 회원 행 잠금은 늘 회원을 찾음 (B9)
+		when(memberRepository.findLockedByMemberId(MEMBER_ID)).thenReturn(Optional.of(BeanUtils.instantiateClass(Member.class)));
+		reverseCalcHistoryService = new ReverseCalcHistoryServiceImpl(reverseCalcHistoryRepository, memberRepository);
 	}
 
 	// ---- 테스트 데이터 ----
@@ -51,12 +61,13 @@ class ReverseCalcHistoryServiceImplTest {
 		return new ReverseCalcHistoryRequestDTO(repayMethod, 1000000L, new BigDecimal("4.5"), 360, 197000000L);
 	}
 
+	// 이미 저장된 기록 예시: 금액이 request와 달라 같은 기록이 아님 (같은 기록 409를 피해 10개 정리 등을 확인)
 	private static ReverseCalcHistory calc(long reverseId, long memberId) {
 		return ReverseCalcHistory.builder()
 				.reverseId(reverseId)
 				.memberId(memberId)
 				.repayMethod(RepayMethod.EQUAL_PI)
-				.monthlyPayment(1000000L)
+				.monthlyPayment(2000000L)
 				.interestRate(new BigDecimal("4.50"))
 				.loanMonths(360)
 				.maxLoan(197000000L)
@@ -217,5 +228,86 @@ class ReverseCalcHistoryServiceImplTest {
 
 		// Then
 		verify(reverseCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+	}
+
+	// ---- 같은 기록 다시 저장 (409, B9) ----
+
+	/** 이미 저장된 기록: request(EQUAL_PI)와 입력 4칸이 같음 (결과 칸, 계산 시각은 다름) */
+	private static ReverseCalcHistory sameInputCalc(long reverseId) {
+		return ReverseCalcHistory.builder()
+				.reverseId(reverseId)
+				.memberId(MEMBER_ID)
+				.repayMethod(RepayMethod.EQUAL_PI)
+				.monthlyPayment(1000000L)
+				.interestRate(new BigDecimal("4.50"))
+				.loanMonths(360)
+				.maxLoan(1L)
+				.calcAt(LocalDateTime.of(2026, 11, 1, 9, 0))
+				.build();
+	}
+
+	@Test
+	void 입력이_같은_기록이_있으면_409다() {
+		// Given
+		when(reverseCalcHistoryRepository.findByMemberIdOrderByReverseIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+		ReverseCalcHistoryRequestDTO request = request(RepayMethod.EQUAL_PI);
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class,
+				() -> reverseCalcHistoryService.saveReverseCalc(MEMBER_ID, request));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 입력이_같은_기록이_있으면_저장하지_않는다() {
+		// Given
+		when(reverseCalcHistoryRepository.findByMemberIdOrderByReverseIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+		ReverseCalcHistoryRequestDTO request = request(RepayMethod.EQUAL_PI);
+
+		// When
+		assertThrows(BusinessException.class, () -> reverseCalcHistoryService.saveReverseCalc(MEMBER_ID, request));
+
+		// Then
+		verify(reverseCalcHistoryRepository, never()).save(any());
+	}
+
+	@Test
+	void 입력_1칸만_달라도_저장한다() {
+		// Given 상환 방식만 다름 (원금균등 / 저장된 기록은 원리금균등)
+		when(reverseCalcHistoryRepository.findByMemberIdOrderByReverseIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+
+		// When
+		reverseCalcHistoryService.saveReverseCalc(MEMBER_ID, request(RepayMethod.EQUAL_P));
+
+		// Then
+		verify(reverseCalcHistoryRepository).save(any(ReverseCalcHistory.class));
+	}
+
+	@Test
+	void 회원_행을_잠근_뒤에_기록을_비교한다() {
+		// Given
+		when(reverseCalcHistoryRepository.findByMemberIdOrderByReverseIdDesc(MEMBER_ID)).thenReturn(calcs(1));
+		InOrder order = inOrder(memberRepository, reverseCalcHistoryRepository);
+
+		// When
+		reverseCalcHistoryService.saveReverseCalc(MEMBER_ID, request(RepayMethod.EQUAL_PI));
+
+		// Then
+		order.verify(memberRepository).findLockedByMemberId(MEMBER_ID);
+		order.verify(reverseCalcHistoryRepository).findByMemberIdOrderByReverseIdDesc(MEMBER_ID);
+	}
+
+	@Test
+	void 저장_여부_확인은_입력이_같은_기록이_있으면_true다() {
+		// Given
+		when(reverseCalcHistoryRepository.findByMemberIdOrderByReverseIdDesc(MEMBER_ID)).thenReturn(List.of(sameInputCalc(1)));
+
+		// When
+		boolean saved = reverseCalcHistoryService.hasSavedReverseCalc(MEMBER_ID, request(RepayMethod.EQUAL_PI));
+
+		// Then
+		assertTrue(saved);
 	}
 }

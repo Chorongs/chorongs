@@ -39,6 +39,7 @@ public class MemberServiceImpl implements MemberService {
     private final HomeLimitCalcHistoryRepository homeLimitCalcHistory;
     private final ReverseCalcHistoryRepository reverseCalcHistoryRepository;
     private final DsrLoanRepository dsrLoanRepository;
+    private final HomeOtherLoanRepository homeOtherLoanRepository;
 
 
     @Override
@@ -71,6 +72,7 @@ public class MemberServiceImpl implements MemberService {
         dsrLoanRepository.deleteByMemberId(memberId);
         dsrCalcHistoryRepository.deleteByMemberId(memberId);
         changeCalcHistory.deleteByMemberId(memberId);
+        homeOtherLoanRepository.deleteByMemberId(memberId); // 집 살 때 대출한도의 다른 대출 행 먼저 (fk_home_other_loan_calc, CHORONG-54)
         homeLimitCalcHistory.deleteByMemberId(memberId);
         reverseCalcHistoryRepository.deleteByMemberId(memberId);
 
