@@ -19,7 +19,7 @@ import Modal from '../ui/Modal'
 // - refreshKey: 바뀌면 목록을 다시 받음 (계산기에서 [결과 저장] 뒤)
 // - kind: 어느 계산기의 기록인지 (LOAN 대출 이자 API-24, CHANGE 갈아타기 API-56, DSR API-57, REVERSE 상환능력 API-58, HOME 집 살 때 대출한도 API-59). 처음 값 LOAN
 // - isOnlyWithItems: 저장한 기록이 있을 때만 그림 (계산기 화면 오른쪽 칸, CalculatorPage). 비회원, 불러오는 중, 실패, 빈 목록이면 아무것도 안 그림 (2026-11-26 사용자 결정)
-//   모양은 대출 비교의 '비교할 상품 고르기'(CP-07 CompareSidebar)와 같게: 제목 + 안내 / 접었다 펴는 상자 (건수) / 카드 3개씩 쪽 넘김. 카드를 누르면 불러오기
+//   모양은 대출 비교의 '비교할 상품 고르기'(CP-07 CompareSidebar)와 같게: 제목 / 접었다 펴는 상자 (건수) / 카드 3개씩 쪽 넘김. 카드를 누르면 불러오기
 //   카드마다 X (지우기), 상자 아래 '전체 지우기'. 지우기는 MY와 같이 확인 창 뒤에 (MySection과 같은 알림 글)
 // TODO(API-24, CHORONG-48 BE): 계산 기록 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const METHOD_LABEL = Object.fromEntries(CALC_METHODS.map((method) => [method.code, method.label]))
@@ -150,13 +150,6 @@ const RailWrap = styled.section`
 const RailTitle = styled.h2`
   font-size: var(--fs-lg);
   font-weight: 800;
-`
-
-const RailHint = styled.p`
-  margin-top: -8px;
-  color: var(--cocoa);
-  font-size: var(--fs-sm);
-  line-height: 1.55;
 `
 
 const RailGroup = styled.details`
@@ -335,7 +328,6 @@ function CalcHistoryRail({ config, items, onLoad, onRemove, onClearAll }) {
   return (
     <RailWrap aria-label="계산 기록">
       <RailTitle>계산 기록</RailTitle>
-      <RailHint>[결과 저장]을 누른 기록이에요. 누르면 그 값으로 다시 계산해요.</RailHint>
       <RailGroup open>
         <summary>
           <span>

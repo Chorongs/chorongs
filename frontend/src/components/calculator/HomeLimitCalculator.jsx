@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import {
   Button,
@@ -50,6 +51,9 @@ import SelectField from '../ui/SelectField'
 //   입력을 바꾸고 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장]은 막음 (화면에 보이는 결과와 저장 값이 다르지 않게)
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-59, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
+//   201(저장 성공), 409(같은 입력의 기록이 이미 있음) → 버튼을 '저장했어요'로 잠금, 409는 오류 알림 대신 '이미 저장한 계산 기록이에요'
+//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음, 2026-11-26 사용자 결정)
+//   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-59 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 // 입력칸 맨 위 안내: 어떤 대출 기준인지
 const Intro = styled.p`
   color: var(--cocoa);
@@ -148,6 +152,8 @@ function HomeLimitCalculator() {
   const [applied, setApplied] = useState(() => withIds(getInitialHome(location.state)))
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  // 저장했거나 서버가 '이미 저장한 기록'이라고 알려 준 계산 값 (applied를 JSON으로, 없으면 null)
+  const [savedKey, setSavedKey] = useState(null)
   const nextLoanId = useRef(form.otherLoans.length + 1)
   const resultRef = useRef(null)
 
@@ -182,7 +188,29 @@ function HomeLimitCalculator() {
   // 결과는 applied로만 계산 (applied는 검사를 통과한 값만 들어옴)
   const result = getHomeResult(applied)
   // 입력을 바꾼 뒤 아직 계산을 안 눌렀는지
-  const isStale = JSON.stringify(form) !== JSON.stringify(applied)
+  const saveKey = JSON.stringify(applied)
+  const isStale = JSON.stringify(form) !== saveKey
+  // 이미 저장한 계산인지 (저장했거나 409를 받은 그 계산 값이 지금 결과와 같고, 입력도 바꾸지 않았을 때)
+  const isSaved = savedKey === saveKey && !isStale
+  const isMember = useAuthStore((state) => state.status === 'member')
+  // 저장 본문 (계산이 안 되면 null)을 글로: 서버에 물어볼 때 씀 (글을 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  const recordKey = result ? JSON.stringify(toHomeRecord(applied, result)) : null
+
+  // 회원이면 이 계산을 이미 저장했는지 서버에 한 번 물어봄 (API-59 check, 추천 결과 저장과 같은 방식): 화면이 열릴 때, 로그인했을 때, 새로 계산했을 때
+  // true면 '저장했어요'로 잠금. 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || recordKey === null || savedKey === saveKey) return undefined
+    let isCancelled = false
+    myApi
+      .checkHomeCalc(JSON.parse(recordKey))
+      .then((saved) => {
+        if (!isCancelled && saved) setSavedKey(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, recordKey, saveKey, savedKey])
 
   // [계산하기]: 검사 → 통과하면 입력칸 값으로 결과를 새로 계산. 결과가 입력 아래로 내려가는 좁은 화면에서는 결과 자리로 내려감
   const handleCalculate = () => {
@@ -201,17 +229,22 @@ function HomeLimitCalculator() {
 
   // [결과 저장] (API-59): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
-    if (isSaving || !result) return
+    if (isSaving || isSaved || !result) return
     setIsSaving(true)
     try {
       await myApi.postHomeCalc(toHomeRecord(applied, result))
+      setSavedKey(saveKey)
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
       onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
+      // 409: 같은 입력의 기록이 이미 있음. 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금
+      if (status === 409) {
+        setSavedKey(saveKey)
+        showToast('이미 저장한 계산 기록이에요')
+      } else if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
@@ -466,9 +499,9 @@ function HomeLimitCalculator() {
               <Icon name="calc" size={16} />
               계산하기
             </Button>
-            <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
-              <Icon name="doc" size={16} />
-              결과 저장
+            <Button $variant="outline" disabled={isSaving || isSaved} onClick={handleSave}>
+              <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+              {isSaved ? '저장했어요' : '결과 저장'}
             </Button>
           </Actions>
         </CalcFormStack>

@@ -1,7 +1,8 @@
-import { Fragment, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useLocation, useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, CalcFormStack, CalcKv, CalcLayout, CalcLinkButton, CalcPanel, EmptyBox, FormLabel } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
@@ -33,6 +34,9 @@ import SelectField from '../ui/SelectField'
 // 화면이 길어지지 않게 대출 줄은 접을 수 있다: 줄마다 제목 줄을 누르거나 줄 아래 [완료]를 누르면 접힘 (제목 줄로 접을 때도 [완료]와 같게, 그 줄에 입력 오류가 있으면 접지 않고 오류 문구를 보임. 접힌 줄은 한 줄 요약만, 제목 줄을 누르면 다시 펼침). [+ 대출 추가]는 앞 줄의 상태를 그대로 두고 새 줄을 펼쳐서 추가
 //   [계산하기]가 입력 오류로 막히면 오류가 있는 줄은 펼쳐서 오류 문구를 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-57, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
+//   201(저장 성공), 409(같은 입력의 기록이 이미 있음) → 버튼을 '저장했어요'로 잠금, 409는 오류 알림 대신 '이미 저장한 계산 기록이에요'
+//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음, 2026-11-26 사용자 결정)
+//   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-57 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 // 대출 한 줄 상자
 const LoanBox = styled.div`
   display: flex;
@@ -232,6 +236,8 @@ function DsrCalculator() {
   const [applied, setApplied] = useState(() => withIds(getInitialDsr(location.state)))
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  // 저장했거나 서버가 '이미 저장한 기록'이라고 알려 준 계산 값 (applied를 JSON으로, 없으면 null)
+  const [savedKey, setSavedKey] = useState(null)
   // 펼쳐 둔 대출 줄의 id 목록: 처음엔 첫 줄만, 줄이 길어지지 않게 나머지는 접어 둠
   const [openIds, setOpenIds] = useState(() => [form.loans[0].id])
   // [완료]를 눌러 본 줄의 id: [계산하기] 전이라도 그 줄은 오류 문구를 보임
@@ -289,7 +295,29 @@ function DsrCalculator() {
   // 결과는 applied로만 계산 (applied는 검사를 통과한 값만 들어옴)
   const result = getDsrResult(applied)
   // 입력을 바꾼 뒤 아직 계산을 안 눌렀는지
-  const isStale = JSON.stringify(form) !== JSON.stringify(applied)
+  const saveKey = JSON.stringify(applied)
+  const isStale = JSON.stringify(form) !== saveKey
+  // 이미 저장한 계산인지 (저장했거나 409를 받은 그 계산 값이 지금 결과와 같고, 입력도 바꾸지 않았을 때)
+  const isSaved = savedKey === saveKey && !isStale
+  const isMember = useAuthStore((state) => state.status === 'member')
+  // 저장 본문 (계산이 안 되면 null)을 글로: 서버에 물어볼 때 씀 (글을 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  const recordKey = result ? JSON.stringify(toDsrRecord(applied, result)) : null
+
+  // 회원이면 이 계산을 이미 저장했는지 서버에 한 번 물어봄 (API-57 check, 추천 결과 저장과 같은 방식): 화면이 열릴 때, 로그인했을 때, 새로 계산했을 때
+  // true면 '저장했어요'로 잠금. 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || recordKey === null || savedKey === saveKey) return undefined
+    let isCancelled = false
+    myApi
+      .checkDsrCalc(JSON.parse(recordKey))
+      .then((saved) => {
+        if (!isCancelled && saved) setSavedKey(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, recordKey, saveKey, savedKey])
 
   // [계산하기]: 검사 → 통과하면 입력칸 값으로 결과를 새로 계산. 결과가 입력 아래로 내려가는 좁은 화면에서는 결과 자리로 내려감
   const handleCalculate = () => {
@@ -313,17 +341,22 @@ function DsrCalculator() {
 
   // [결과 저장] (API-57): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
-    if (isSaving || !result) return
+    if (isSaving || isSaved || !result) return
     setIsSaving(true)
     try {
       await myApi.postDsrCalc(toDsrRecord(applied, result))
+      setSavedKey(saveKey)
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
       onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
+      // 409: 같은 입력의 기록이 이미 있음. 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금
+      if (status === 409) {
+        setSavedKey(saveKey)
+        showToast('이미 저장한 계산 기록이에요')
+      } else if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsSaving(false)
@@ -515,9 +548,9 @@ function DsrCalculator() {
               <Icon name="calc" size={16} />
               계산하기
             </Button>
-            <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
-              <Icon name="doc" size={16} />
-              결과 저장
+            <Button $variant="outline" disabled={isSaving || isSaved} onClick={handleSave}>
+              <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+              {isSaved ? '저장했어요' : '결과 저장'}
             </Button>
           </Actions>
         </CalcFormStack>

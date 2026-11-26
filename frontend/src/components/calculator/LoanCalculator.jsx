@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import { PREPARING_TEXT } from '../../api/axiosInstance'
 import * as myApi from '../../api/myApi'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, CalcFormStack, CalcLayout, CalcPanel, EmptyBox, FormField, FormLabel, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
@@ -40,6 +41,10 @@ import ScheduleTable from './ScheduleTable'
 //   [중도상환 후 방식 카드]는 결과 쪽 선택이라 누르면 바로 다시 계산
 // 입력 검사(E2)는 getCalcErrors: [계산하기]을 누르면 검사해서 오류가 있으면 칸마다 문구를 보이고(그 뒤로는 고치는 대로 갱신) 결과는 그대로 둠. 계산이 안 되는 조건(무한대, 음수)이면 결과를 숨기고 문구
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-24, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
+//   201(저장 성공) → 버튼을 '저장했어요'로 잠금 (같은 계산을 또 누르지 않게, 추천 결과 저장 RC-07과 같음. 2026-11-26 사용자 결정, 명세서 API-24 201에는 없음)
+//   409(같은 입력의 기록이 이미 있음: 다른 탭, 다른 단말기, 기록 불러오기 뒤 다시 저장) → 오류 알림 대신 '이미 저장한 계산 기록이에요' + 버튼을 '저장했어요'로 잠금 (API-24)
+//   잠금은 그 계산 값(params)에만: 입력을 바꿔 [계산하기]를 다시 누르거나 중도상환 후 방식을 바꾸면 풀림
+//   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-24 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 const Actions = styled.div`
   display: flex;
   gap: 8px;
@@ -101,6 +106,8 @@ function LoanCalculator() {
   const [applied, setApplied] = useState(() => createCalcForm(initial))
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  // 저장했거나 서버가 '이미 저장한 기록'이라고 알려 준 계산 값 (params를 JSON으로, 없으면 null)
+  const [savedKey, setSavedKey] = useState(null)
   const resultRef = useRef(null)
 
   const handleChange = (patch) => setForm((prev) => ({ ...prev, ...patch }))
@@ -116,7 +123,29 @@ function LoanCalculator() {
   const methodInterests = schedule ? getMethodInterests(params) : null
   const prepayResults = schedule && applied.method !== 'BULLET' ? getPrepayModeResults(params) : null
   // 입력을 바꾼 뒤 아직 계산을 안 눌렀는지 (계산에 쓰는 값이 달라졌을 때만)
-  const isStale = JSON.stringify(toScheduleParams(form)) !== JSON.stringify(params)
+  const saveKey = JSON.stringify(params)
+  const isStale = JSON.stringify(toScheduleParams(form)) !== saveKey
+  // 이미 저장한 계산인지 (저장했거나 409를 받은 그 계산 값이 지금 결과와 같고, 입력도 바꾸지 않았을 때)
+  const isSaved = savedKey === saveKey && !isStale
+  const isMember = useAuthStore((state) => state.status === 'member')
+  // 저장 본문 (계산이 안 되면 null)을 글로: 서버에 물어볼 때 씀 (글을 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  const recordKey = schedule ? JSON.stringify(toCalcRecord(params, schedule)) : null
+
+  // 회원이면 이 계산을 이미 저장했는지 서버에 한 번 물어봄 (API-24 check, 추천 결과 저장과 같은 방식): 화면이 열릴 때, 로그인했을 때, 새로 계산했을 때
+  // true면 '저장했어요'로 잠금. 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || recordKey === null || savedKey === saveKey) return undefined
+    let isCancelled = false
+    myApi
+      .checkCalc(JSON.parse(recordKey))
+      .then((saved) => {
+        if (!isCancelled && saved) setSavedKey(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, recordKey, saveKey, savedKey])
 
   // [계산하기]: 검사 → 통과하면 입력칸 값으로 결과를 새로 계산. 결과가 입력 아래로 내려가는 좁은 화면에서는 결과 자리로 내려감
   const handleCalculate = () => {
@@ -141,17 +170,22 @@ function LoanCalculator() {
 
   // [결과 저장] (API-24): 입력(옵션 포함)과 결과 값을 보냄. 불러오면 같은 화면이 열리게 옵션도 저장
   const saveResult = async () => {
-    if (isSaving || !schedule) return
+    if (isSaving || isSaved || !schedule) return
     setIsSaving(true)
     try {
       await myApi.postCalc(toCalcRecord(params, schedule))
+      setSavedKey(saveKey)
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
       onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      if (error.isPreparing) showToast(PREPARING_TEXT)
+      // 409: 같은 입력의 기록이 이미 있음. 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (API-24)
+      if (status === 409) {
+        setSavedKey(saveKey)
+        showToast('이미 저장한 계산 기록이에요')
+      } else if (error.isPreparing) showToast(PREPARING_TEXT)
       else if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
@@ -289,9 +323,9 @@ function LoanCalculator() {
                 <Icon name="calc" size={16} />
                 계산하기
               </Button>
-              <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
-                <Icon name="doc" size={16} />
-                결과 저장
+              <Button $variant="outline" disabled={isSaving || isSaved} onClick={handleSave}>
+                <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+                {isSaved ? '저장했어요' : '결과 저장'}
               </Button>
             </Actions>
           </CalcFormStack>
