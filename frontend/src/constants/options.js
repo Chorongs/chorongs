@@ -251,6 +251,59 @@ export const KEYWORD_PRESETS = [
   { name: '청년 전월세', summary: '보증금 / 낮은 금리', keywords: ['사회초년생', '전월세', '낮은 금리'] },
 ]
 
+// ===== 대출 랭킹 (RK-01~02, CHORONG-60, 글자는 가안 기준) =====
+
+// 금융권 4개: 고른 글자를 cat에 그대로 보냄 (전체는 빈 값)
+export const RANKING_CAT_OPTIONS = ['전체', '은행권', '비은행권', '정책금융']
+
+// 기준 탭 4개 (metric). 인기순 = '캐링에서 많이 본 순서' (상세 조회수)
+export const RANKING_METRIC_OPTIONS = [
+  { value: 'rate', label: '금리순' },
+  { value: 'limit', label: '한도순' },
+  { value: 'term', label: '기간순' },
+  { value: 'views', label: '인기순' },
+]
+
+// 순서 (dir): 기준 탭을 바꾸면 그 기준의 기본 순서 (금리순은 낮은 순, 나머지는 높은 순)로 돌아감
+export const RANKING_DIR_VALUES = ['asc', 'desc']
+export const RANKING_DEFAULT_METRIC = 'rate'
+export const RANKING_DEFAULT_DIR = { rate: 'asc', limit: 'desc', term: 'desc', views: 'desc' }
+export const RANKING_MAX = 30 // 목록 최대 개수
+
+// 순서 버튼 2개 (명세서: 낮은 순 / 높은 순, 기준과 상관없이 같은 글자)
+export const RANKING_DIR_OPTIONS = [
+  { value: 'asc', label: '낮은 순' },
+  { value: 'desc', label: '높은 순' },
+]
+
+// 결과 머리 안내 글: [기본 순서, 반대 순서]
+const RANKING_HINT = {
+  rate: ['최저 금리가 낮은 순서예요', '최저 금리가 높은 순서예요'],
+  limit: ['최대 한도가 높은 순서예요', '최대 한도가 낮은 순서예요'],
+  term: ['최대 상환 기간이 긴 순서예요', '최대 상환 기간이 짧은 순서예요'],
+  views: ['캐링에서 많이 본 순서예요 (상세 보기 조회수)', '캐링에서 적게 본 순서예요 (상세 보기 조회수)'],
+}
+
+// 기준 값이 같으면 조회수 많은 쪽이 먼저 나온다는 안내 (인기순은 해당 없음)
+const RANKING_TIE_NOTE = { rate: '금리가', limit: '한도가', term: '기간이' }
+
+// 결과 머리 안내 글: 기준 + 순서 설명, 기준 값이 같을 때 규칙
+export function getRankingHint(metric, dir) {
+  const hints = RANKING_HINT[metric] ?? RANKING_HINT[RANKING_DEFAULT_METRIC]
+  const text = dir === RANKING_DEFAULT_DIR[metric] ? hints[0] : hints[1]
+  const tie = RANKING_TIE_NOTE[metric]
+  return tie ? `${text}. ${tie} 같으면 캐링에서 많이 본 상품이 먼저 나와요` : text
+}
+
+// 주소 값(?cat=&metric=&dir=)은 누구나 바꿀 수 있어서 정해진 값인지 검사: 이상한 값은 기본값
+// cat은 전체면 빈 값, dir이 이상하면 그 기준의 기본 순서
+export function readRankingParams({ cat, metric, dir }) {
+  const safeMetric = RANKING_METRIC_OPTIONS.some((option) => option.value === metric) ? metric : RANKING_DEFAULT_METRIC
+  const safeDir = RANKING_DIR_VALUES.includes(dir) ? dir : RANKING_DEFAULT_DIR[safeMetric]
+  const safeCat = RANKING_CAT_OPTIONS.includes(cat) && cat !== '전체' ? cat : ''
+  return { cat: safeCat, metric: safeMetric, dir: safeDir }
+}
+
 // 관리자 화면 글자표 (AD-03~06, 09~11). 코드 값은 서버 API 시트 그대로 (API-46, 48)
 export const ADMIN_ROLE_LABEL = {
   APPROVER: '승인권자',
