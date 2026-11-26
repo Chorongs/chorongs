@@ -440,7 +440,8 @@ function ProductDetail({ product, onClose }) {
             {pickLabel && <Icon name="close" size={15} />}
           </CompareButton>
         )}
-        <Button onClick={handleCalc}>
+        {/* data-leave-to: 대출 비교 중이면 이동하기 전에 벗어나기 확인 창을 먼저 (Layout) */}
+        <Button data-leave-to="/calc" onClick={handleCalc}>
           이자 계산
           <Icon name="arrow" size={13} />
         </Button>

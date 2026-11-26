@@ -203,4 +203,12 @@ const useCompareStore = create(
   ),
 )
 
+// 담은 상품이 있는 대출 비교 중인 화면: 비교 화면, 또는 비교할 상품을 고르러 나온 상품 찾기
+// 여기서 벗어나려 하면 먼저 확인 창을 띄움 (Layout, 로그아웃)
+export function isComparing(pathname) {
+  const { pair, pickSlot } = useCompareStore.getState()
+  const isOnCompare = pathname === '/compare' || (pickSlot !== null && getComparePage(pathname) === 'search')
+  return isOnCompare && pair.some((id) => id !== null)
+}
+
 export default useCompareStore

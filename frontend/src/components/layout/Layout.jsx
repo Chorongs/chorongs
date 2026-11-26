@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { getCompareProducts } from '../../api/productApi'
-import useCompareStore, { getComparePage } from '../../store/useCompareStore'
+import useCompareStore, { getComparePage, isComparing } from '../../store/useCompareStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
 import LoginRequiredDialog from '../common/LoginRequiredDialog'
@@ -117,13 +117,6 @@ function keepsCompare(to, isPicking) {
   return to === '/compare' || (isPicking && getComparePage(to) === 'search')
 }
 
-// 담은 상품이 있는 대출 비교 중인 화면: 비교 화면, 또는 비교할 상품을 고르러 나온 상품 찾기
-function isComparing(pathname) {
-  const { pair, pickSlot } = useCompareStore.getState()
-  const isOnCompare = pathname === '/compare' || (pickSlot !== null && getComparePage(pathname) === 'search')
-  return isOnCompare && pair.some((id) => id !== null)
-}
-
 // 담은 상품이 사라지는 곳으로 가려 하면 먼저 확인
 function needsLeaveConfirm(from, to) {
   return isComparing(from) && !keepsCompare(to, useCompareStore.getState().pickSlot !== null)
@@ -163,7 +156,8 @@ function CompareLeaveDialog() {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={closeCompareLeave} label="대출 비교 벗어나기 확인" width={pathname.startsWith('/search') ? 480 : 420}>
+    // isTop: 상품 상세 창 안의 [이자 계산]에서도 뜨므로 그 창 위에
+    <Modal isTop isOpen={isOpen} onClose={closeCompareLeave} label="대출 비교 벗어나기 확인" width={pathname.startsWith('/search') ? 480 : 420}>
       {isOpen && (
         <>
           <DialogText $isThin={pathname.startsWith('/search')}>
@@ -200,7 +194,7 @@ function Layout() {
   const closeRecommend = useUiStore((state) => state.closeRecommend)
   const openCompareLeave = useUiStore((state) => state.openCompareLeave)
 
-  // 링크(메뉴, 탭바, 푸터 등)와 data-leave-to를 붙인 버튼(로그인, 로그아웃)은 누른 순간 멈추고 확인 창을 띄움
+  // 링크(메뉴, 탭바, 푸터 등)와 data-leave-to를 붙인 버튼(로그인, 상세 창 [이자 계산])은 누른 순간 멈추고 확인 창을 띄움
   // (새 탭으로 여는 클릭은 벗어나는 것이 아니라 그대로, 다른 사이트 링크는 아래 beforeunload가 맡음)
   useEffect(() => {
     const handleClick = (event) => {
