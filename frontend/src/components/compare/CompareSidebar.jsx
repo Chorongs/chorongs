@@ -12,7 +12,7 @@ import { formatMatchRate } from '../../utils/recommend'
 import Icon from '../ui/Icon'
 
 // CP-07 비교할 상품 고르기: 비교 화면에서 바로 상품 채우기 (구역마다 3개씩 쪽 넘김 + 건수). 모양은 시안과 같게 접었다 펴는 구역
-// 카드를 누르면 빈 칸에 먼저, 둘 다 차 있으면 B를 바꿈. 이미 있는 상품 → '이미 A에 있어요' 알림
+// 카드를 누르면 빈 칸에 먼저, 둘 다 차 있으면 B를 바꿈. 이미 있는 상품 → '이미 상품이 A에 담겨 있어요' 알림 (B 칸이면 B, [+ 비교]의 알림과 같은 문구)
 // 다른 한 상품과 자금 용도나 상환 방식이 안 겹치는 카드는 흐리게 + '용도가(상환 방식이) 달라 비교 불가', 누르면 안 담고 경고 (E15)
 // 추천 상품: useRecommendStore의 result.items를 그대로 보여 줌 (카드에 '추천도 N%' 딱지, 비회원도 가능, 새 API 없음). 추천을 받기 전에는 구역이 안 보임
 // 찜, 최근 본: 회원만 (명세서 CP-07, 비회원이면 구역 안 보임): 요청이 401이면 그 구역을 숨긴다.
@@ -371,7 +371,7 @@ function CompareSidebar({ slotProducts, onPicked }) {
   const handlePick = (product) => {
     const slot = pair[0] === product.productId ? 'A' : pair[1] === product.productId ? 'B' : null
     if (slot) {
-      showToast(`이미 ${slot}에 있어요`)
+      showToast(`이미 상품이 ${slot}에 담겨 있어요`)
       return
     }
     if (otherProduct && !canCompare(product, otherProduct)) {

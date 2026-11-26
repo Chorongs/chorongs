@@ -309,8 +309,8 @@ function ProductRow({ product, from = null, rank = null, matchRate = null, keywo
             aria-pressed={Boolean(pickLabel)}
             onClick={handleCompare}
           >
-            {pickLabel && <Icon name="check" size={15} />}
             {pickLabel ? `${pickLabel} 담음` : isNo ? '비교 불가' : '+ 비교'}
+            {pickLabel && <Icon name="close" size={15} />}
           </CompareButton>
         </CompareCell>
       )}

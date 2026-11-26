@@ -418,6 +418,23 @@ function DetailSearch() {
   const otherItems = pinned ? view.items.filter((item) => item.productId !== pinned.productId) : view.items
   const listItems = pinnedRow ? [pinnedRow, ...otherItems] : otherItems
 
+  // 보여 줄 상품이 없는 이유 안내: 거르는 기준 때문에 모두 빠졌으면(서버가 알려 준 숨긴 개수가 있음) 그 안내, 아니면 조건 안내
+  const renderNoMatch = () => {
+    if (view.hiddenCount > 0) {
+      return <EmptyBox>비교할 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>
+    }
+    return (
+      <EmptyBox>
+        조건에 맞는 상품이 없어요. 위의 조건 칩에서 X를 눌러 하나씩 빼 보세요.
+        {hasConditions && (
+          <Button $variant="outline" $size="sm" onClick={handleReset}>
+            필터 초기화
+          </Button>
+        )}
+      </EmptyBox>
+    )
+  }
+
   const renderResults = () => {
     if (view.status === 'loading') return <EmptyBox role="status">상품을 불러오는 중이에요</EmptyBox>
     if (view.status === 'error') {
@@ -430,7 +447,7 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
-    // 고정한 상품이 있으면 조건에 맞는 다른 상품이 없어도 그 상품은 보여 줌
+    // 고정한 상품이 있으면 조건에 맞는 다른 상품이 없어도 그 상품은 보여 주고, 아래에 이유를 안내
     // 건수는 있는데 이 쪽이 비었으면 없는 쪽 (주소의 page를 직접 고쳤을 때 등)
     if (listItems.length === 0 && tabCount > 0) {
       return (
@@ -442,23 +459,17 @@ function DetailSearch() {
         </EmptyBox>
       )
     }
-    // 거르는 기준 때문에 모두 빠진 경우 (서버가 알려 준 숨긴 개수가 있음)
-    if (listItems.length === 0 && view.hiddenCount > 0) {
-      return <EmptyBox>비교할 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>
-    }
-    if (listItems.length === 0) {
+    if (listItems.length === 0) return renderNoMatch()
+    const list = <ProductList items={listItems} getRowProps={() => ({ keyword: raw.q })} />
+    if (pinnedRow && otherItems.length === 0) {
       return (
-        <EmptyBox>
-          조건에 맞는 상품이 없어요. 위의 조건 칩에서 X를 눌러 하나씩 빼 보세요.
-          {hasConditions && (
-            <Button $variant="outline" $size="sm" onClick={handleReset}>
-              필터 초기화
-            </Button>
-          )}
-        </EmptyBox>
+        <>
+          {list}
+          {renderNoMatch()}
+        </>
       )
     }
-    return <ProductList items={listItems} getRowProps={() => ({ keyword: raw.q })} />
+    return list
   }
 
   return (
@@ -513,6 +524,7 @@ function DetailSearch() {
           <ActiveFilterChips
             q={raw.q}
             selected={used}
+            locked={locked}
             groups={getFilter('fin')?.groups ?? []}
             onRemove={handleRemove}
             onReset={handleReset}

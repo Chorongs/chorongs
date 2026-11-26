@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { getCompareProducts } from '../../api/productApi'
@@ -119,35 +119,36 @@ const CONFLICT_REASON = {
   method: '방금 고른 상품은 상환 방식이 겹치지 않아 함께 비교할 수 없어요.',
 }
 
-// 비교 화면에 상품 하나가 담긴 채로(고르는 중 아님) 다른 상품의 [+ 비교]를 눌렀을 때 (useCompareStore의 pending)
-// 담긴 상품을 받아 와서: 비교할 수 있으면 빈 칸에 담고 바로 비교 화면으로 / 자금 용도나 상환 방식이 안 맞으면 팝업
-//   [담겨진 상품 뺄래요] → 담긴 상품을 빼고 방금 누른 상품을 A에 담아 비교 화면으로 / [담겨진 상품으로 비교] → 담긴 상품은 두고, 그 상품 기준으로 거른 상세 검색(고르는 중)으로
+// 담긴 상품이 있는데(고르는 중 아님) 다른 상품의 [+ 비교]를 눌렀을 때 (useCompareStore의 pending). 담긴 A 상품(A가 비었으면 B)을 받아 옴
+//   하나만 담김: 비교할 수 있으면 팝업 없이 빈 칸에 담고 비교 화면으로 / 자금 용도나 상환 방식이 안 맞으면 팝업
+//   두 상품이 다 담김(pending.isFull): 맞든 안 맞든 같은 팝업 (A 상품 기준)
+//   두 상품이 다 담긴 상태에서 B 상품을 누름(pending.isSameB): B 상품 카드 팝업, [이 상품 기준으로 새로 비교]만 → 그 상품을 A로 옮기고(지금 A는 빠짐) B를 고르는 중
+// 팝업: 담긴 상품 카드 + [새로 담기] → 담긴 상품을 모두 빼고 방금 누른 상품을 A에 담아 비교 화면으로
+//   [이 상품으로 비교] → 그 상품은 두고, 그 상품 기준으로 거른 상세 검색(고르는 중)으로. 두 개 담겼으면 거기서 고른 상품이 B를 바꿈
 //   우측 상단 X, Esc, 바깥 클릭 → 닫기만 (아무것도 안 바뀜)
-// 두 상품이 다 담겨 있을 때(pending.isFull)는 상품 정보 없이 경고만: [취소] / [비교하기](두 상품을 빼고 누른 상품을 A에 담아 비교 화면으로)
-//   상품 상세 창에서 눌러도 위에 뜨게 isTop
 function CompareConflictDialog() {
   const navigate = useNavigate()
   const pending = useCompareStore((state) => state.pending)
   const resolvePending = useCompareStore((state) => state.resolvePending)
   const clearPending = useCompareStore((state) => state.clearPending)
   const closeProduct = useUiStore((state) => state.closeProduct)
-  // 비교할 수 없는 경우만 채움: { pending, product(담긴 상품), slot, block }
+  // 팝업을 띄울 때만 채움: { pending, product(담긴 상품), slot, block(안 맞는 이유, 맞으면 null) }
   const [conflict, setConflict] = useState(null)
   const isOpen = pending !== null && conflict?.pending === pending
-  const isFullOpen = Boolean(pending?.isFull)
 
   useEffect(() => {
-    if (!pending || pending.isFull) return undefined
+    if (!pending) return undefined
     let isCancelled = false
     const { pair } = useCompareStore.getState()
-    const slot = pair[0] === null ? 'B' : 'A'
-    getCompareProducts([pair[0] ?? pair[1]])
+    // 카드에 보여 줄 칸: B 상품을 눌렀거나 B만 담겼으면 B, 나머지는 A
+    const slot = pending.isSameB || pair[0] === null ? 'B' : 'A'
+    getCompareProducts([pair[slot === 'A' ? 0 : 1]])
       .then(([stored]) => {
         if (isCancelled) return
         // 담긴 상품을 더는 볼 수 없으면 비교할 수 없으니 새 상품으로 바꿈
         const isGone = !stored || stored.productStatus === 'HIDDEN'
-        const block = isGone ? null : getCompareBlock(stored, pending.item)
-        if (block === null) {
+        const block = isGone || pending.isSameB ? null : getCompareBlock(stored, pending.item)
+        if (block === null && !pending.isFull && !pending.isSameB) {
           resolvePending(!isGone)
           navigate('/compare')
           return
@@ -167,13 +168,13 @@ function CompareConflictDialog() {
 
   // 팝업이 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
-    if (!isOpen && !isFullOpen) return undefined
+    if (!isOpen) return undefined
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = prevOverflow
     }
-  }, [isOpen, isFullOpen])
+  }, [isOpen])
 
   const handleRemove = () => {
     resolvePending(false)
@@ -181,40 +182,43 @@ function CompareConflictDialog() {
   }
   // 담긴 상품은 두고, 그 상품과 비교할 상품을 고르러 상세 검색으로 (비교 화면의 [비교 상품 고르기]와 같음: 담긴 상품 기준으로 거름)
   const handleKeep = () => {
-    useCompareStore.getState().setPickSlot(conflict.slot === 'A' ? 'B' : 'A', conflict.product)
+    // B 상품을 누른 경우: 그 상품을 A로 옮기고 B를 고름
+    if (conflict.pending.isSameB) useCompareStore.getState().setPair(conflict.product.productId, null)
+    useCompareStore.getState().setPickSlot(conflict.pending.isSameB || conflict.slot === 'A' ? 'B' : 'A', conflict.product)
     clearPending()
     navigate('/search')
   }
 
   return (
-    <>
-      <Modal isOpen={isOpen} onClose={clearPending} label="담긴 상품 확인" width={480}>
-        {isOpen && (
-          <>
-            <DialogText>이미 담겨 있는 상품이 있어요</DialogText>
-            <DialogNote>{CONFLICT_REASON[conflict.block]}</DialogNote>
-            <DialogCard>
-              <CompareCard slot={conflict.slot} product={conflict.product} isReadOnly />
-            </DialogCard>
-            <DialogActions>
+    <Modal isOpen={isOpen} onClose={clearPending} label="담긴 상품 확인" width={480}>
+      {isOpen && (
+        <>
+          <DialogText>{conflict.pending.isSameB ? '이미 상품이 B에 담겨 있어요' : '이미 담겨 있는 상품이 있어요'}</DialogText>
+          {conflict.block && <DialogNote>{CONFLICT_REASON[conflict.block]}</DialogNote>}
+          {conflict.pending.isSameB && (
+            <DialogNote>
+              A에 있던 상품은 빠지고 이 상품이 A가 돼요.
+              <br />
+              그다음 B에 넣을 상품을 새로 골라요.
+            </DialogNote>
+          )}
+          <DialogCard>
+            <CompareCard slot={conflict.slot} product={conflict.product} isReadOnly />
+          </DialogCard>
+          <DialogActions>
+            {!conflict.pending.isSameB && (
               <Button $variant="outline" onClick={handleRemove}>
-                담겨진 상품 뺄래요
+                새로 담기
               </Button>
-              <Button onClick={handleKeep}>담겨진 상품으로 비교</Button>
-            </DialogActions>
-          </>
-        )}
-      </Modal>
-      <Modal isOpen={isFullOpen} onClose={clearPending} label="비교 상품 교체 확인" width={380} isTop showClose={false}>
-        <DialogText>{'대출 비교에 담겨 있던 상품이 사라져요.\n비교하시겠어요?'}</DialogText>
-        <DialogActions>
-          <Button $variant="outline" onClick={clearPending}>
-            취소
-          </Button>
-          <Button onClick={handleRemove}>비교하기</Button>
-        </DialogActions>
-      </Modal>
-    </>
+            )}
+            {/* 담긴 상품을 더는 볼 수 없으면 기준이 못 돼서 빼기만 */}
+            {conflict.product?.productStatus !== 'HIDDEN' && (
+              <Button onClick={handleKeep}>{conflict.pending.isSameB ? '이 상품 기준으로 새로 비교' : '이 상품으로 비교'}</Button>
+            )}
+          </DialogActions>
+        </>
+      )}
+    </Modal>
   )
 }
 
@@ -223,34 +227,14 @@ function Layout() {
   const closeMenu = useUiStore((state) => state.closeMenu)
   const closeProduct = useUiStore((state) => state.closeProduct)
   const closeRecommend = useUiStore((state) => state.closeRecommend)
-  // 비교 화면의 한 칸을 고르는 중(pickSlot)은 비교할 수 있는 화면(상품 찾기, 맞춤 추천, 찜한 대출) 안에서만 이어짐
+  // 비교 화면의 한 칸을 고르는 중(pickSlot)은 버튼([비교 상품 고르기], [다른 상품으로 비교], 팝업의 [이 상품으로 비교])을 눌렀을 때만 켜짐
+  // (메뉴로 이동해서는 켜지지 않음: 직전 화면에 따라 켜지면 같은 메뉴를 눌러도 결과가 달라져서 헷갈림)
+  // 켜진 뒤에는 비교할 수 있는 화면(상품 찾기, 맞춤 추천, 찜한 대출) 안에서만 이어짐
   // (자금 용도와 상환 방식이 맞으면 어느 화면의 상품이든 비교할 수 있어서 이 세 화면 사이는 끊지 않음)
   // 그 밖 화면(랭킹, 계산기, 마이페이지, 비교 화면 등)으로 가면 팝업 없이 끝냄(풀림). 비교 화면 상품은 그대로라 잃는 게 없음. 안 끝내면 나중에 그 화면을 열 때 'A 담음' 표시와 거르기가 남아 있음
-  // 반대로 비교 화면에서 곧바로 그 세 화면으로 왔고 상품이 하나만 담겨 있으면 (버튼이든 메뉴든 똑같이) 고르는 중을 켬
   // 풀린 뒤에는 거르지 않고 전부 보이며, 안 맞는 상품의 [+ 비교]는 담긴 상품 확인 팝업 (CompareConflictDialog)
-  const prevPathRef = useRef(pathname)
   useEffect(() => {
-    const prevPath = prevPathRef.current
-    prevPathRef.current = pathname
-    const { pair, pickSlot, setPickSlot } = useCompareStore.getState()
-    if (getComparePage(pathname) === null) {
-      setPickSlot(null)
-      return
-    }
-    // 비교 화면의 버튼으로 온 경우는 이미 켜져 있어서(pickSlot) 건너뜀
-    const ids = pair.filter((id) => id !== null)
-    if (prevPath !== '/compare' || pickSlot !== null || ids.length !== 1) return
-    const emptySlot = pair[0] === null ? 'A' : 'B'
-    getCompareProducts(ids)
-      .then(([product]) => {
-        const now = useCompareStore.getState()
-        // 받는 사이에 다른 화면으로 갔거나 비교 화면 상품이 바뀌었으면 켜지 않음
-        const isStale = now.pair !== pair || now.pickSlot !== null || getComparePage(window.location.pathname) === null
-        if (isStale || !product || product.productStatus === 'HIDDEN') return
-        now.setPickSlot(emptySlot, product)
-      })
-      // 못 받으면 켜지 않음 (풀린 상태와 같음: [+ 비교]를 누를 때 다시 확인함)
-      .catch(() => {})
+    if (getComparePage(pathname) === null) useCompareStore.getState().setPickSlot(null)
   }, [pathname])
 
   // 고르는 중이면 남겨 둔 상품의 상세를 받아 둠 (상품 찾기가 검색 결과 맨 위에 고정해 보여 줌)

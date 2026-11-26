@@ -11,7 +11,7 @@ import Icon from '../ui/Icon'
 //   소속 세분류가 전부 selected에 있을 때 대분류 칩이 선택된 것으로 그림, 일부만 있으면 글자만 주황 (시안 .part)
 // props: label 줄 이름 / chips [{ value, label, count }] / groups [{ value, label, count, members }] / selected 고른 값 목록
 //   hint 줄 아래 작은 안내 (신용점수 'NICE 기준') / onChange(다음 값 목록)
-//   isLocked: true면 칩을 못 누름 + '비교할 상품 기준으로 고정돼 있어요' (비교할 상품을 고르는 중의 자금 용도, 상환 방법 줄, CHORONG-82)
+//   isLocked: true면 칩을 못 누름 + 켜진 칩의 체크 표시 대신 자물쇠(칩 글자색) + '비교할 상품 기준으로 고정돼 있어요' (비교할 상품을 고르는 중의 자금 용도, 상환 방법 줄, CHORONG-82)
 const Row = styled.div`
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
@@ -77,8 +77,10 @@ const Option = styled.button.attrs({ type: 'button' })`
   &:disabled {
     cursor: default;
   }
+  /* 못 누르는 칩(고정한 줄의 꺼진 칩)은 개수까지 확실히 연하게 */
   &:disabled:not([aria-pressed='true']) {
     color: var(--muted);
+    opacity: 0.4;
   }
 `
 
@@ -139,6 +141,20 @@ const Hint = styled.p`
   }
 `
 
+// 고정돼 켜진 칩 앞의 자물쇠. currentColor라 칩 글자색을 그대로 따라감 (이모지는 색을 못 바꿔서 직접 그림)
+// 뜻은 줄 아래 안내 글이 알려 주므로 화면 낭독기에는 안 읽힘. 적용 조건 칩(ActiveFilterChips)도 같이 씀
+export function LockMark() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true" focusable="false">
+      <rect x="4" y="10.5" width="16" height="11.5" rx="2.5" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+      {/* 열쇠구멍: 동그라미 + 아래로 짧은 선 */}
+      <circle cx="12" cy="15" r="1.7" fill="currentColor" stroke="none" />
+      <path d="M12 15.5v3" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', isLocked = false, onChange }) {
   const hintText = isLocked ? '비교할 상품 기준으로 고정돼 있어요' : hint
   const showToast = useUiStore((state) => state.showToast)
@@ -170,7 +186,7 @@ function FilterRow({ label, chips = [], groups = [], selected = [], hint = '', i
 
   const renderChip = (chip) => (
     <Option key={chip.value} aria-pressed={selected.includes(chip.value)} disabled={isLocked} onClick={() => toggle(chip.value)}>
-      {selected.includes(chip.value) && <Icon name="check" size={15} />}
+      {selected.includes(chip.value) && (isLocked ? <LockMark /> : <Icon name="check" size={15} />)}
       {chip.label ?? chip.value}
       <Count>{chip.count}</Count>
     </Option>

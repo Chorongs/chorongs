@@ -104,7 +104,8 @@ const Numbers = styled.div`
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  small {
+  /* 항목 이름(small)만 위 줄에. 값 안의 단위(만원, %)도 small이라 범위를 좁혀야 줄이 안 바뀜 */
+  & > div > small {
     display: block;
     color: var(--cocoa);
     font-size: var(--fs-xs);
@@ -171,6 +172,7 @@ function CompareCard({ slot, product, otherProduct = null, amountMan, months, me
   const navigate = useNavigate()
   const clearSlot = useCompareStore((state) => state.clearSlot)
   const setPickSlot = useCompareStore((state) => state.setPickSlot)
+  const setPair = useCompareStore((state) => state.setPair)
   const sector = formatTagValues(product, 'SECTOR')
 
   const info = (
@@ -237,10 +239,12 @@ function CompareCard({ slot, product, otherProduct = null, amountMan, months, me
       state: { loanAmount: amountMan * 10000, loanMonths: months, interestRate: midRate, repayMethod },
     })
 
-  // 이 칸의 상품을 다른 상품으로 바꾸러 감 (반대 칸 상품은 그대로). 거기서 [+ 비교]를 누르면 이 칸이 그 상품으로 바뀌고 비교 화면으로 되돌아옴
-  // 반대 칸 상품(otherProduct)은 거기서 용도, 상환 방식이 겹치는 상품만 보이게 거르는 기준 (숨김 상품이면 기준 없음)
+  // 다른 상품을 고르러 감. 반대 칸 상품(otherProduct)이 남고, 고를 칸은 늘 B
+  //   A 카드: 지금 A는 빠지고 B 상품이 A로 올라온 뒤 새 B를 고름 / B 카드: A는 두고 B를 바꿈 (고르기 전까지 B는 그대로)
+  // 거기서 [+ 비교]를 누르면 B에 들어가고 비교 화면으로 되돌아옴. 남는 상품은 용도, 상환 방식이 겹치는 상품만 보이게 거르는 기준 (숨김 상품이면 기준 없음)
   const handleSwap = () => {
-    setPickSlot(slot, otherProduct?.productStatus === 'HIDDEN' ? null : otherProduct)
+    if (slot === 'A' && otherProduct) setPair(otherProduct.productId, null)
+    setPickSlot('B', otherProduct?.productStatus === 'HIDDEN' ? null : otherProduct)
     navigate('/search')
   }
 

@@ -154,7 +154,7 @@ const Tags = styled.div`
   gap: 6px;
 `
 
-// 버튼 줄: [이자 계산] [+ 비교]를 같은 폭, 같은 글자로 (금리가 없어 [이자 계산]이 숨으면 [+ 비교]가 한 줄 전체). 899px 이하는 글자를 줄이고 아이콘은 숨김
+// 버튼 줄: [이자 계산] [+ 비교]를 같은 폭, 같은 글자로 (금리가 없어 [이자 계산]이 숨으면 [+ 비교]가 한 줄 전체). 899px 이하는 글자를 줄이고 아이콘은 숨김 ('A 담음'의 X는 남김)
 // [+ 비교]는 주황 (primary 버튼), 담긴 상품 ('A 담음')과 '비교 불가'는 outline 바탕으로 각자 모양을 유지. 글자는 primary의 큰 글자를 쓰지 않고 [이자 계산]과 같게 맞춤
 const Actions = styled.div`
   display: grid;
@@ -175,7 +175,7 @@ const Actions = styled.div`
       font-size: var(--fs-sm);
     }
 
-    & [data-icon] {
+    & > button:not([aria-pressed='true']) [data-icon] {
       display: none;
     }
   }
@@ -318,8 +318,8 @@ function RecommendCard({ item }) {
           onClick={handleCompare}
           onKeyDown={(event) => event.stopPropagation()}
         >
-          {pickLabel && <Icon name="check" size={15} />}
           {pickLabel ? `${pickLabel} 담음` : isNo ? '비교 불가' : '+ 비교'}
+          {pickLabel && <Icon name="close" size={15} />}
         </CompareButton>
       </Actions>
 

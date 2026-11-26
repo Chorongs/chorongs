@@ -14,7 +14,6 @@ import useUiStore from './useUiStore'
 
 const SAME_PURPOSE_MESSAGE = '자금 용도가 같은 상품끼리만 비교할 수 있어요'
 const SAME_METHOD_MESSAGE = '상환 방식이 겹치는 상품끼리만 비교할 수 있어요'
-
 // 비교할 상품을 담을 수 있는 화면 묶음: 맞춤 추천 / 상품 찾기 / 찜한 대출(MY). 그 밖 화면(랭킹 등)에서는 비교 안 함
 export function getComparePage(pathname) {
   if (typeof pathname !== 'string') return null
@@ -118,7 +117,7 @@ const useCompareStore = create(
       pickSlot: null,
       // 그때 비교 화면에 남아 있던 상품 (용도, 상환 방식이 겹치는지 검사하는 기준. 숨김 상품이라 모르면 null)
       pickBase: null,
-      // 바로 바꾸면 안 되는 새 상품 { item, isFull } (처리 전, 메모리만)
+      // 바로 바꾸면 안 되는 새 상품 { item, isFull, isSameB } (처리 전, 메모리만)
       pending: null,
       // 고르는 중에 남겨 둔 상품의 상세 (검색 결과 맨 위 고정용, 메모리만)
       pickProduct: null,
@@ -132,9 +131,10 @@ const useCompareStore = create(
       // 비교 화면에서 한 칸을 고르러 나온 길(pickSlot)이면: 남은 상품은 그대로 두고 그 칸에 넣음 (그 칸에 있던 상품은 바뀜)
       //   남은 상품과 자금 용도나 상환 방식이 안 겹치면 못 넣고 알림 (E15)
       //   이미 비교 화면에 있는 상품을 누르면 아무것도 안 바꾸고 돌아감 (남겨 둔 상품 'A 담음'을 누르면 고르기를 끄고 이 화면에 그대로)
-      // 고르는 중이 아닌데 상품 하나만 담겨 있고 다른 상품이면: pending에 두고 false (Layout이 비교할 수 있는지 보고 처리)
-      // 두 상품이 다 담겨 있으면: 이미 비교 중인 상품이면 true(바꾸지 않음), 아니면 pending(isFull)에 두고 false (Layout이 경고 팝업)
-      // 비교 화면이 비어 있거나 같은 상품 하나뿐이면 이 상품을 A에 넣음
+      // 고르는 중이 아닌데 이미 담긴 상품이면: '이미 상품이 A(B)에 담겨 있어요' 알림. 단 둘 다 담긴 상태의 B 상품은 pending(isSameB)에 두고 (Layout 팝업). 모두 false
+      // 상품 하나만 담겨 있고 다른 상품이면: pending에 두고 false (Layout이 비교할 수 있는지 보고 처리)
+      // 두 상품이 다 담겨 있으면: pending(isFull)에 두고 false (Layout이 A 상품 카드 팝업)
+      // 비교 화면이 비어 있으면 이 상품을 A에 넣음
       // 비교 화면으로 이동해도 되면 true, 이 화면에 그대로 있어야 하면(알림만 띄움, 고르기를 끔, 확인 대기) false
       startCompare: (product) => {
         const { pair, pickSlot, pickBase } = get()
@@ -158,14 +158,19 @@ const useCompareStore = create(
           set({ pair: next, pickSlot: null, pickBase: null })
           return true
         }
+        // 이미 담긴 상품이면 이 화면에 그대로. 둘 다 담긴 상태의 B 상품만 팝업(B를 A로 옮기고 새 B 고르기), 나머지는 어느 칸인지 알림
+        const index = pair.indexOf(product.productId)
+        if (index !== -1) {
+          if (index === 1 && pair[0] !== null) set({ pending: { item: toCompareItem(product), isSameB: true } })
+          else useUiStore.getState().showToast(`이미 상품이 ${index === 0 ? 'A' : 'B'}에 담겨 있어요`)
+          return false
+        }
         const stored = pair.filter((id) => id !== null)
-        if (stored.length === 1 && stored[0] !== product.productId) {
+        if (stored.length === 1) {
           set({ pending: { item: toCompareItem(product) } })
           return false
         }
         if (stored.length === 2) {
-          // 이미 비교 중인 상품이면 바꿀 것이 없으니 비교 화면으로만 감
-          if (pair.includes(product.productId)) return true
           // 두 상품이 빠지게 되니 먼저 경고 팝업 (Layout)
           set({ pending: { item: toCompareItem(product), isFull: true } })
           return false
@@ -198,9 +203,10 @@ const useCompareStore = create(
         else set({ pair: [idA, id] })
       },
 
+      // 칸 비우기. A를 빼면 B에 있던 상품이 A로 올라옴 (빈 칸은 늘 B)
       clearSlot: (slot) => {
         const [idA, idB] = get().pair
-        set({ pair: slot === 'A' ? [null, idB] : [idA, null] })
+        set({ pair: [slot === 'A' ? idB : idA, null] })
       },
 
     }),
