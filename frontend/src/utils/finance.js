@@ -471,11 +471,15 @@ export const REVERSE_TERMS = [...new Set([...MONTHS_OPTIONS_DEFAULT, ...MONTHS_O
 // 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 상환 방식은 원리금균등 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: '', rate: '', months: '' }
 
-const REVERSE_METHOD_CODES = REPAY_METHODS.map((method) => method.code)
+// 상환 방식은 원리금균등, 원금균등 2개 (2026-11-26 사용자 결정, 명세서 CA-10 '상환 방식 3개'와 다름)
+// 만기일시는 매달 이자만 내서 '매달 갚을 돈'으로 원금이 정해지지 않고(기간과 관계없이 이자 / 월 금리) 금액이 지나치게 크게 나와 뺌
+export const REVERSE_METHODS = REPAY_METHODS.filter((method) => method.code !== 'BULLET')
+const REVERSE_METHOD_CODES = REVERSE_METHODS.map((method) => method.code)
 
 // 다른 화면(MY 계산 기록 [불러오기])이 navigate state로 넘긴 값 → 상환능력 입력칸 처음 값 (CA-01)
 // state: { repayMethod, monthlyPayment 원, interestRate, loanMonths }
 // 칸마다 따로 검사해서 범위 밖이거나 이상한 값은 그 칸만 무시하고 기본값 (금액은 원 그대로, 기간은 1-600 정수)
+// 예전에 만기일시로 저장한 기록은 상환 방식만 원리금균등으로 연다
 export function getInitialReverse(state) {
   const form = { ...REVERSE_DEFAULTS }
   const { amountMin, amountMax, rateMax, monthsMin, monthsMax } = REVERSE_LIMITS
@@ -491,7 +495,6 @@ export function getInitialReverse(state) {
 }
 
 // 상환능력 입력 검사 (E2): 칸 이름별 오류 문구, 오류가 없으면 빈 객체 = 계산할 수 있음
-// 만기일시는 금리가 0%이면 이자가 없어 빌릴 수 있는 돈을 정할 수 없으므로 0%보다 커야 한다
 export function getReverseErrors(form) {
   const errors = {}
   const { amountMin, amountMax, rateMax, monthsMin, monthsMax } = REVERSE_LIMITS
@@ -503,7 +506,6 @@ export function getReverseErrors(form) {
 
   if (isEmptyValue(form.rate)) errors.rate = '연 이자율을 입력해 주세요'
   else if (!isInRange(form.rate, 0, rateMax)) errors.rate = `연 이자율은 0% 이상 ${rateMax}% 이하로 입력해 주세요`
-  else if (form.method === 'BULLET' && form.rate === 0) errors.rate = '만기일시는 연 이자율이 0%보다 커야 계산할 수 있어요'
 
   if (isEmptyValue(form.months)) errors.months = '대출 기간을 입력해 주세요'
   else if (!Number.isInteger(form.months) || !isInRange(form.months, monthsMin, monthsMax)) {
@@ -517,6 +519,8 @@ export function getReverseErrors(form) {
 // 그 금액을 빌렸을 때 총이자는 대출 이자 계산기와 같은 함수(calcPayment)로 계산
 // 결과: { maxLoan, totalInterest, totalPayment, byTerm: [{ months, maxLoan }] (기간별 빌릴 수 있는 금액, 입력한 기간 포함해 짧은 순) } / 입력이 이상하거나 계산이 안 되면 null
 export function getReverseResult(form) {
+  // 원리금균등, 원금균등만 계산 (만기일시 등 다른 방식은 null)
+  if (!REVERSE_METHOD_CODES.includes(form.method)) return null
   const monthlyWon = form.monthly
   const maxLoan = calcMaxLoan(form.method, monthlyWon, form.rate, form.months)
   if (maxLoan === null) return null

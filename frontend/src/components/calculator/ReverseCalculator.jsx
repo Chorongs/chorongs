@@ -7,13 +7,14 @@ import useUiStore from '../../store/useUiStore'
 import { Button, CalcFormStack, CalcLayout, CalcPanel, EmptyBox, FormField, FormLabel, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import {
+  REVERSE_METHODS,
   getInitialReverse,
   getReverseErrors,
   getReverseResult,
   toLoanCalcState,
   toReverseRecord,
 } from '../../utils/finance'
-import { CALC_LIMITS, REPAY_METHODS } from '../../utils/loanMath'
+import { CALC_LIMITS } from '../../utils/loanMath'
 import requireLogin from '../../utils/requireLogin'
 import HBar from '../chart/HBar'
 import Disclaimer from '../common/Disclaimer'
@@ -24,7 +25,7 @@ import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
 
 // CA-10 상환능력 기반 대출 계산기 (SCR-23, /calc/reverse): 매달 갚을 수 있는 돈으로 최대 대출 금액 역산. 계산은 프론트에서 (utils/finance.js)
-// 왼쪽 입력: 상환 방식 3개 → 매달 갚을 돈, 연 이자율, 대출 기간(칩 없이 1-600개월 직접 입력) → [계산하기] [결과 저장]
+// 왼쪽 입력: 상환 방식 2개 (원리금균등, 원금균등, 만기일시는 뺌 2026-11-26 사용자 결정) → 매달 갚을 돈, 연 이자율, 대출 기간(칩 없이 1-600개월 직접 입력) → [계산하기] [결과 저장]
 // 오른쪽 결과: 요약 3칸 (최대 대출 금액, 총 이자, 총 갚는 돈) → 기간별 빌릴 수 있는 금액 → [대출 이자 계산기로 이동] → 고지 (좁은 화면은 입력 아래)
 // 계산 시점은 CA-02와 같다: 입력칸 값(form)과 결과에 쓰는 값(applied)을 나눠 들고, [계산하기]를 눌렀을 때만 form을 applied로 옮긴다.
 //   입력을 바꾸고 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장], [대출 이자 계산기로 이동]은 막음 (화면에 보이는 결과와 저장, 넘기는 값이 다르지 않게)
@@ -79,7 +80,9 @@ const MoveBox = styled.div`
   gap: 8px;
 `
 
-const METHOD_OPTIONS = REPAY_METHODS.map((method) => ({ value: method.code, label: method.label }))
+const METHOD_OPTIONS = REVERSE_METHODS.map((method) => ({ value: method.code, label: method.label }))
+// 고지 문구에 넣을 상환 방식 이름 (원리금균등, 원금균등)
+const METHOD_LABEL = Object.fromEntries(REVERSE_METHODS.map((method) => [method.code, method.label]))
 const MAX_MOVE_AMOUNT = CALC_LIMITS.amountMax
 
 const money = (value) => formatMoney(value, '원')
@@ -87,7 +90,6 @@ const money = (value) => formatMoney(value, '원')
 // 요약 첫 칸 아래 글: 상환 방식에 따라 '매달 갚는 돈'의 뜻이 다름
 function getMonthlyText(method, monthlyWon) {
   if (method === 'EQUAL_P') return `첫 달 ${money(monthlyWon)}을 갚는 기준 (매달 줄어요)`
-  if (method === 'BULLET') return `매달 이자 ${money(monthlyWon)}만 내는 기준`
   return `매달 ${money(monthlyWon)}씩 갚는 기준`
 }
 
@@ -234,22 +236,18 @@ function ReverseCalculator() {
         <SummaryCards items={summaryItems} />
         <section>
           <SectionHeader title="기간별 빌릴 수 있는 금액" description="같은 상환 방식, 이자율로 기간만 바꿔 봤어요." />
-          {applied.method === 'BULLET' ? (
-            <Hint>만기일시는 매달 이자만 내서, 기간과 관계없이 빌릴 수 있는 금액이 같아요.</Hint>
-          ) : (
-            <Bars>
-              {result.byTerm.map((term) => (
-                <HBar
-                  key={term.months}
-                  label={`${term.months}개월`}
-                  value={term.maxLoan}
-                  max={maxByTerm}
-                  valueText={money(term.maxLoan)}
-                  isActive={term.months === applied.months}
-                />
-              ))}
-            </Bars>
-          )}
+          <Bars>
+            {result.byTerm.map((term) => (
+              <HBar
+                key={term.months}
+                label={`${term.months}개월`}
+                value={term.maxLoan}
+                max={maxByTerm}
+                valueText={money(term.maxLoan)}
+                isActive={term.months === applied.months}
+              />
+            ))}
+          </Bars>
         </section>
         <MoveBox>
           <Button $variant="outline" onClick={handleMove}>
@@ -258,7 +256,11 @@ function ReverseCalculator() {
           </Button>
           {isCapped && <Hint>대출 이자 계산기는 최대 {money(MAX_MOVE_AMOUNT)}까지라 그 금액으로 넘겨요.</Hint>}
         </MoveBox>
-        <Disclaimer>실제 한도는 소득, 신용, DSR 규제로 더 작을 수 있어요.</Disclaimer>
+        <Disclaimer>
+          매달 갚을 수 있는 돈을 기준으로 {METHOD_LABEL[applied.method]}으로 갚는다고 보고 거꾸로 계산한 대출 원금이에요
+          {applied.method === 'EQUAL_P' ? ' (원금균등은 가장 많이 내는 첫 달 납입액 기준)' : ''}. 금융기관이 승인하는 한도가 아니며, 실제
+          한도는 소득, 신용, DSR 규제로 더 작을 수 있어요.
+        </Disclaimer>
       </>
     )
   }

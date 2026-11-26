@@ -1,10 +1,11 @@
-import { useState, useSyncExternalStore } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import CalcHistoryList from '../components/calculator/CalcHistoryList'
 import PageHeader from '../components/common/PageHeader'
 import RouteTabs from '../components/common/RouteTabs'
+import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
 import { getInitialCalc } from '../utils/loanMath'
 
@@ -45,6 +46,21 @@ function CalculatorPage() {
   const sideEl = useSyncExternalStore(subscribeNothing, getSideEl, () => null)
   const tab = TABS.find((one) => one.to === location.pathname.replace(/\/$/, '')) ?? TABS[0]
 
+  // 계산기 종류별로 마지막에 받은 기록 목록: 탭을 옮길 때 오른쪽 칸이 비어 화면이 움직이지 않게 먼저 보여 주는 복사본 (2026-11-26 사용자 결정)
+  // 기록 칸이 서버에서 다시 받으면 바꿔 끼우고, 다시 받기가 실패하면 버림 (틀린 목록을 남기지 않음). 저장, 409 판단은 늘 서버 값
+  // owner: 그 목록을 받은 로그인 정보 (다른 회원으로 다시 로그인하면 달라져 버림) / 계산기 화면을 벗어나거나 새로고침하면 사라짐
+  const user = useAuthStore((state) => state.user)
+  const [historyCache, setHistoryCache] = useState({ owner: null, lists: {} })
+  const cachedItems = historyCache.owner === user ? historyCache.lists[tab.kind] : undefined
+  const handleItemsChange = useCallback(
+    (items) =>
+      setHistoryCache((prev) => ({
+        owner: user,
+        lists: { ...(prev.owner === user ? prev.lists : {}), [tab.kind]: items },
+      })),
+    [user, tab.kind],
+  )
+
   const handleSaved = () => setSavedCount((count) => count + 1)
 
   const handleLoad = (item) => {
@@ -62,7 +78,15 @@ function CalculatorPage() {
       </CalcArea>
       {sideEl &&
         createPortal(
-          <CalcHistoryList key={tab.kind} kind={tab.kind} isOnlyWithItems onLoad={handleLoad} refreshKey={savedCount} />,
+          <CalcHistoryList
+            key={tab.kind}
+            kind={tab.kind}
+            isOnlyWithItems
+            onLoad={handleLoad}
+            refreshKey={savedCount}
+            initialItems={cachedItems}
+            onItemsChange={handleItemsChange}
+          />,
           sideEl,
         )}
     </>

@@ -1403,28 +1403,28 @@ describe('getReverseResult (상환능력 기반 대출 계산)', () => {
     expect(result.maxLoan).toBe(10714286)
   })
 
-  it('만기일시의 최대 대출 금액은 매달 이자 / 월 금리이다', () => {
-    // Given 매달 이자 100만원, 연 12%
+  it('만기일시는 상환 방식에서 빼서 계산하지 않고 null이다', () => {
+    // Given 만기일시, 연 12% (2026-11-26 사용자 결정으로 원리금균등, 원금균등만)
     // When
     const result = getReverseResult(makeReverse({ method: 'BULLET', rate: 12 }))
     // Then
-    expect(result.maxLoan).toBe(100000000)
+    expect(result).toBeNull()
   })
 
-  it('만기일시의 총 이자는 매달 이자 x 개월이다', () => {
-    // Given 1억원, 연 12%, 12개월 → 매달 100만원 x 12
+  it('금리 0%이면 총 이자는 0원이다', () => {
+    // Given 원리금균등, 연 0%
     // When
-    const result = getReverseResult(makeReverse({ method: 'BULLET', rate: 12 }))
+    const result = getReverseResult(makeReverse())
     // Then
-    expect(result.totalInterest).toBe(12000000)
+    expect(result.totalInterest).toBe(0)
   })
 
   it('총 갚는 돈은 최대 대출 금액 + 총 이자이다', () => {
-    // Given 1억원, 총 이자 1,200만원
+    // Given 원리금균등, 연 12%
     // When
-    const result = getReverseResult(makeReverse({ method: 'BULLET', rate: 12 }))
+    const result = getReverseResult(makeReverse({ rate: 12 }))
     // Then
-    expect(result.totalPayment).toBe(112000000)
+    expect(result.totalPayment).toBe(result.maxLoan + result.totalInterest)
   })
 
   it('총 이자는 대출 이자 계산기와 같은 상환 계산(calcPayment)으로 구한다', () => {
@@ -1468,18 +1468,18 @@ describe('getReverseResult (상환능력 기반 대출 계산)', () => {
     expect(byTerm[byTerm.length - 1].maxLoan > byTerm[0].maxLoan).toBe(true)
   })
 
-  it('만기일시는 기간별 금액이 모두 같다', () => {
-    // Given 만기일시, 연 12%
+  it('원금균등은 기간이 길수록 더 빌릴 수 있다', () => {
+    // Given 원금균등, 연 12%
     // When
-    const { byTerm } = getReverseResult(makeReverse({ method: 'BULLET', rate: 12 }))
+    const { byTerm } = getReverseResult(makeReverse({ method: 'EQUAL_P', rate: 12 }))
     // Then
-    expect(new Set(byTerm.map((term) => term.maxLoan)).size).toBe(1)
+    expect(byTerm[byTerm.length - 1].maxLoan > byTerm[0].maxLoan).toBe(true)
   })
 
-  it('만기일시에 금리가 0%이면 계산하지 않고 null이다', () => {
-    // Given 만기일시, 연 0%
+  it('모르는 상환 방식이면 계산하지 않고 null이다', () => {
+    // Given 체증식
     // When
-    const result = getReverseResult(makeReverse({ method: 'BULLET' }))
+    const result = getReverseResult(makeReverse({ method: 'GRADUATED', rate: 5 }))
     // Then
     expect(result).toBeNull()
   })
@@ -1534,12 +1534,12 @@ describe('getReverseErrors (상환능력 입력 검사)', () => {
     expect(errors.rate).toBe('연 이자율은 0% 이상 20% 이하로 입력해 주세요')
   })
 
-  it('만기일시는 이자율 0%이면 오류이다', () => {
-    // Given 만기일시, 이자율 0%
+  it('원금균등은 이자율 0%도 오류가 아니다', () => {
+    // Given 원금균등, 이자율 0% (만기일시를 빼면서 0% 규칙도 없앰)
     // When
-    const errors = getReverseErrors(makeReverse({ method: 'BULLET', rate: 0 }))
+    const errors = getReverseErrors(makeReverse({ method: 'EQUAL_P', rate: 0 }))
     // Then
-    expect(errors.rate).toBe('만기일시는 연 이자율이 0%보다 커야 계산할 수 있어요')
+    expect(errors.rate).toBeUndefined()
   })
 
   it('원리금균등은 이자율 0%도 오류가 아니다', () => {
@@ -1640,12 +1640,12 @@ describe('getInitialReverse (넘어온 값 → 상환능력 입력칸 처음 값
     expect(form.months).toBe(120)
   })
 
-  it('만기일시를 받는다', () => {
-    // Given 상환 방식 만기일시
+  it('예전에 만기일시로 저장한 기록은 원리금균등으로 연다', () => {
+    // Given 상환 방식 만기일시 (상환능력 계산기에서 뺌)
     // When
     const form = getInitialReverse({ repayMethod: 'BULLET' })
     // Then
-    expect(form.method).toBe('BULLET')
+    expect(form.method).toBe('EQUAL_PI')
   })
 
   it('체증식은 기본값이다', () => {

@@ -18,6 +18,8 @@ import Modal from '../ui/Modal'
 // - [불러오기]: onLoad(item)이 있으면 그 화면이 처리 (계산기 화면). 없으면 그 계산기 주소(/calc 등)로 이동하며 기록 한 줄을 넘김 (MY 계산 기록)
 // - refreshKey: 바뀌면 목록을 다시 받음 (계산기에서 [결과 저장] 뒤)
 // - kind: 어느 계산기의 기록인지 (LOAN 대출 이자 API-24, CHANGE 갈아타기 API-56, DSR API-57, REVERSE 상환능력 API-58, HOME 집 살 때 대출한도 API-59). 처음 값 LOAN
+// - initialItems: 기억해 둔 목록이 있으면 '불러오는 중' 대신 그 목록으로 시작하고 서버에서 다시 받아 바꿈 (계산기 탭을 옮길 때 칸이 비지 않게)
+// - onItemsChange(items): 목록을 받거나 지울 때마다 알림 (다시 받기가 실패하면 undefined = 기억해 둔 목록을 버림)
 // - isOnlyWithItems: 저장한 기록이 있을 때만 그림 (계산기 화면 오른쪽 칸, CalculatorPage). 비회원, 불러오는 중, 실패, 빈 목록이면 아무것도 안 그림 (2026-11-26 사용자 결정)
 //   모양은 대출 비교의 '비교할 상품 고르기'(CP-07 CompareSidebar)와 같게: 접었다 펴는 상자 ('{계산기 이름} 계산 기록' + 건수, 위 제목 없음) / 카드 3개씩 쪽 넘김. 카드를 누르면 불러오기
 //   카드마다 X (지우기, MY와 같이 확인 창 뒤에, MySection과 같은 알림 글). 전체 지우기는 계산기 화면에 두지 않음 (MY에만, 2026-11-26 사용자 결정)
@@ -378,13 +380,15 @@ function CalcHistoryRail({ config, items, onLoad, onRemove }) {
   )
 }
 
-function CalcHistoryList({ onLoad, refreshKey = 0, kind = 'LOAN', isOnlyWithItems = false }) {
+function CalcHistoryList({ onLoad, refreshKey = 0, kind = 'LOAN', isOnlyWithItems = false, initialItems, onItemsChange }) {
   const config = KINDS[kind] ?? KINDS.LOAN
   const navigate = useNavigate()
   const authStatus = useAuthStore((state) => state.status)
   const isMember = authStatus === 'member'
   const [attempt, setAttempt] = useState(0)
-  const [result, setResult] = useState({ status: 'loading', items: [] })
+  const [result, setResult] = useState(() =>
+    initialItems ? { status: 'done', items: initialItems } : { status: 'loading', items: [] },
+  )
 
   useEffect(() => {
     if (!isMember) return undefined
@@ -392,15 +396,20 @@ function CalcHistoryList({ onLoad, refreshKey = 0, kind = 'LOAN', isOnlyWithItem
     config
       .getList()
       .then((data) => {
-        if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
+        if (isCancelled) return
+        const items = data?.items ?? []
+        setResult({ status: 'done', items })
+        onItemsChange?.(items)
       })
       .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+        if (isCancelled) return
+        setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+        onItemsChange?.(undefined)
       })
     return () => {
       isCancelled = true
     }
-  }, [isMember, attempt, refreshKey, config])
+  }, [isMember, attempt, refreshKey, config, onItemsChange])
 
   const handleRetry = () => {
     setResult({ status: 'loading', items: [] })
@@ -409,12 +418,15 @@ function CalcHistoryList({ onLoad, refreshKey = 0, kind = 'LOAN', isOnlyWithItem
 
   const handleRemove = async (item) => {
     await config.remove(item[config.idKey])
-    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one[config.idKey] !== item[config.idKey]) }))
+    const nextItems = result.items.filter((one) => one[config.idKey] !== item[config.idKey])
+    setResult((prev) => ({ ...prev, items: nextItems }))
+    onItemsChange?.(nextItems)
   }
 
   const handleClearAll = async () => {
     await config.clearAll()
     setResult({ status: 'done', items: [] })
+    onItemsChange?.([])
   }
 
   // 불러오기: onLoad가 있으면 그 화면이 처리 (계산기 화면), 없으면 그 계산기로 기록 한 줄을 그대로 넘겨 이동 (MY, 옵션도 함께 복원, 맞지 않는 값은 계산기가 무시)
