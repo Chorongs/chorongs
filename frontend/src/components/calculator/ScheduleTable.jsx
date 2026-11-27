@@ -1,39 +1,42 @@
-import { useState } from 'react'
 import styled from 'styled-components'
-import { Button } from '../../styles/common'
 import { formatNumber } from '../../utils/format'
 import SectionHeader from '../common/SectionHeader'
 
 // CA-05 회차별 납입 표: 회차 / 납입금 / 원금 / 이자 / 중도상환 / 남은 원금 (금액은 원)
-// 회차가 많으면 처음 12줄만 그리고 [더 보기]로 12줄씩 더 (그리기 부담 줄임). 그래프보다 위
+// 모든 회차를 높이 560px 상자 안에 넣고 상자 안에서 스크롤로 내려 봄, 머리글 줄은 위에 붙어 있음 (2026-11-25 사용자 결정, 명세서 CA-05 '[더 보기]'와 다름, 가안 .table-box는 420px). 560px은 12회차가 한 번에 보이는 높이 (머리글 약 43px + 12줄 x 약 41px), 그 아래 13회차가 살짝 보여 스크롤할 수 있음을 알림. 그래프보다 위
+// 오른쪽 계산 기록 칸이 생겨 결과 열이 좁아져도 가로 스크롤이 안 생기게 최소 폭(520px)을 두지 않고 칸 좌우 여백을 10px로 (2026-11-26 사용자 요청)
 // rows: getSchedule 결과의 rows
-const PAGE_SIZE = 12
-
 const Scroll = styled.div`
-  overflow-x: auto;
+  max-height: 560px;
+  overflow: auto;
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-sm);
 `
 
 const Table = styled.table`
   width: 100%;
-  min-width: 520px;
   border-collapse: collapse;
-  font-size: var(--fs-md);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
   th,
   td {
-    padding: 12px 16px;
     border-bottom: 1px solid var(--line);
-    font-family: var(--f-num);
-    font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
   }
   th {
+    position: sticky;
+    top: 0;
+    padding: 11px 10px;
+    box-shadow: inset 0 -1px 0 var(--line);
     background: var(--mist);
     color: var(--ink-2);
-    font-family: var(--f-ui);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-xs);
+    font-weight: 700;
+  }
+  td {
+    padding: 10px;
+    font-family: var(--f-num);
     font-weight: 700;
   }
   tbody tr:last-child td {
@@ -49,20 +52,10 @@ const Muted = styled.span`
   color: var(--muted);
 `
 
-const More = styled.div`
-  display: flex;
-  justify-content: center;
-  margin-top: 16px;
-`
-
 function ScheduleTable({ rows }) {
-  const [shownCount, setShownCount] = useState(PAGE_SIZE)
-  const shownRows = rows.slice(0, shownCount)
-  const leftCount = rows.length - shownRows.length
-
   return (
     <section>
-      <SectionHeader title="회차별 납입 금액" description="금액은 모두 원 단위예요." />
+      <SectionHeader title="회차별 납입 금액" description={`금액은 모두 원 단위예요. 총 ${rows.length}회차`} />
       <Scroll>
         <Table>
           <thead>
@@ -76,7 +69,7 @@ function ScheduleTable({ rows }) {
             </tr>
           </thead>
           <tbody>
-            {shownRows.map((row) => (
+            {rows.map((row) => (
               <tr key={row.round}>
                 <td>{row.round}</td>
                 <td>{formatNumber(row.payment)}</td>
@@ -89,13 +82,6 @@ function ScheduleTable({ rows }) {
           </tbody>
         </Table>
       </Scroll>
-      {leftCount > 0 && (
-        <More>
-          <Button $variant="outline" onClick={() => setShownCount((count) => count + PAGE_SIZE)}>
-            더 보기 (남은 {leftCount}회차)
-          </Button>
-        </More>
-      )}
     </section>
   )
 }

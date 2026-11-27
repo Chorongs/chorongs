@@ -1,16 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import styled from 'styled-components'
 import { PREPARING_TEXT } from '../../api/axiosInstance'
 import * as myApi from '../../api/myApi'
+import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, FormField, FormLabel, FormStack, Panel, SegmentedFull } from '../../styles/common'
+import { Button, CalcFormStack, CalcLayout, CalcPanel, EmptyBox, FormField, FormLabel, SegmentedFull } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import {
   CALC_METHODS,
   createCalcForm,
   getCalcErrors,
-  getInitialCalc,
   getMethodInterests,
   getPrepayModeResults,
   getSchedule,
@@ -20,11 +20,9 @@ import {
 import requireLogin from '../../utils/requireLogin'
 import Disclaimer from '../common/Disclaimer'
 import SummaryCards from '../common/SummaryCards'
-import ChipGroup from '../ui/ChipGroup'
 import Icon from '../ui/Icon'
 import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
-import CalcHistoryList from './CalcHistoryList'
 import LoanOptions from './LoanOptions'
 import MethodCompare from './MethodCompare'
 import PaymentChart from './PaymentChart'
@@ -32,7 +30,9 @@ import PrepayModeCards from './PrepayModeCards'
 import ScheduleTable from './ScheduleTable'
 
 // CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일, 2026-11-20 사용자 결정)
-// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03) → 금액, 기간 칩, 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장] → 계산 기록(CA-07)
+// 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03, 체크했을 때만 입력칸) → 금액, 상환 기간(직접 입력), 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장]
+// 계산 기록(CA-07)은 CalculatorPage가 오른쪽 칸에 띄움 (저장한 기록이 있을 때만, 2026-11-26 사용자 결정). 저장에 성공하면 Outlet 값의 onSaved()로 목록을 다시 받게 함
+// 기간은 칩 없이 칸에 1-600개월을 직접 적음, 거치 기간도 체크했을 때만 입력 (2026-11-25 사용자 결정, 명세서 CA-02 '상환 기간 칩', CA-03 '거치기간 항상 보임'과 다름)
 // 오른쪽 결과: 요약 3칸 → 중도상환 후 방식 카드(CA-04) → 회차별 표(CA-05) → 그래프, 방식별 총이자(CA-06) (좁은 화면은 입력 아래)
 // 처음 값: CalculatorPage가 navigate state에서 골라 Outlet 값(initial)으로 내려줌. 없으면 기본값
 // 계산 시점 (2026-11-20 사용자 결정, 명세서 CA-02 '숫자 바꾸면 바로 다시 계산'과 다름): 입력할 때마다 결과가 바뀌면 정신없어서 [계산하기]을 눌렀을 때만 결과를 새로 계산한다.
@@ -41,16 +41,10 @@ import ScheduleTable from './ScheduleTable'
 //   [중도상환 후 방식 카드]는 결과 쪽 선택이라 누르면 바로 다시 계산
 // 입력 검사(E2)는 getCalcErrors: [계산하기]을 누르면 검사해서 오류가 있으면 칸마다 문구를 보이고(그 뒤로는 고치는 대로 갱신) 결과는 그대로 둠. 계산이 안 되는 조건(무한대, 음수)이면 결과를 숨기고 문구
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-24, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-const Layout = styled.div`
-  display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
-  gap: 28px;
-  align-items: start;
-  @media (max-width: 899px) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-`
-
+//   201(저장 성공) → 버튼을 '저장했어요'로 잠금 (같은 계산을 또 누르지 않게, 추천 결과 저장 RC-07과 같음. 2026-11-26 사용자 결정, 명세서 API-24 201에는 없음)
+//   409(같은 입력의 기록이 이미 있음: 다른 탭, 다른 단말기, 기록 불러오기 뒤 다시 저장) → 오류 알림 대신 '이미 저장한 계산 기록이에요' + 버튼을 '저장했어요'로 잠금 (API-24)
+//   잠금은 그 계산 값(params)에만: 입력을 바꿔 [계산하기]를 다시 누르거나 중도상환 후 방식을 바꾸면 풀림
+//   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-24 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 const Actions = styled.div`
   display: flex;
   gap: 8px;
@@ -59,10 +53,12 @@ const Actions = styled.div`
   }
 `
 
-const History = styled.div`
-  margin-top: 28px;
-  padding-top: 28px;
-  border-top: 1px solid var(--line-2);
+// 왼쪽 열: 입력 판 (가안 .stack.g20)
+const Left = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 `
 
 const Result = styled.div`
@@ -103,16 +99,18 @@ function getMonthlyNote(method, graceMonths) {
 }
 
 function LoanCalculator() {
-  const { initial } = useOutletContext()
+  const { initial, onSaved } = useOutletContext()
   const showToast = useUiStore((state) => state.showToast)
   // form: 입력칸 값 / applied: 결과에 쓰는 값 ([계산하기]을 누른 때의 form, 처음엔 처음 값)
   const [form, setForm] = useState(() => createCalcForm(initial))
   const [applied, setApplied] = useState(() => createCalcForm(initial))
+  // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
+  const [isCalculated, setIsCalculated] = useState(() => Object.keys(getCalcErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
-  const [termOptions, setTermOptions] = useState(initial.termOptions)
   const [isSaving, setIsSaving] = useState(false)
-  const [historyKey, setHistoryKey] = useState(0)
-  const topRef = useRef(null)
+  // 저장했거나 서버가 '이미 저장한 기록'이라고 알려 준 계산 값 (params를 JSON으로, 없으면 null)
+  const [savedKey, setSavedKey] = useState(null)
   const resultRef = useRef(null)
 
   const handleChange = (patch) => setForm((prev) => ({ ...prev, ...patch }))
@@ -128,7 +126,29 @@ function LoanCalculator() {
   const methodInterests = schedule ? getMethodInterests(params) : null
   const prepayResults = schedule && applied.method !== 'BULLET' ? getPrepayModeResults(params) : null
   // 입력을 바꾼 뒤 아직 계산을 안 눌렀는지 (계산에 쓰는 값이 달라졌을 때만)
-  const isStale = JSON.stringify(toScheduleParams(form)) !== JSON.stringify(params)
+  const saveKey = JSON.stringify(params)
+  const isStale = JSON.stringify(toScheduleParams(form)) !== saveKey
+  // 이미 저장한 계산인지 (저장했거나 409를 받은 그 계산 값이 지금 결과와 같고, 입력도 바꾸지 않았을 때)
+  const isSaved = isCalculated && savedKey === saveKey && !isStale
+  const isMember = useAuthStore((state) => state.status === 'member')
+  // 저장 본문 (계산이 안 되면 null)을 글로: 서버에 물어볼 때 씀 (글을 기준으로 해야 그릴 때마다 다시 묻지 않음)
+  const recordKey = isCalculated && schedule ? JSON.stringify(toCalcRecord(params, schedule)) : null
+
+  // 회원이면 이 계산을 이미 저장했는지 서버에 한 번 물어봄 (API-24 check, 추천 결과 저장과 같은 방식): 화면이 열릴 때, 로그인했을 때, 새로 계산했을 때
+  // true면 '저장했어요'로 잠금. 묻지 못하면 버튼을 그대로 두고 따로 알리지 않음 (누르면 서버가 409로 막음)
+  useEffect(() => {
+    if (!isMember || recordKey === null || savedKey === saveKey) return undefined
+    let isCancelled = false
+    myApi
+      .checkCalc(JSON.parse(recordKey))
+      .then((saved) => {
+        if (!isCancelled && saved) setSavedKey(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, recordKey, saveKey, savedKey])
 
   // [계산하기]: 검사 → 통과하면 입력칸 값으로 결과를 새로 계산. 결과가 입력 아래로 내려가는 좁은 화면에서는 결과 자리로 내려감
   const handleCalculate = () => {
@@ -138,8 +158,11 @@ function LoanCalculator() {
       return
     }
     setApplied(form)
-    if (window.matchMedia('(max-width: 899px)').matches) {
-      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setIsCalculated(true)
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    const resultEl = resultRef.current
+    if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
+      resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -151,17 +174,22 @@ function LoanCalculator() {
 
   // [결과 저장] (API-24): 입력(옵션 포함)과 결과 값을 보냄. 불러오면 같은 화면이 열리게 옵션도 저장
   const saveResult = async () => {
-    if (isSaving || !schedule) return
+    if (isSaving || isSaved || !schedule) return
     setIsSaving(true)
     try {
       await myApi.postCalc(toCalcRecord(params, schedule))
+      setSavedKey(saveKey)
       showToast('계산 결과를 저장했어요. MY의 계산 기록에서 다시 볼 수 있어요')
-      setHistoryKey((count) => count + 1)
+      onSaved?.()
     } catch (error) {
       const status = error.response?.status
       // 401(로그인 풀림)은 axiosInstance가 로그인 안내 창을 띄우므로 알림을 겹쳐 띄우지 않음 (E4)
       if (status === 401) return
-      if (error.isPreparing) showToast(PREPARING_TEXT)
+      // 409: 같은 입력의 기록이 이미 있음. 오류가 아니라 안내하고 버튼을 '저장했어요'로 잠금 (API-24)
+      if (status === 409) {
+        setSavedKey(saveKey)
+        showToast('이미 저장한 계산 기록이에요')
+      } else if (error.isPreparing) showToast(PREPARING_TEXT)
       else if (status === 400) showToast(error.response?.data?.message ?? '입력한 값을 확인해 주세요')
       else showToast('저장하지 못했어요. 다시 시도해 주세요')
     } finally {
@@ -170,6 +198,10 @@ function LoanCalculator() {
   }
 
   const handleSave = () => {
+    if (!isCalculated) {
+      showToast('값을 넣고 [계산하기]를 먼저 눌러 주세요')
+      return
+    }
     if (isStale) {
       showToast('입력을 바꿨어요. [계산하기]를 먼저 눌러 주세요')
       return
@@ -181,20 +213,10 @@ function LoanCalculator() {
     requireLogin(saveResult, '계산 기록 저장은 회원 전용이에요.')
   }
 
-  // 기록 불러오기 (CA-07): 입력칸을 기록 값으로 채우고 (값이 맞으면 결과도 그 값으로 계산) 맨 위로
-  const handleLoad = (item) => {
-    const loaded = getInitialCalc(item)
-    const loadedForm = createCalcForm(loaded)
-    setTermOptions(loaded.termOptions)
-    setForm(loadedForm)
-    setHasTried(false)
-    if (Object.keys(getCalcErrors(loadedForm)).length === 0) setApplied(loadedForm)
-    topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    showToast('기록을 불러왔어요')
-  }
-
   let result
-  if (!schedule) {
+  if (!isCalculated) {
+    result = <EmptyBox>값을 넣고 [계산하기]를 누르면 결과가 보여요.</EmptyBox>
+  } else if (!schedule) {
     result = <EmptyBox>이 조건으로는 계산할 수 없어요. 금리나 증가율을 낮춰 보세요.</EmptyBox>
   } else {
     const summaryItems = [
@@ -234,94 +256,97 @@ function LoanCalculator() {
   }
 
   return (
-    <Layout ref={topRef}>
-      <Panel>
-        <FormStack>
-          <FormField>
-            <FormLabel>상환 방식</FormLabel>
-            <SegmentedFull>
-              <Segmented
-                options={METHOD_OPTIONS}
-                value={form.method}
-                onChange={(method) => handleChange({ method })}
-                isOnPanel
-                label="상환 방식"
-              />
-            </SegmentedFull>
-          </FormField>
+    <CalcLayout>
+      <Left>
+        <CalcPanel>
+          <CalcFormStack>
+            <FormField>
+              <FormLabel>상환 방식</FormLabel>
+              <SegmentedFull>
+                <Segmented
+                  options={METHOD_OPTIONS}
+                  value={form.method}
+                  onChange={(method) => handleChange({ method })}
+                  isOnPanel
+                  label="상환 방식"
+                />
+              </SegmentedFull>
+            </FormField>
 
-          <LoanOptions form={form} errors={errors} onChange={handleChange} />
+            <LoanOptions form={form} errors={errors} onChange={handleChange} />
 
-          <NumberField
-            label="빌릴 금액"
-            unit="만원"
-            value={form.amount}
-            onChange={(amount) => handleChange({ amount })}
-            hasComma
-            isRequired
-            placeholder="예: 1,000"
-            error={errors.amount}
-          />
+            <NumberField
+              isLabelInside
+              label="빌릴 금액"
+              unit="원"
+              value={form.amount}
+              onChange={(amount) => handleChange({ amount })}
+              hasComma
+              showReadable
+              isRequired
+              placeholder="예: 10,000,000"
+              error={errors.amount}
+            />
 
-          <FormField>
-            <FormLabel>상환 기간</FormLabel>
-            <ChipGroup
-              options={termOptions.map((term) => ({ value: term, label: `${term}개월` }))}
+            <NumberField
+              isLabelInside
+              label="상환 기간"
+              unit="개월"
               value={form.months}
               onChange={(months) => handleChange({ months })}
-              label="상환 기간"
+              isRequired
+              placeholder="예: 36"
+              error={errors.months}
             />
-          </FormField>
 
-          <NumberField
-            label="연 이자율"
-            unit="%"
-            decimals={2}
-            value={form.rate}
-            onChange={(rate) => handleChange({ rate })}
-            isRequired
-            placeholder="예: 5.5"
-            error={errors.rate}
-          />
+            <NumberField
+              isLabelInside
+              label="연 이자율"
+              unit="%"
+              decimals={2}
+              value={form.rate}
+              onChange={(rate) => handleChange({ rate })}
+              isRequired
+              placeholder="예: 5.5"
+              error={errors.rate}
+            />
 
-          {form.method === 'GRADUATED' && (
-            <FormField>
-              <NumberField
-                label="연 증가율"
-                unit="%"
-                decimals={2}
-                value={form.growth}
-                onChange={(growth) => handleChange({ growth })}
-                isRequired
-                placeholder="예: 5"
-                error={errors.growth}
-              />
-              <Hint>체증식은 12개월마다 납입액이 이 비율만큼 늘어나요.</Hint>
-            </FormField>
-          )}
+            {form.method === 'GRADUATED' && (
+              <FormField>
+                <NumberField
+                  isLabelInside
+                  label="연 증가율"
+                  unit="%"
+                  decimals={2}
+                  value={form.growth}
+                  onChange={(growth) => handleChange({ growth })}
+                  isRequired
+                  placeholder="예: 5"
+                  error={errors.growth}
+                />
+                <Hint>체증식은 12개월마다 납입액이 이 비율만큼 늘어나요.</Hint>
+              </FormField>
+            )}
 
-          <Actions>
-            <Button onClick={handleCalculate}>
-              <Icon name="calc" size={16} />
-              계산하기
-            </Button>
-            <Button $variant="outline" disabled={isSaving} onClick={handleSave}>
-              <Icon name="doc" size={16} />
-              결과 저장
-            </Button>
-          </Actions>
-        </FormStack>
-
-        <History>
-          <CalcHistoryList onLoad={handleLoad} refreshKey={historyKey} />
-        </History>
-      </Panel>
+            <Actions>
+              <Button onClick={handleCalculate}>
+                <Icon name="calc" size={16} />
+                계산하기
+              </Button>
+              <Button $variant="outline" disabled={isSaving || isSaved} onClick={handleSave}>
+                <Icon name={isSaved ? 'check' : 'doc'} size={16} />
+                {isSaved ? '저장했어요' : '결과 저장'}
+              </Button>
+            </Actions>
+          </CalcFormStack>
+        </CalcPanel>
+      </Left>
 
       <Result ref={resultRef}>
-        {isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
+        {isCalculated && isStale && <StaleNotice>입력을 바꿨어요. [계산하기]를 누르면 결과가 새로 계산돼요.</StaleNotice>}
         {result}
       </Result>
-    </Layout>
+    </CalcLayout>
   )
 }
 
