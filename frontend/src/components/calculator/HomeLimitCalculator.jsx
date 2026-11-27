@@ -40,11 +40,11 @@ import Segmented from '../ui/Segmented'
 import SelectField from '../ui/SelectField'
 
 // CA-11 집 살 때 대출한도 계산기 (SCR-25, /calc/home): 집 살 때 최대 대출 한도. 계산은 프론트에서 (utils/finance.js)
-// 이름은 '내 집 대출한도'에서 바꿈 (2026-11-25 사용자 결정): 이미 가진 집을 담보로 빌리는 경우와 헷갈리지 않게.
+// 이름을 '내 집 대출한도'가 아니라 '집 살 때 대출한도'로 둠: 이미 가진 집을 담보로 빌리는 경우와 헷갈리지 않게.
 //   사려는 집을 담보로 받는 주택담보대출을 처음 받는 경우만 기준 (기존 주택담보대출 잔액은 빼지 않음), 이 안내를 입력칸 맨 위에 보임
-// 다른 대출은 여러 건을 넣을 수 있고 건마다 1년 상환액을 구해 더함 (2026-11-25 사용자 결정)
-// 소득 기준은 DTI가 아니라 은행 DSR 40% (2026-11-25 사용자 결정): 다른 대출은 잔액, 금리로 받아 5년 원리금균등으로 갚는다고 보고 1년 상환액을 뺌. 상환 방식 칸은 없음 (원리금균등 고정)
-// 집값 구간별 대출 상한 (수도권·규제 지역만)과 금리 유형별 스트레스 금리 (변동형 +1.5%p, 혼합형 +1.05%p, 고정형 0, 소득 기준 한도 계산에만 더함)도 반영 (2026-11-25 사용자 결정, 값은 예시)
+// 다른 대출은 여러 건을 넣을 수 있고 건마다 1년 상환액을 구해 더함 (대출을 여러 건 가진 경우 한 건만으로는 DSR이 실제보다 낮게 나옴)
+// 소득 기준은 DTI가 아니라 은행 DSR 40% (은행 대출 심사가 DTI가 아니라 DSR 기준이라서): 다른 대출은 잔액, 금리로 받아 5년 원리금균등으로 갚는다고 보고 1년 상환액을 뺌. 상환 방식 칸은 없음 (원리금균등 고정)
+// 집값 구간별 대출 상한 (수도권·규제 지역만)과 금리 유형별 스트레스 금리 (변동형 +1.5%p, 혼합형 +1.05%p, 고정형 0, 소득 기준 한도 계산에만 더함)도 반영 (실제 한도에 가깝게 보이려고, 값은 예시)
 // 왼쪽 입력: 안내 한 줄 → 집값, 집이 있는 곳, 생애 첫 집 구입, 연소득, 대출 금리, 금리 유형, 대출 기간, 다른 대출이 있어요 (체크하면 다른 대출 줄: 잔액, 금리, 남은 기간, [+ 다른 대출 추가] 최대 10건, [삭제]) → [계산하기] [결과 저장]
 // 오른쪽 결과: 요약 3칸 (최대 대출 한도, 집값 기준 LTV, 소득 기준 DSR) → 상세 3줄 → 고지 (좁은 화면은 입력 아래)
 // 계산 시점은 CA-02와 같다: 입력칸 값(form)과 결과에 쓰는 값(applied)을 나눠 들고, [계산하기]를 눌렀을 때만 form을 applied로 옮긴다.
@@ -52,7 +52,7 @@ import SelectField from '../ui/SelectField'
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-59, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
 //   201(저장 성공), 409(같은 입력의 기록이 이미 있음) → 버튼을 '저장했어요'로 잠금, 409는 오류 알림 대신 '이미 저장한 계산 기록이에요'
-//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음, 2026-11-26 사용자 결정)
+//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음. 입력이 바뀌면 다른 계산이라 다시 저장할 수 있어야 함)
 //   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-59 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 // 입력칸 맨 위 안내: 어떤 대출 기준인지
 const Intro = styled.p`
@@ -151,7 +151,7 @@ function HomeLimitCalculator() {
   const [form, setForm] = useState(() => withIds(getInitialHome(location.state)))
   const [applied, setApplied] = useState(() => withIds(getInitialHome(location.state)))
   // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
-  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (예시 값으로 낸 결과를 내 결과로 오해하지 않게)
   const [isCalculated, setIsCalculated] = useState(() => Object.keys(getHomeErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -224,14 +224,14 @@ function HomeLimitCalculator() {
     }
     setApplied(form)
     setIsCalculated(true)
-    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (두 열이면 결과가 이미 입력 옆에 보이므로 내려가지 않음)
     const resultEl = resultRef.current
     if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
       resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
-  // [결과 저장] (API-59): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
+  // [결과 저장] (API-59): 입력과 결과 값을 보냄 (입력 값은 원 단위로 들고 있어 그대로 보냄, 만원은 입력칸에서만 씀)
   const saveResult = async () => {
     if (isSaving || isSaved || !result) return
     setIsSaving(true)
@@ -342,13 +342,14 @@ function HomeLimitCalculator() {
           <NumberField
             isLabelInside
             label="집값"
-            unit="원"
+            unit="만원"
+            isManwon
             value={form.housePrice}
             onChange={(housePrice) => handleChange({ housePrice })}
             hasComma
             showReadable
             isRequired
-            placeholder="예: 500,000,000"
+            placeholder="예: 50,000"
             error={errors.housePrice}
           />
           <FormField>
@@ -373,13 +374,14 @@ function HomeLimitCalculator() {
           <NumberField
             isLabelInside
             label="연소득"
-            unit="원"
+            unit="만원"
+            isManwon
             value={form.annualIncome}
             onChange={(annualIncome) => handleChange({ annualIncome })}
             hasComma
             showReadable
             isRequired
-            placeholder="예: 60,000,000"
+            placeholder="예: 6,000"
             error={errors.annualIncome}
           />
           <NumberField
@@ -458,12 +460,13 @@ function HomeLimitCalculator() {
                       isLabelInside
                       isCompact
                       label="잔액"
-                      unit="원"
+                      unit="만원"
+                      isManwon
                       value={loan.balance}
                       onChange={(balance) => handleOtherLoanChange(loan.id, { balance })}
                       hasComma
                       showReadable
-                      placeholder="예: 30,000,000"
+                      placeholder="예: 3,000"
                       error={loanErrors.balance}
                     />
                     <NumberField

@@ -103,7 +103,7 @@ export async function deleteCalcs() {
   await api.delete('/api/me/calcs')
 }
 
-// API-24 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+// API-24 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식. 결과를 보여 줄 때 이미 저장한 계산이면 [결과 저장]을 처음부터 잠그려고 씀)
 export async function checkCalc(body) {
   const response = await api.post('/api/me/calcs/check', body)
   return response.data.data
@@ -130,7 +130,7 @@ export async function deleteChangeCalcs() {
   await api.delete('/api/me/change-calcs')
 }
 
-// API-56 갈아타기 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+// API-56 갈아타기 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식. 결과를 보여 줄 때 이미 저장한 계산이면 [결과 저장]을 처음부터 잠그려고 씀)
 export async function checkChangeCalc(body) {
   const response = await api.post('/api/me/change-calcs/check', body)
   return response.data.data
@@ -157,7 +157,7 @@ export async function deleteHomeCalcs() {
   await api.delete('/api/me/home-calcs')
 }
 
-// API-59 내 집 대출한도 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+// API-59 내 집 대출한도 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식. 결과를 보여 줄 때 이미 저장한 계산이면 [결과 저장]을 처음부터 잠그려고 씀)
 export async function checkHomeCalc(body) {
   const response = await api.post('/api/me/home-calcs/check', body)
   return response.data.data
@@ -184,7 +184,7 @@ export async function deleteReverseCalcs() {
   await api.delete('/api/me/reverse-calcs')
 }
 
-// API-58 상환능력 기반 대출 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+// API-58 상환능력 기반 대출 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식. 결과를 보여 줄 때 이미 저장한 계산이면 [결과 저장]을 처음부터 잠그려고 씀)
 export async function checkReverseCalc(body) {
   const response = await api.post('/api/me/reverse-calcs/check', body)
   return response.data.data
@@ -211,7 +211,7 @@ export async function deleteDsrCalcs() {
   await api.delete('/api/me/dsr-calcs')
 }
 
-// API-57 DSR 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+// API-57 DSR 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식. 결과를 보여 줄 때 이미 저장한 계산이면 [결과 저장]을 처음부터 잠그려고 씀)
 export async function checkDsrCalc(body) {
   const response = await api.post('/api/me/dsr-calcs/check', body)
   return response.data.data

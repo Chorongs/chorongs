@@ -23,7 +23,7 @@ import Segmented from '../ui/Segmented'
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-56, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
 //   201(저장 성공), 409(같은 입력의 기록이 이미 있음) → 버튼을 '저장했어요'로 잠금, 409는 오류 알림 대신 '이미 저장한 계산 기록이에요'
-//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음, 2026-11-26 사용자 결정)
+//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음. 입력이 바뀌면 다른 계산이라 다시 저장할 수 있어야 함)
 //   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-56 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 const GroupTitle = styled.h3`
   color: var(--ink);
@@ -91,7 +91,7 @@ function ChangeCalculator() {
   const [form, setForm] = useState(() => getInitialChange(location.state))
   const [applied, setApplied] = useState(() => getInitialChange(location.state))
   // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
-  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (예시 값으로 낸 결과를 내 결과로 오해하지 않게)
   const [isCalculated, setIsCalculated] = useState(() => Object.keys(getChangeErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -142,14 +142,14 @@ function ChangeCalculator() {
     }
     setApplied(form)
     setIsCalculated(true)
-    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (두 열이면 결과가 이미 입력 옆에 보이므로 내려가지 않음)
     const resultEl = resultRef.current
     if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
       resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
-  // [결과 저장] (API-56): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
+  // [결과 저장] (API-56): 입력과 결과 값을 보냄 (입력 값은 원 단위로 들고 있어 그대로 보냄, 만원은 입력칸에서만 씀)
   const saveResult = async () => {
     if (isSaving || isSaved || !result) return
     setIsSaving(true)
@@ -254,13 +254,14 @@ function ChangeCalculator() {
           <NumberField
             isLabelInside
             label="남은 대출금"
-            unit="원"
+            unit="만원"
+            isManwon
             value={form.balance}
             onChange={(balance) => handleChange({ balance })}
             hasComma
             showReadable
             isRequired
-            placeholder="예: 50,000,000"
+            placeholder="예: 5,000"
             error={errors.balance}
           />
           <NumberField
@@ -337,12 +338,13 @@ function ChangeCalculator() {
             <NumberField
               isLabelInside
               label="기타 비용"
-              unit="원"
+              unit="만원"
+              isManwon
               value={form.etcCost}
               onChange={(etcCost) => handleChange({ etcCost })}
               hasComma
               showReadable
-              placeholder="예: 500,000"
+              placeholder="예: 50"
               error={errors.etcCost}
             />
             <Hint>기타 비용은 인지세, 보증료처럼 새 대출 때 드는 돈이에요.</Hint>

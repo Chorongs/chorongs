@@ -29,19 +29,19 @@ import PaymentChart from './PaymentChart'
 import PrepayModeCards from './PrepayModeCards'
 import ScheduleTable from './ScheduleTable'
 
-// CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일, 2026-11-20 사용자 결정)
+// CA-02 대출 이자 계산기 (SCR-06, /calc): 월 상환액, 총이자 계산. 계산은 프론트에서 (utils/loanMath.js), [계산하기]를 누르면 계산 (버튼 이름은 계산기가 여러 개라 '계산하기'로 통일)
 // 왼쪽 입력: 상환 방식 4개 → 옵션(거치, 중도상환, 금리 변동, CA-03, 체크했을 때만 입력칸) → 금액, 상환 기간(직접 입력), 연 이자율 (체증식은 연 증가율도) → [계산하기] [결과 저장]
-// 계산 기록(CA-07)은 CalculatorPage가 오른쪽 칸에 띄움 (저장한 기록이 있을 때만, 2026-11-26 사용자 결정). 저장에 성공하면 Outlet 값의 onSaved()로 목록을 다시 받게 함
-// 기간은 칩 없이 칸에 1-600개월을 직접 적음, 거치 기간도 체크했을 때만 입력 (2026-11-25 사용자 결정, 명세서 CA-02 '상환 기간 칩', CA-03 '거치기간 항상 보임'과 다름)
+// 계산 기록(CA-07)은 CalculatorPage가 오른쪽 칸에 띄움 (저장한 기록이 있을 때만: 빈 상자가 자리를 차지하지 않게). 저장에 성공하면 Outlet 값의 onSaved()로 목록을 다시 받게 함
+// 기간은 칩 없이 칸에 1-600개월을 직접 적음, 거치 기간도 체크했을 때만 입력 (명세서 CA-02 '상환 기간 칩', CA-03 '거치기간 항상 보임'과 다름: 칩에 없는 기간도 넣을 수 있게, 거치를 쓰지 않으면 칸이 늘지 않게)
 // 오른쪽 결과: 요약 3칸 → 중도상환 후 방식 카드(CA-04) → 회차별 표(CA-05) → 그래프, 방식별 총이자(CA-06) (좁은 화면은 입력 아래)
 // 처음 값: CalculatorPage가 navigate state에서 골라 Outlet 값(initial)으로 내려줌. 없으면 기본값
-// 계산 시점 (2026-11-20 사용자 결정, 명세서 CA-02 '숫자 바꾸면 바로 다시 계산'과 다름): 입력할 때마다 결과가 바뀌면 정신없어서 [계산하기]을 눌렀을 때만 결과를 새로 계산한다.
+// 계산 시점 (명세서 CA-02 '숫자 바꾸면 바로 다시 계산'과 다름): 입력할 때마다 결과가 바뀌면 정신없어서 [계산하기]을 눌렀을 때만 결과를 새로 계산한다.
 //   입력칸 값(form)과 결과에 쓰는 값(applied)을 나눠 들고, 버튼을 누르면 form을 applied로 옮김. 열자마자 처음 값으로 한 번 계산해 보여 줌
 //   입력을 바꾼 뒤 아직 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장]은 막음 (화면에 보이는 결과와 저장 값이 다르지 않게)
 //   [중도상환 후 방식 카드]는 결과 쪽 선택이라 누르면 바로 다시 계산
 // 입력 검사(E2)는 getCalcErrors: [계산하기]을 누르면 검사해서 오류가 있으면 칸마다 문구를 보이고(그 뒤로는 고치는 대로 갱신) 결과는 그대로 둠. 계산이 안 되는 조건(무한대, 음수)이면 결과를 숨기고 문구
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-24, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
-//   201(저장 성공) → 버튼을 '저장했어요'로 잠금 (같은 계산을 또 누르지 않게, 추천 결과 저장 RC-07과 같음. 2026-11-26 사용자 결정, 명세서 API-24 201에는 없음)
+//   201(저장 성공) → 버튼을 '저장했어요'로 잠금 (같은 계산을 또 누르지 않게, 추천 결과 저장 RC-07과 같음. 명세서 API-24 201에는 없음)
 //   409(같은 입력의 기록이 이미 있음: 다른 탭, 다른 단말기, 기록 불러오기 뒤 다시 저장) → 오류 알림 대신 '이미 저장한 계산 기록이에요' + 버튼을 '저장했어요'로 잠금 (API-24)
 //   잠금은 그 계산 값(params)에만: 입력을 바꿔 [계산하기]를 다시 누르거나 중도상환 후 방식을 바꾸면 풀림
 //   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-24 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
@@ -105,7 +105,7 @@ function LoanCalculator() {
   const [form, setForm] = useState(() => createCalcForm(initial))
   const [applied, setApplied] = useState(() => createCalcForm(initial))
   // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
-  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (예시 값으로 낸 결과를 내 결과로 오해하지 않게)
   const [isCalculated, setIsCalculated] = useState(() => Object.keys(getCalcErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -159,7 +159,7 @@ function LoanCalculator() {
     }
     setApplied(form)
     setIsCalculated(true)
-    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (두 열이면 결과가 이미 입력 옆에 보이므로 내려가지 않음)
     const resultEl = resultRef.current
     if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
       resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -278,13 +278,14 @@ function LoanCalculator() {
             <NumberField
               isLabelInside
               label="빌릴 금액"
-              unit="원"
+              unit="만원"
+              isManwon
               value={form.amount}
               onChange={(amount) => handleChange({ amount })}
               hasComma
               showReadable
               isRequired
-              placeholder="예: 10,000,000"
+              placeholder="예: 1,000"
               error={errors.amount}
             />
 
