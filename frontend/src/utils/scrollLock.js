@@ -16,6 +16,8 @@ export function lockScroll() {
   body.style.height = '100vh'
   body.style.overflow = 'hidden'
   body.scrollTop = savedY
+  // 비워 둔 스크롤바 자리도 뒤 화면처럼 흐리게 (GlobalStyle html[data-scroll-locked])
+  document.documentElement.setAttribute('data-scroll-locked', '')
 }
 
 export function unlockScroll() {
@@ -25,5 +27,6 @@ export function unlockScroll() {
   const { body } = document
   body.style.height = ''
   body.style.overflow = ''
+  document.documentElement.removeAttribute('data-scroll-locked')
   window.scrollTo(0, window.location.pathname === savedPath ? savedY : 0)
 }
