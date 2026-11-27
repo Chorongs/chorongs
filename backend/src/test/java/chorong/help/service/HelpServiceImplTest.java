@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -19,16 +21,29 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.mock.web.MockHttpSession;
 
+import chorong.common.dto.LoginMemberDTO;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
 import chorong.common.util.MemoryCache;
+import chorong.common.util.SessionConst;
+import chorong.help.dto.FeedbackRequestDTO;
 import chorong.help.dto.HelpContentResponseDTO;
+import chorong.help.dto.QuestionRequestDTO;
+import chorong.help.dto.TermAddRequestDTO;
 import chorong.help.entity.HelpContent;
+import chorong.help.entity.HelpQuestion;
 import chorong.help.entity.HelpStat;
 import chorong.help.entity.HelpType;
+import chorong.help.entity.QuestionStatus;
+import chorong.help.entity.TermRequest;
+import chorong.help.entity.Vote;
 import chorong.help.repository.HelpContentRepository;
+import chorong.help.repository.HelpQuestionRepository;
 import chorong.help.repository.HelpStatRepository;
+import chorong.help.repository.TermRequestRepository;
 
 /*
  * HelpServiceImpl 테스트: getTerms (HELP-02 용어 사전), getTips (HELP-03 금융 TIP), getFaqs (HELP-01 자주 묻는 질문)
@@ -37,6 +52,12 @@ import chorong.help.repository.HelpStatRepository;
  *   + help_stat.targetKey는 helpId (helpNo 아님)
  * 열기(openFaq) 기대값 출처: be_help.md HELP-01 (help_stat open_count + 1, 없으면 행 추가)
  *   + 담당자 결정: 없는 helpId, FAQ가 아닌 helpId는 404
+ * 용어 추가 요청(addTermRequest) 기대값 출처: be_help.md HELP-07 (같은 단어면 request_count + 1, last_requested_at 갱신 / 없으면 추가)
+ *   + be_common.md B15 (앞뒤 공백 제거, 글자 그대로 저장)
+ * 질문 남기기(addQuestion) 기대값 출처: be_help.md HELP-05 (공백 제거 후 4~300자 아니면 400, 회원이면 member_yn Y,
+ *   상태 PENDING, 글 그대로 저장)
+ * 도움말 평가(addFeedback) 기대값 출처: be_help.md HELP-06 (UP은 helpful_count, DOWN은 unhelpful_count + 1,
+ *   cancel이면 - 1, 0 밑으로 안 내림, 없으면 행 추가) + 담당자 결정: 대상이 없거나 종류가 다르면 404
  *   + 열기 주소의 {id}가 helpId이므로 FAQ 목록에 helpId를 담음 (담당자 확인, 명세서 응답 값에는 아직 없음)
  * TIP 기대값 출처: be_help.md HELP-03 (제목, 요약, 자세히, 키워드) + be_common.md B10, MemoryCache 설명
  *   (TIP은 메모리 캐시, 상품 반영 때 비우는 칸은 추천, 랭킹, 필터 칩, 용어이고 TIP은 아님)
@@ -50,6 +71,8 @@ class HelpServiceImplTest {
 
 	private HelpContentRepository helpContentRepository;
 	private HelpStatRepository helpStatRepository;
+	private TermRequestRepository termRequestRepository;
+	private HelpQuestionRepository helpQuestionRepository;
 	private MemoryCache memoryCache;
 	private HelpServiceImpl helpService;
 
@@ -57,8 +80,11 @@ class HelpServiceImplTest {
 	void setUp() {
 		helpContentRepository = mock(HelpContentRepository.class);
 		helpStatRepository = mock(HelpStatRepository.class);
+		termRequestRepository = mock(TermRequestRepository.class);
+		helpQuestionRepository = mock(HelpQuestionRepository.class);
 		memoryCache = new MemoryCache();
-		helpService = new HelpServiceImpl(helpContentRepository, memoryCache, helpStatRepository);
+		helpService = new HelpServiceImpl(helpContentRepository, memoryCache, helpStatRepository, termRequestRepository,
+				helpQuestionRepository);
 	}
 
 	private static HelpContent term(int helpNo, String title, String... keywords) {
@@ -699,7 +725,8 @@ class HelpServiceImplTest {
 		HelpStat stat = HelpStat.builder().targetKey(targetKey).openCount(openCount).build();
 		helpStatRepository = mock(HelpStatRepository.class, invocation ->
 				Arrays.asList(invocation.getArguments()).contains(targetKey) ? Optional.of(stat) : Optional.empty());
-		helpService = new HelpServiceImpl(helpContentRepository, memoryCache, helpStatRepository);
+		helpService = new HelpServiceImpl(helpContentRepository, memoryCache, helpStatRepository, termRequestRepository,
+				helpQuestionRepository);
 	}
 
 	@Test
@@ -784,7 +811,7 @@ class HelpServiceImplTest {
 	// helpId 201인 FAQ가 있고, +1 쿼리가 바꾼 행 수가 changedRows인 상태
 	private void givenOpenTarget(int changedRows) {
 		when(helpContentRepository.findByHelpTypeAndHelpId(HelpType.FAQ, 201L)).thenReturn(Optional.of(faq(1, "가입")));
-		when(helpStatRepository.increaseViewCount("201")).thenReturn(changedRows);
+		when(helpStatRepository.increaseOpenCount("201")).thenReturn(changedRows);
 	}
 
 	private HelpStat savedStat() {
@@ -824,7 +851,7 @@ class HelpServiceImplTest {
 		helpService.openFaq(201L);
 
 		// Then
-		verify(helpStatRepository).increaseViewCount("201");
+		verify(helpStatRepository).increaseOpenCount("201");
 	}
 
 	@Test
@@ -907,5 +934,539 @@ class HelpServiceImplTest {
 
 		// Then
 		verify(helpContentRepository, times(2)).findByHelpTypeOrderByHelpNoAsc(HelpType.FAQ);
+	}
+
+	// ========== HELP-07 용어 추가 요청 (addTermRequest) ==========
+
+	private static final LocalDateTime OLD = LocalDateTime.of(2026, 1, 1, 9, 0);
+
+	// "DSR"을 이미 3번 요청받은 상태
+	private TermRequest givenRequestedWord() {
+		TermRequest saved = TermRequest.builder().requestId(1L).termWord("DSR").requestCount(3)
+				.createdAt(OLD).lastRequestedAt(OLD).build();
+		when(termRequestRepository.findByTermWord("DSR")).thenReturn(Optional.of(saved));
+		return saved;
+	}
+
+	private TermRequest savedRequest() {
+		ArgumentCaptor<TermRequest> captor = ArgumentCaptor.forClass(TermRequest.class);
+		verify(termRequestRepository).save(captor.capture());
+		return captor.getValue();
+	}
+
+	@Test
+	void 처음_요청한_단어는_새_행으로_저장한다() {
+		// Given (같은 단어 없음)
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		assertEquals("DSR", savedRequest().getTermWord());
+	}
+
+	@Test
+	void 새_행의_요청_횟수는_1이다() {
+		// Given (같은 단어 없음)
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		assertEquals(1, savedRequest().getRequestCount());
+	}
+
+	@Test
+	void 새_행에는_처음_요청_시각과_최근_요청_시각을_담는다() {
+		// Given (같은 단어 없음)
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		TermRequest saved = savedRequest();
+		assertNotNull(saved.getCreatedAt());
+		assertNotNull(saved.getLastRequestedAt());
+	}
+
+	@Test
+	void 앞뒤_공백을_지우고_저장한다() {
+		// Given (같은 단어 없음)
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("  DSR  "));
+
+		// Then
+		assertEquals("DSR", savedRequest().getTermWord());
+	}
+
+	@Test
+	void 요청_단어의_태그_글자는_바꾸지_않고_저장한다() {
+		// Given (같은 단어 없음)
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("<b>총부채 원리금</b>"));
+
+		// Then
+		assertEquals("<b>총부채 원리금</b>", savedRequest().getTermWord());
+	}
+
+	@Test
+	void 같은_단어면_요청_횟수가_1_늘어난다() {
+		// Given
+		TermRequest saved = givenRequestedWord();
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		assertEquals(4, saved.getRequestCount());
+	}
+
+	@Test
+	void 앞뒤_공백만_다른_단어도_같은_단어로_센다() {
+		// Given
+		TermRequest saved = givenRequestedWord();
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO(" DSR "));
+
+		// Then
+		assertEquals(4, saved.getRequestCount());
+	}
+
+	@Test
+	void 같은_단어면_최근_요청_시각을_갱신한다() {
+		// Given
+		TermRequest saved = givenRequestedWord();
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		assertTrue(saved.getLastRequestedAt().isAfter(OLD));
+	}
+
+	@Test
+	void 같은_단어면_처음_요청_시각은_그대로다() {
+		// Given
+		TermRequest saved = givenRequestedWord();
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		assertEquals(OLD, saved.getCreatedAt());
+	}
+
+	@Test
+	void 같은_단어면_새_행을_만들지_않는다() {
+		// Given
+		givenRequestedWord();
+
+		// When
+		helpService.addTermRequest(new TermAddRequestDTO("DSR"));
+
+		// Then
+		verify(termRequestRepository, never()).save(any(TermRequest.class));
+	}
+
+	// ========== HELP-05 질문 남기기 (addQuestion) ==========
+
+	private static MockHttpSession memberSession() {
+		MockHttpSession session = new MockHttpSession();
+		session.setAttribute(SessionConst.LOGIN_MEMBER, new LoginMemberDTO(7L, "회원", "1990", "01-01"));
+		return session;
+	}
+
+	private void ask(String content) {
+		helpService.addQuestion(new QuestionRequestDTO(content), null);
+	}
+
+	private HelpQuestion savedQuestion() {
+		ArgumentCaptor<HelpQuestion> captor = ArgumentCaptor.forClass(HelpQuestion.class);
+		verify(helpQuestionRepository).save(captor.capture());
+		return captor.getValue();
+	}
+
+	private void assertInvalidQuestion(String content) {
+		BusinessException e = assertThrows(BusinessException.class, () -> ask(content));
+		assertEquals(ErrorCode.INVALID_INPUT, e.getErrorCode());
+	}
+
+	@Test
+	void 비회원의_질문도_저장한다() {
+		// Given (세션 없음)
+
+		// When
+		ask("대출 비교는 어떻게 하나요");
+
+		// Then
+		assertEquals("대출 비교는 어떻게 하나요", savedQuestion().getContent());
+	}
+
+	@Test
+	void 세션이_없으면_회원_여부는_N이다() {
+		// Given (세션 없음)
+
+		// When
+		ask("질문 있어요");
+
+		// Then
+		assertEquals("N", String.valueOf(savedQuestion().getMemberYn()));
+	}
+
+	@Test
+	void 로그인하지_않은_세션이면_회원_여부는_N이다() {
+		// Given
+		MockHttpSession session = new MockHttpSession();
+
+		// When
+		helpService.addQuestion(new QuestionRequestDTO("질문 있어요"), session);
+
+		// Then
+		assertEquals("N", String.valueOf(savedQuestion().getMemberYn()));
+	}
+
+	@Test
+	void 로그인한_회원이면_회원_여부는_Y다() {
+		// Given
+		MockHttpSession session = memberSession();
+
+		// When
+		helpService.addQuestion(new QuestionRequestDTO("질문 있어요"), session);
+
+		// Then
+		assertEquals("Y", String.valueOf(savedQuestion().getMemberYn()));
+	}
+
+	@Test
+	void 새_질문의_상태는_PENDING이다() {
+		// Given, When
+		ask("질문 있어요");
+
+		// Then
+		assertEquals(QuestionStatus.PENDING, savedQuestion().getQuestionStatus());
+	}
+
+	@Test
+	void 새_질문에는_남긴_시각을_담는다() {
+		// Given, When
+		ask("질문 있어요");
+
+		// Then
+		assertNotNull(savedQuestion().getCreatedAt());
+	}
+
+	@Test
+	void 질문의_앞뒤_공백을_지우고_저장한다() {
+		// Given, When
+		ask("  질문 있어요  ");
+
+		// Then
+		assertEquals("질문 있어요", savedQuestion().getContent());
+	}
+
+	@Test
+	void 질문의_태그_글자는_바꾸지_않고_저장한다() {
+		// Given, When
+		ask("<b>금리</b> & 한도?");
+
+		// Then
+		assertEquals("<b>금리</b> & 한도?", savedQuestion().getContent());
+	}
+
+	@Test
+	void 질문이_3자면_400이다() {
+		// Given, When, Then
+		assertInvalidQuestion("가".repeat(3));
+	}
+
+	@Test
+	void 공백을_지우면_2자인_질문은_400이다() {
+		// Given, When, Then
+		assertInvalidQuestion("  가나  ");
+	}
+
+	@Test
+	void 질문이_301자면_400이다() {
+		// Given, When, Then
+		assertInvalidQuestion("가".repeat(301));
+	}
+
+	@Test
+	void 길이가_틀린_질문은_저장하지_않는다() {
+		// Given, When
+		assertThrows(BusinessException.class, () -> ask("가"));
+
+		// Then
+		verifyNoInteractions(helpQuestionRepository);
+	}
+
+	@Test
+	void 질문이_4자면_저장한다() {
+		// Given, When
+		ask("가".repeat(4));
+
+		// Then
+		assertEquals(4, savedQuestion().getContent().length());
+	}
+
+	@Test
+	void 질문이_300자면_저장한다() {
+		// Given, When
+		ask("가".repeat(300));
+
+		// Then
+		assertEquals(300, savedQuestion().getContent().length());
+	}
+
+	// ========== HELP-06 도움말 평가 (addFeedback) ==========
+
+	// helpId 201인 FAQ가 있는 상태
+	private void givenFeedbackTarget() {
+		when(helpContentRepository.findByHelpTypeAndHelpId(HelpType.FAQ, 201L)).thenReturn(Optional.of(faq(1, "가입")));
+	}
+
+	// 그 FAQ의 집계 행이 이미 있는 상태 (도움돼요 helpful, 별로예요 unhelpful)
+	private HelpStat givenFeedbackStat(int helpful, int unhelpful) {
+		givenFeedbackTarget();
+		HelpStat stat = HelpStat.builder().statId(1L).targetType(HelpType.FAQ).targetKey("201")
+				.openCount(5).helpfulCount(helpful).unhelpfulCount(unhelpful).build();
+		when(helpStatRepository.findByTargetKeyAndTargetType("201", HelpType.FAQ)).thenReturn(Optional.of(stat));
+		return stat;
+	}
+
+	private void feedback(Vote vote, boolean cancel) {
+		helpService.addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, vote, cancel));
+	}
+
+	@Test
+	void 평가_대상이_없거나_종류가_다르면_404이다() {
+		// Given (가짜 Repository는 아무것도 찾지 못함)
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> feedback(Vote.UP, false));
+
+		// Then
+		assertEquals(ErrorCode.NOT_FOUND, e.getErrorCode());
+	}
+
+	@Test
+	void 평가_대상이_없으면_집계를_건드리지_않는다() {
+		// Given (없는 대상)
+
+		// When
+		assertThrows(BusinessException.class, () -> feedback(Vote.UP, false));
+
+		// Then
+		verifyNoInteractions(helpStatRepository);
+	}
+
+	@Test
+	void 첫_평가는_보낸_종류와_helpId로_행을_만든다() {
+		// Given
+		givenFeedbackTarget();
+
+		// When
+		feedback(Vote.UP, false);
+
+		// Then
+		HelpStat stat = savedStat();
+		assertEquals(HelpType.FAQ, stat.getTargetType());
+		assertEquals("201", stat.getTargetKey());
+	}
+
+	@Test
+	void 첫_평가가_UP이면_도움돼요만_1이다() {
+		// Given
+		givenFeedbackTarget();
+
+		// When
+		feedback(Vote.UP, false);
+
+		// Then
+		HelpStat stat = savedStat();
+		assertEquals(1, stat.getHelpfulCount());
+		assertEquals(0, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void 첫_평가가_DOWN이면_별로예요만_1이다() {
+		// Given
+		givenFeedbackTarget();
+
+		// When
+		feedback(Vote.DOWN, false);
+
+		// Then
+		HelpStat stat = savedStat();
+		assertEquals(0, stat.getHelpfulCount());
+		assertEquals(1, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void 평가로_만든_행의_연_횟수는_0이다() {
+		// Given
+		givenFeedbackTarget();
+
+		// When
+		feedback(Vote.UP, false);
+
+		// Then
+		assertEquals(0, savedStat().getOpenCount());
+	}
+
+	@Test
+	void 행이_없는_취소는_0인_행을_추가한다() {
+		// Given (명세: 0 밑으로 안 내림, 없으면 행 추가)
+		givenFeedbackTarget();
+
+		// When
+		feedback(Vote.UP, true);
+
+		// Then
+		HelpStat stat = savedStat();
+		assertEquals(0, stat.getHelpfulCount());
+		assertEquals(0, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void 행이_있으면_UP은_도움돼요를_1_늘린다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		feedback(Vote.UP, false);
+
+		// Then
+		assertEquals(4, stat.getHelpfulCount());
+		assertEquals(2, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void 행이_있으면_DOWN은_별로예요를_1_늘린다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		feedback(Vote.DOWN, false);
+
+		// Then
+		assertEquals(3, stat.getHelpfulCount());
+		assertEquals(3, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void UP_취소는_도움돼요를_1_줄인다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		feedback(Vote.UP, true);
+
+		// Then
+		assertEquals(2, stat.getHelpfulCount());
+		assertEquals(2, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void DOWN_취소는_별로예요를_1_줄인다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		feedback(Vote.DOWN, true);
+
+		// Then
+		assertEquals(3, stat.getHelpfulCount());
+		assertEquals(1, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void 취소해도_0_밑으로_내려가지_않는다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(0, 0);
+
+		// When
+		feedback(Vote.UP, true);
+		feedback(Vote.DOWN, true);
+
+		// Then
+		assertEquals(0, stat.getHelpfulCount());
+		assertEquals(0, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void UP_취소는_별로예요를_바꾸지_않는다() {
+		// Given (도움돼요가 0인 상태)
+		HelpStat stat = givenFeedbackStat(0, 3);
+
+		// When
+		feedback(Vote.UP, true);
+
+		// Then
+		assertEquals(3, stat.getUnhelpfulCount());
+	}
+
+	@Test
+	void DOWN_취소는_도움돼요를_바꾸지_않는다() {
+		// Given (별로예요가 0인 상태)
+		HelpStat stat = givenFeedbackStat(3, 0);
+
+		// When
+		feedback(Vote.DOWN, true);
+
+		// Then
+		assertEquals(3, stat.getHelpfulCount());
+	}
+
+	@Test
+	void 행이_있고_cancel이_없으면_1_늘린다() {
+		// Given (담당자 결정: cancel을 보내지 않으면 취소가 아님)
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		helpService.addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, Vote.UP, null));
+
+		// Then
+		assertEquals(4, stat.getHelpfulCount());
+	}
+
+	@Test
+	void 행이_없고_cancel이_없으면_1인_행을_만든다() {
+		// Given
+		givenFeedbackTarget();
+
+		// When
+		helpService.addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, Vote.UP, null));
+
+		// Then
+		assertEquals(1, savedStat().getHelpfulCount());
+	}
+
+	@Test
+	void 첫_평가_저장이_겹치면_409이다() {
+		// Given (담당자 결정: 동시에 처음 저장해 unique 제약에 걸리면 CONFLICT)
+		givenFeedbackTarget();
+		when(helpStatRepository.save(any(HelpStat.class))).thenThrow(new DataIntegrityViolationException("uq_help_stat"));
+
+		// When
+		BusinessException e = assertThrows(BusinessException.class, () -> feedback(Vote.UP, false));
+
+		// Then
+		assertEquals(ErrorCode.CONFLICT, e.getErrorCode());
+	}
+
+	@Test
+	void 평가는_연_횟수를_바꾸지_않는다() {
+		// Given
+		HelpStat stat = givenFeedbackStat(3, 2);
+
+		// When
+		feedback(Vote.UP, false);
+
+		// Then
+		assertEquals(5, stat.getOpenCount());
 	}
 }

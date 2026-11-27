@@ -1,13 +1,12 @@
 package chorong.help.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -21,9 +20,12 @@ public class HelpQuestion {
     @NotNull
     private String content;
     @NotNull
-    private char memberYn;
+    @JdbcTypeCode(SqlTypes.CHAR)               // DB 타입이 CHAR라고 알려 줌
+    @Column(name = "member_yn", length = 1)
+    private String memberYn;
     @NotNull
-    private String questionStatus;
+    @Enumerated(EnumType.STRING)
+    private QuestionStatus questionStatus;
     @NotNull
-    private LocalDate createdAt;
+    private LocalDateTime createdAt;
 }

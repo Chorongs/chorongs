@@ -14,5 +14,5 @@ public interface HelpStatRepository extends JpaRepository<HelpStat, Long> {
 
     @Modifying
     @Query("update HelpStat set openCount = openCount+1 where targetKey = :targetKey")
-    int increaseViewCount(@Param("targetKey") String targetKey);
+    int increaseOpenCount(@Param("targetKey") String targetKey);
 }

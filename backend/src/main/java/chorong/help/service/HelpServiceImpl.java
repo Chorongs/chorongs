@@ -1,5 +1,6 @@
 package chorong.help.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -7,16 +8,21 @@ import java.util.Optional;
 import java.util.stream.Stream;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.common.util.LoginUtil;
 import chorong.common.util.MemoryCache;
-import chorong.help.entity.HelpContent;
-import chorong.help.entity.HelpStat;
-import chorong.help.entity.HelpType;
+import chorong.help.entity.*;
 import chorong.help.repository.HelpContentRepository;
+import chorong.help.repository.HelpQuestionRepository;
 import chorong.help.repository.HelpStatRepository;
+import chorong.help.repository.TermRequestRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import chorong.help.dto.FeedbackRequestDTO;
 import chorong.help.dto.HelpContentResponseDTO;
+import chorong.help.dto.QuestionRequestDTO;
+import chorong.help.dto.TermAddRequestDTO;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 
 
@@ -26,10 +32,13 @@ public class HelpServiceImpl implements HelpService {
     private final HelpContentRepository helpContentRepository;
     private final MemoryCache  memoryCache;
     private final HelpStatRepository helpStatRepository;
+    private final TermRequestRepository termRequestRepository;
+    private final HelpQuestionRepository helpQuestionRepository;
     private static final String CACHE_TERM_KEY = "terms";
     private static final String CACHE_TIP_KEY = "tips";
     private static final String CACHE_FAQ_KEY = "faqs";
 
+//    HELP-02
     @Override
     @Transactional(readOnly = true)
     public List<HelpContentResponseDTO> getTerms() {
@@ -42,20 +51,20 @@ public class HelpServiceImpl implements HelpService {
         List<HelpContentResponseDTO> responseDTOList = new ArrayList<>();
 
 
-        for (HelpContent helpContent : termList) {
-            List<String> keywords = Stream.of(helpContent.getKeyword1(),
-                    helpContent.getKeyword2(), helpContent.getKeyword3(), helpContent.getKeyword4(), helpContent.getKeyword5())
+        for (HelpContent term : termList) {
+            List<String> keywords = Stream.of(term.getKeyword1(),
+                    term.getKeyword2(), term.getKeyword3(), term.getKeyword4(), term.getKeyword5())
                     .filter(Objects::nonNull).toList();
             responseDTOList.add(new HelpContentResponseDTO
-                    (helpContent.getHelpId(), helpContent.getHelpNo(), helpContent.getCategory(),
-                            helpContent.getTitle(), helpContent.getContent(), keywords, null, null));
+                    (term.getHelpId(), term.getHelpNo(), term.getCategory(),
+                            term.getTitle(), term.getContent(), keywords, null, null));
         }
         List<HelpContentResponseDTO> copyList = List.copyOf(responseDTOList);
         memoryCache.put(MemoryCache.TERM, CACHE_TERM_KEY, copyList);
         return copyList;
     }
 
-
+    //    HELP-03
     @Override
     @Transactional(readOnly = true)
     public List<HelpContentResponseDTO> getTips() {
@@ -66,11 +75,11 @@ public class HelpServiceImpl implements HelpService {
 
         List<HelpContent> tipList = helpContentRepository.findByHelpTypeOrderByHelpNoAsc(HelpType.TIP);
         List<HelpContentResponseDTO> responseDTOList = new ArrayList<>();
-        for (HelpContent tips : tipList) {
-            List<String> keywords = Stream.of(tips.getKeyword1(), tips.getKeyword2(),
-                    tips.getKeyword3(), tips.getKeyword4(), tips.getKeyword5()).filter(Objects::nonNull).toList();
-            responseDTOList.add(new HelpContentResponseDTO(tips.getHelpId(), tips.getHelpNo(), tips.getCategory(),
-                    tips.getTitle(), tips.getContent(), keywords, tips.getSummary(), null));
+        for (HelpContent tip : tipList) {
+            List<String> keywords = Stream.of(tip.getKeyword1(), tip.getKeyword2(),
+                    tip.getKeyword3(), tip.getKeyword4(), tip.getKeyword5()).filter(Objects::nonNull).toList();
+            responseDTOList.add(new HelpContentResponseDTO(tip.getHelpId(), tip.getHelpNo(), tip.getCategory(),
+                    tip.getTitle(), tip.getContent(), keywords, tip.getSummary(), null));
         }
         List<HelpContentResponseDTO> copyList = List.copyOf(responseDTOList);
         memoryCache.put(MemoryCache.TIP, CACHE_TIP_KEY, copyList);
@@ -88,13 +97,13 @@ public class HelpServiceImpl implements HelpService {
         }
         List<HelpContent> faqList = helpContentRepository.findByHelpTypeOrderByHelpNoAsc(HelpType.FAQ);
         List<HelpContentResponseDTO> responseDTOList = new ArrayList<>();
-        for (HelpContent faqs : faqList) {
+        for (HelpContent faq : faqList) {
 
-            Optional<HelpStat> faqsStat = helpStatRepository.findByTargetKeyAndTargetType( faqs.getHelpId().toString(), HelpType.FAQ);
-            int openCount = faqsStat.map(HelpStat::getOpenCount).orElse(0);
+            Optional<HelpStat> faqStat = helpStatRepository.findByTargetKeyAndTargetType( faq.getHelpId().toString(), HelpType.FAQ);
+            int openCount = faqStat.map(HelpStat::getOpenCount).orElse(0);
 
-            responseDTOList.add(new HelpContentResponseDTO(faqs.getHelpId(), faqs.getHelpNo(), faqs.getCategory(),
-                    faqs.getTitle(), faqs.getContent(), null, null, openCount));
+            responseDTOList.add(new HelpContentResponseDTO(faq.getHelpId(), faq.getHelpNo(), faq.getCategory(),
+                    faq.getTitle(), faq.getContent(), null, null, openCount));
         }
 
         List<HelpContentResponseDTO> copyList = List.copyOf(responseDTOList);
@@ -103,33 +112,117 @@ public class HelpServiceImpl implements HelpService {
         return copyList;
     }
 
-    /*
-     * HELP-01 FAQ 열기 처리 순서 (be_help.md: help_stat open_count + 1, 없으면 행 추가)
-     * 1. help_content에서 helpId 행을 찾고 FAQ인지 확인 (없거나 FAQ가 아닐 때의 응답은 명세서에 없음, 정할 것)
-     * 2. help_stat에서 (FAQ, helpId 문자열) 행의 open_count + 1 (HelpStatRepository에 메서드 추가)
-     * 3. 그 행이 없으면 open_count 1로 새 행 추가
-     * 4. FAQ 목록 캐시에 옛 연 횟수가 남지 않게 처리
-     */
+//     HELP-01 FAQ 열기
     @Override
     @Transactional
     public void openFaq(Long helpId) {
-        HelpContent faqsStat = helpContentRepository.findByHelpTypeAndHelpId(HelpType.FAQ, helpId)
+        HelpContent faq = helpContentRepository.findByHelpTypeAndHelpId(HelpType.FAQ, helpId)
                 .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND));
-        int increaseOpenCount = helpStatRepository.increaseViewCount(faqsStat.getHelpId().toString());
-        if(increaseOpenCount == 0) {
-            HelpStat saveHelpStat = HelpStat.builder()
+        int updatedRows = helpStatRepository.increaseOpenCount(faq.getHelpId().toString());
+        if(updatedRows == 0) {
+            HelpStat newStat = HelpStat.builder()
                     .targetType(HelpType.FAQ)
-                    .targetKey(faqsStat.getHelpId().toString())
+                    .targetKey(faq.getHelpId().toString())
                     .openCount(1)
                     .helpfulCount(0)
                     .unhelpfulCount(0)
                     .build();
             try {
-                helpStatRepository.save(saveHelpStat);
+                helpStatRepository.save(newStat);
             }catch (DataIntegrityViolationException e) {
                 throw new BusinessException(ErrorCode.CONFLICT);
             }
         }
         memoryCache.clear(MemoryCache.FAQ);
+    }
+
+
+//     HELP-07 용어 추가 요청
+
+    @Override
+    @Transactional
+    public void addTermRequest(TermAddRequestDTO request) {
+        String word = request.getWord().strip();
+        Optional<TermRequest> termRequest = termRequestRepository.findByTermWord(word);
+        if(termRequest.isPresent()) {
+            //값이 있으면 카운트 증가, 마지막 요청 날짜 변경
+            TermRequest existing = termRequest.get();
+                existing.addRequest(1, LocalDateTime.now().withNano(0));
+
+        }else {
+            //값이 없다면 새로 저장
+            TermRequest newRequest = TermRequest.builder()
+                    .termWord(word)
+                    .requestCount(1)
+                    .createdAt(LocalDateTime.now().withNano(0))
+                    .lastRequestedAt(LocalDateTime.now().withNano(0))
+                    .build();
+            try {
+                termRequestRepository.save(newRequest);
+            }catch (DataIntegrityViolationException e) {
+                throw new BusinessException(ErrorCode.CONFLICT);
+            }
+        }
+    }
+
+
+        //HELP-05 질문 남기기
+    @Override
+    @Transactional
+    public void addQuestion(QuestionRequestDTO request, HttpSession session) {
+        String content = request.getContent().strip();
+        if(content.length() > 300 || content.length() < 4)  throw new BusinessException(ErrorCode.INVALID_INPUT);
+        String memberYn = LoginUtil.getLoginMember(session) == null ? "N" : "Y";
+
+        HelpQuestion helpQuestion = HelpQuestion.builder()
+                .content(content)
+                .memberYn(memberYn)
+                .questionStatus(QuestionStatus.PENDING)
+                .createdAt(LocalDateTime.now().withNano(0))
+                .build();
+        try {
+            helpQuestionRepository.save(helpQuestion);
+        }catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.CONFLICT);
+        }
+    }
+
+//    HELP-06 도움말 평가
+
+    @Override
+    @Transactional
+    public void addFeedback(FeedbackRequestDTO request) {
+
+        //help_content에 type과 type_key가 매칭되는 행이 있는지 확인
+        helpContentRepository.findByHelpTypeAndHelpId(request.getType(), request.getTargetKey())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        //행이 없을 경우 추가, 있을 경우 값 변경
+        Optional<HelpStat> helpStat = helpStatRepository
+                .findByTargetKeyAndTargetType(request.getTargetKey().toString(), request.getType());
+        if(request.getCancel() == null) request.setCancel(false);
+        if(helpStat.isEmpty()) {
+                //행 추가
+            HelpStat addHelpStat;
+                 addHelpStat = HelpStat.builder()
+                        .targetType(request.getType())
+                        .targetKey(request.getTargetKey().toString())
+                        .openCount(0)
+                        .helpfulCount(request.getVote().equals(Vote.UP) && !request.getCancel() ? 1 : 0)
+                        .unhelpfulCount(request.getVote().equals(Vote.DOWN) && !request.getCancel() ? 1 : 0)
+                        .build();
+
+            try {
+                helpStatRepository.save(addHelpStat);
+            }catch (DataIntegrityViolationException e) {
+                throw new BusinessException(ErrorCode.CONFLICT);
+            }
+        }else {
+            //업 다운
+            if(request.getVote().equals(Vote.UP)) {
+                helpStat.get().requestHelpfulCount(1, request.getCancel());
+            }else{
+                helpStat.get().requestUnhelpfulCount(1, request.getCancel());
+            }
+        }
     }
 }

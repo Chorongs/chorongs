@@ -24,4 +24,31 @@ public class HelpStat {
     private int helpfulCount;
     @NotNull
     private int unhelpfulCount;
+
+    public void requestHelpfulCount(int count, boolean cancel) {
+        if(!cancel) {
+            this.helpfulCount+=count;
+        }else {
+            if(this.helpfulCount <= 0 ) {
+                this.helpfulCount = 0;
+            }else {
+                this.helpfulCount-=count;
+            }
+
+        }
+    }
+
+    public void requestUnhelpfulCount(int count, boolean cancel) {
+        if(!cancel) {
+
+            this.unhelpfulCount+=count;
+        }else {
+            if(this.unhelpfulCount <= 0) {
+                this.unhelpfulCount = 0;
+            }else {
+                this.unhelpfulCount-=count;
+            }
+
+        }
+    }
 }

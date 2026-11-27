@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
-
 public class TermRequest {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,4 +26,9 @@ public class TermRequest {
     private LocalDateTime createdAt;
     @NotNull
     private LocalDateTime lastRequestedAt;
+
+    public void addRequest(int addRequestCount, LocalDateTime lastRequestedAt) {
+        this.requestCount += addRequestCount;
+        this.lastRequestedAt = lastRequestedAt;
+    }
 }

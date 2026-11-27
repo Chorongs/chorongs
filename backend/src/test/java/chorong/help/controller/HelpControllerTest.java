@@ -1,7 +1,11 @@
 package chorong.help.controller;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,14 +18,21 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
 import chorong.common.exception.GlobalExceptionHandler;
 import chorong.common.util.RequestLimiter;
+import chorong.help.dto.FeedbackRequestDTO;
 import chorong.help.dto.HelpContentResponseDTO;
+import chorong.help.dto.QuestionRequestDTO;
+import chorong.help.dto.TermAddRequestDTO;
+import chorong.help.entity.HelpType;
+import chorong.help.entity.Vote;
 import chorong.help.service.HelpService;
 
 /*
@@ -271,5 +282,233 @@ class HelpControllerTest {
 
 		// Then
 		verify(helpService, times(10)).openFaq(203L);
+	}
+
+	// ========== HELP-07 POST /api/help/term-requests (word 30자, 204, 권한: 모두, 길이 400, 반복 429) ==========
+	// 입력 검사 기대값: be_common.md B2 (표시 + @Valid, 실패 400 INVALID_INPUT)
+
+	private static String body(String word) {
+		return "{\"word\":\"" + word + "\"}";
+	}
+
+	private static MockHttpServletRequestBuilder termRequest(String json) {
+		return post("/api/help/term-requests").contentType(MediaType.APPLICATION_JSON).content(json);
+	}
+
+	@Test
+	void 용어_요청은_로그인하지_않아도_204이다() throws Exception {
+		// Given (세션 없음), When, Then
+		mockMvc.perform(termRequest(body("DSR")))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void 보낸_단어를_Service에_넘긴다() throws Exception {
+		// Given, When
+		mockMvc.perform(termRequest(body("DSR")));
+
+		// Then
+		verify(helpService).addTermRequest(new TermAddRequestDTO("DSR"));
+	}
+
+	@Test
+	void 단어가_없으면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(termRequest("{}"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 단어가_빈_글자면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(termRequest(body("")))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 단어가_공백뿐이면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(termRequest(body("   ")))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 단어가_31자면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(termRequest(body("가".repeat(31))))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 입력_검사에_걸리면_Service를_부르지_않는다() throws Exception {
+		// Given, When
+		mockMvc.perform(termRequest(body("가".repeat(31))));
+
+		// Then
+		verify(helpService, never()).addTermRequest(any(TermAddRequestDTO.class));
+	}
+
+	@Test
+	void 단어가_30자면_204이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(termRequest(body("가".repeat(30))))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void 일_분에_열한_번째_용어_요청은_429이다() throws Exception {
+		// Given
+		MockMvc limited = mockMvcWithRealLimiter();
+		for (int i = 0; i < 10; i++) {
+			limited.perform(termRequest(body("DSR")));
+		}
+
+		// When, Then
+		limited.perform(termRequest(body("DSR")))
+				.andExpect(status().isTooManyRequests());
+	}
+
+	// ========== HELP-05 POST /api/help/questions (content 4~300자, 201, 권한: 모두, 길이 400, 반복 429) ==========
+	// 길이 4~300자 확인은 공백 제거 후라 Service 테스트에서 확인
+
+	private static MockHttpServletRequestBuilder question(String json) {
+		return post("/api/help/questions").contentType(MediaType.APPLICATION_JSON).content(json);
+	}
+
+	private static final String QUESTION_JSON = "{\"content\":\"질문 있어요\"}";
+
+	@Test
+	void 질문은_로그인하지_않아도_201이다() throws Exception {
+		// Given (세션 없음), When, Then
+		mockMvc.perform(question(QUESTION_JSON))
+				.andExpect(status().isCreated());
+	}
+
+	@Test
+	void 비회원은_세션_없이_Service를_부른다() throws Exception {
+		// Given, When
+		mockMvc.perform(question(QUESTION_JSON));
+
+		// Then
+		verify(helpService).addQuestion(eq(new QuestionRequestDTO("질문 있어요")), isNull());
+	}
+
+	@Test
+	void 질문이_없으면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(question("{}"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 질문이_공백뿐이면_400이다() throws Exception {
+		// Given, When, Then
+		mockMvc.perform(question("{\"content\":\"      \"}"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void Service가_길이_오류를_알리면_400이다() throws Exception {
+		// Given
+		doThrow(new BusinessException(ErrorCode.INVALID_INPUT)).when(helpService)
+				.addQuestion(any(), isNull());
+
+		// When, Then
+		mockMvc.perform(question(QUESTION_JSON))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 일_분에_열한_번째_질문은_429이다() throws Exception {
+		// Given
+		MockMvc limited = mockMvcWithRealLimiter();
+		for (int i = 0; i < 10; i++) {
+			limited.perform(question(QUESTION_JSON));
+		}
+
+		// When, Then
+		limited.perform(question(QUESTION_JSON))
+				.andExpect(status().isTooManyRequests());
+	}
+
+	// ========== HELP-06 POST /api/help/feedback (204, 권한: 모두, 반복 429) ==========
+	// 입력 검사 기대값: be_common.md B2, 코드 값 타입 (빠진 값, 모르는 코드는 400)
+
+	private static MockHttpServletRequestBuilder feedbackRequest(String json) {
+		return post("/api/help/feedback").contentType(MediaType.APPLICATION_JSON).content(json);
+	}
+
+	private static final String FEEDBACK_JSON =
+			"{\"type\":\"FAQ\",\"targetKey\":201,\"vote\":\"UP\",\"cancel\":false}";
+
+	private void expectBadFeedback(String json) throws Exception {
+		mockMvc.perform(feedbackRequest(json))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 평가는_로그인하지_않아도_204이다() throws Exception {
+		// Given (세션 없음), When, Then
+		mockMvc.perform(feedbackRequest(FEEDBACK_JSON))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void 보낸_평가_값을_Service에_넘긴다() throws Exception {
+		// Given, When
+		mockMvc.perform(feedbackRequest(FEEDBACK_JSON));
+
+		// Then
+		verify(helpService).addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, Vote.UP, false));
+	}
+
+	@Test
+	void cancel이_없어도_204이다() throws Exception {
+		// Given, When, Then (없는 cancel을 취소 아님으로 처리하는지는 Service 테스트에서 확인)
+		mockMvc.perform(feedbackRequest("{\"type\":\"FAQ\",\"targetKey\":201,\"vote\":\"UP\"}"))
+				.andExpect(status().isNoContent());
+	}
+
+	@Test
+	void 평가_종류가_없으면_400이다() throws Exception {
+		// Given, When, Then
+		expectBadFeedback("{\"targetKey\":201,\"vote\":\"UP\"}");
+	}
+
+	@Test
+	void 평가_대상_번호가_없으면_400이다() throws Exception {
+		// Given, When, Then
+		expectBadFeedback("{\"type\":\"FAQ\",\"vote\":\"UP\"}");
+	}
+
+	@Test
+	void 평가_값이_없으면_400이다() throws Exception {
+		// Given, When, Then
+		expectBadFeedback("{\"type\":\"FAQ\",\"targetKey\":201}");
+	}
+
+	@Test
+	void 모르는_평가_종류는_400이다() throws Exception {
+		// Given, When, Then
+		expectBadFeedback("{\"type\":\"NOTICE\",\"targetKey\":201,\"vote\":\"UP\"}");
+	}
+
+	@Test
+	void 모르는_평가_값은_400이다() throws Exception {
+		// Given, When, Then
+		expectBadFeedback("{\"type\":\"FAQ\",\"targetKey\":201,\"vote\":\"MAYBE\"}");
+	}
+
+	@Test
+	void 일_분에_열한_번째_평가는_429이다() throws Exception {
+		// Given
+		MockMvc limited = mockMvcWithRealLimiter();
+		for (int i = 0; i < 10; i++) {
+			limited.perform(feedbackRequest(FEEDBACK_JSON));
+		}
+
+		// When, Then
+		limited.perform(feedbackRequest(FEEDBACK_JSON))
+				.andExpect(status().isTooManyRequests());
 	}
 }
