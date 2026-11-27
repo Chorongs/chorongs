@@ -86,6 +86,8 @@ function LikedList() {
   return (
     <MySection
       title="찜한 대출"
+      itemName="찜"
+      removeWord="취소"
       description="찜은 30개까지 할 수 있어요."
       status={result.status}
       onRetry={handleRetry}

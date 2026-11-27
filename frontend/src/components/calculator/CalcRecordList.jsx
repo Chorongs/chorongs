@@ -104,6 +104,7 @@ function CalcRecordList({
   return (
     <MySection
       title={title}
+      itemName="계산 기록"
       description="[결과 저장]을 누른 기록이에요."
       status={result.status}
       onRetry={handleRetry}

@@ -15,6 +15,9 @@ import Icon from '../ui/Icon'
 // title이 구역 이름 (찜한 대출, 최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
 // onRemove를 안 넘기면 X, [선택 삭제]를, onClearAll을 안 넘기면 [전체 삭제]를 안 그림
 // hasRowRemove가 false면 줄 X만 안 그리고 [선택 삭제]는 둠 (찜한 대출: 줄마다 하트가 있어 X가 겹침)
+// itemName: 기록 하나를 부르는 말 (기본 '기록'. 최근 본 대출 '상품', 최근 검색 '검색 기록', 비교 내역 '비교 내역', 저장한 추천 결과 '추천 결과', 계산 기록 '계산 기록', 찜한 대출 '찜')
+//   → '이 {itemName}을(를) 삭제할까요?', '선택한 {itemName} N개를 삭제할까요?'
+// removeWord: 지우는 동작 말 (기본 '삭제'. 찜한 대출은 '취소' → [선택해서 찜 취소], [N개 찜 취소], '선택한 찜 N개를 취소할까요?' [닫기] [찜 취소], '찜 N개를 취소했어요')
 // status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
 //   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
 //   흐리게는 0.3초가 넘게 걸릴 때만 (응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
@@ -195,6 +198,8 @@ function MySection({
   onRemove,
   onClearAll,
   hasRowRemove = true,
+  itemName = '기록',
+  removeWord = '삭제',
   emptyContent,
   hasMore = false,
   onMore,
@@ -211,6 +216,12 @@ function MySection({
   const [isSelectConfirmOpen, setIsSelectConfirmOpen] = useState(false)
   // 지금 목록에 남아 있는 것만 (지운 기록, 다시 불러온 목록에 없는 기록은 빠짐)
   const selectedItems = items.filter((item) => selectedKeys.includes(getKey(item)))
+
+  // 버튼, 확인 창, 알림 글 (메뉴마다 itemName, removeWord로 맞춤)
+  const isDelete = removeWord === '삭제'
+  const actionLabel = isDelete ? '삭제' : `${itemName} ${removeWord}`
+  const selectLabel = isDelete ? '선택 삭제' : `선택해서 ${actionLabel}`
+  const failText = isDelete ? REMOVE_FAIL_TEXT : `${withObjectParticle(itemName)} ${removeWord}하지 못했어요. 다시 시도해 주세요`
 
   const stopSelecting = () => {
     setIsSelecting(false)
@@ -236,10 +247,10 @@ function MySection({
         await onRemove(item)
         removedCount += 1
       }
-      showToast(`${title}에서 ${removedCount}개를 삭제했어요`)
+      showToast(isDelete ? `${title}에서 ${removedCount}개를 삭제했어요` : `${itemName} ${removedCount}개를 ${removeWord}했어요`)
       stopSelecting()
     } catch (error) {
-      if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
+      if (error.response?.status !== 401) showToast(failText)
     } finally {
       setIsSelectConfirmOpen(false)
       setIsPending(false)
@@ -253,7 +264,7 @@ function MySection({
       showToast(`${title}에서 삭제했어요`)
       setRemoveTarget(null)
     } catch (error) {
-      if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
+      if (error.response?.status !== 401) showToast(failText)
     } finally {
       setIsPending(false)
     }
@@ -310,7 +321,7 @@ function MySection({
               {renderItem(item)}
             </ItemBody>
             {onRemove && hasRowRemove && !isSelecting && (
-              <IconButton aria-label={`${getItemLabel(item)} 삭제`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
+              <IconButton aria-label={`${getItemLabel(item)} ${actionLabel}`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
                 <Icon name="close" size={16} />
               </IconButton>
             )}
@@ -331,14 +342,14 @@ function MySection({
                   취소
                 </Button>
                 <Button $size="sm" onClick={() => setIsSelectConfirmOpen(true)} disabled={selectedItems.length === 0}>
-                  {selectedItems.length}개 삭제
+                  {selectedItems.length}개 {actionLabel}
                 </Button>
               </>
             ) : (
               <>
                 {onRemove && (
                   <Button $size="sm" $variant="ghost" onClick={() => setIsSelecting(true)}>
-                    선택 삭제
+                    {selectLabel}
                   </Button>
                 )}
                 {onClearAll && (
@@ -374,17 +385,18 @@ function MySection({
       <ConfirmDialog
         isOpen={isSelectConfirmOpen}
         onClose={() => setIsSelectConfirmOpen(false)}
-        label={`${title} 선택 삭제`}
-        title={`선택한 기록 ${selectedItems.length}개를 삭제할까요?`}
-        confirmLabel="삭제"
+        label={`${title} ${selectLabel}`}
+        title={`선택한 ${itemName} ${selectedItems.length}개를 ${removeWord}할까요?`}
+        confirmLabel={actionLabel}
         onConfirm={handleRemoveSelected}
         isConfirmDisabled={isPending || selectedItems.length === 0}
+        cancelLabel={isDelete ? '취소' : '닫기'}
       />
       <ConfirmDialog
         isOpen={removeTarget !== null}
         onClose={() => setRemoveTarget(null)}
         label={`${title}에서 삭제`}
-        title="이 기록을 삭제할까요?"
+        title={`이 ${withObjectParticle(itemName)} 삭제할까요?`}
         confirmLabel="삭제"
         onConfirm={() => handleRemove(removeTarget)}
         isConfirmDisabled={isPending}

@@ -135,6 +135,7 @@ function CompareHistoryList() {
   return (
     <MySection
       title="비교 내역"
+      itemName="비교 내역"
       description="저장한 비교를 최근 10개까지 보여 줘요."
       status={result.status}
       onRetry={reload}

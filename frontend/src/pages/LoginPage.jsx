@@ -13,13 +13,14 @@ import { ADMIN_SESSION_TEXT, ALREADY_LOGGED_IN_TEXT, LOGIN_OFFLINE_TEXT, checkSo
 
 // AU-01 로그인 화면 (/login): 소셜 로그인 시작. 자체 회원가입, 비밀번호 없음
 // 이미 로그인 → /my / 버튼 → API-18 (카카오, 네이버 로그인 화면으로 이동)
-// 주소의 error 값(API-19가 붙임)으로 안내 한 줄을 바꿈. 정해진 값이 아니면 기본 안내
+// 주소의 error 값(API-19가 붙임, SIGNUP_EXPIRED는 가입 단계가 붙임)으로 안내 한 줄을 바꿈. 정해진 값이 아니면 기본 안내
 // 소셜 버튼: 카카오 로그인 디자인 가이드의 문구('카카오 로그인' 또는 '로그인')와 받은 네이버 공식 리소스 문구('네이버 로그인')를 따름
 //   심볼은 공식 파일 그대로(모양, 비율, 색 변경 금지), 글자가 있으니 alt=""(꾸밈 그림)
 const ERROR_TEXT = {
   ADMIN_LOGGED_IN: ADMIN_SESSION_TEXT,
   CANCELLED: '로그인을 취소했어요',
   FAILED: '로그인에 실패했어요.\n다시 시도해 주세요',
+  SIGNUP_EXPIRED: '가입 시간이 지났어요.\n다시 로그인해 주세요',
 }
 
 // 소셜 버튼 두 개 (버튼 사이 8px)

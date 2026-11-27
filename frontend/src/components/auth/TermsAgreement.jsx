@@ -132,8 +132,8 @@ function TermsAgreement({ needBirth, onDone }) {
     } catch (err) {
       const code = err.response?.data?.code
       if (code === 'SIGNUP_EXPIRED') {
-        showToast('가입 시간이 지났어요. 다시 로그인해 주세요')
-        navigate('/login', { replace: true })
+        // 안내는 로그인 화면 안내 줄에 두 줄로 (알림은 금방 사라지고 한 줄이라)
+        navigate('/login?error=SIGNUP_EXPIRED', { replace: true })
         return
       }
       if (code === 'INVALID_INPUT') {

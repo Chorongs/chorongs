@@ -49,6 +49,7 @@ function RecentList() {
   return (
     <MySection
       title="최근 본 대출"
+      itemName="상품"
       description="상세 창을 연 상품을 최근 10개까지 보여 줘요."
       status={result.status}
       onRetry={handleRetry}

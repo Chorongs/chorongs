@@ -120,6 +120,7 @@ function SearchHistoryList() {
   return (
     <MySection
       title="최근 검색"
+      itemName="검색 기록"
       description="상품 찾기에서 검색한 조건을 최근 10개까지 보여 줘요."
       status={result.status}
       onRetry={reload}

@@ -119,6 +119,7 @@ function SavedRecList() {
   return (
     <MySection
       title="저장한 추천 결과"
+      itemName="추천 결과"
       description="저장한 추천 결과를 10개까지 보관해요. 상품은 지금 정보로 보여 줘요."
       status={result.status}
       onRetry={handleRetry}
