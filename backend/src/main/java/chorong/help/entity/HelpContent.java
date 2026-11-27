@@ -17,7 +17,7 @@ public class HelpContent {
     @Enumerated(EnumType.STRING)
     private HelpType helpType;
     @NotNull
-    private int helpNo;
+    private Integer helpNo;
     private String category;
     private String keyword1;
     private String keyword2;

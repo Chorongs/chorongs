@@ -170,7 +170,7 @@ class HelpControllerTest {
 
 	private void givenFaq() {
 		when(helpService.getFaqs()).thenReturn(
-				List.of(new HelpContentResponseDTO(203L, 3, "사이트 이용", "가입하는 법", "카카오로 가입", null, null, 7)));
+				List.of(new HelpContentResponseDTO(203L, 3, "사이트 이용", "가입하는 법", "카카오로 가입", null, null, 7L)));
 	}
 
 	@Test

@@ -19,18 +19,18 @@ public class HelpStat {
     @NotNull
     private String targetKey;
     @NotNull
-    private int openCount;
+    private Long openCount;
     @NotNull
-    private int helpfulCount;
+    private Long helpfulCount;
     @NotNull
-    private int unhelpfulCount;
+    private Long unhelpfulCount;
 
     public void requestHelpfulCount(int count, boolean cancel) {
         if(!cancel) {
             this.helpfulCount+=count;
         }else {
             if(this.helpfulCount <= 0 ) {
-                this.helpfulCount = 0;
+                this.helpfulCount = 0L;
             }else {
                 this.helpfulCount-=count;
             }
@@ -44,7 +44,7 @@ public class HelpStat {
             this.unhelpfulCount+=count;
         }else {
             if(this.unhelpfulCount <= 0) {
-                this.unhelpfulCount = 0;
+                this.unhelpfulCount = 0L;
             }else {
                 this.unhelpfulCount-=count;
             }

@@ -637,7 +637,7 @@ class HelpServiceImplTest {
 		HelpContentResponseDTO dto = helpService.getFaqs().get(0);
 
 		// Then
-		assertEquals(0, dto.getOpenCount());
+		assertEquals(0L, dto.getOpenCount());
 	}
 
 	@Test
@@ -722,7 +722,7 @@ class HelpServiceImplTest {
 
 	// 대상 번호가 targetKey인 집계 행 하나만 있는 상태. 조회 메서드 이름에 기대지 않도록, 넘겨받은 값에 targetKey가 있으면 그 행을 돌려줌
 	private void givenStat(String targetKey, int openCount) {
-		HelpStat stat = HelpStat.builder().targetKey(targetKey).openCount(openCount).build();
+		HelpStat stat = HelpStat.builder().targetKey(targetKey).openCount((long) openCount).build();
 		helpStatRepository = mock(HelpStatRepository.class, invocation ->
 				Arrays.asList(invocation.getArguments()).contains(targetKey) ? Optional.of(stat) : Optional.empty());
 		helpService = new HelpServiceImpl(helpContentRepository, memoryCache, helpStatRepository, termRequestRepository,
@@ -739,7 +739,7 @@ class HelpServiceImplTest {
 		HelpContentResponseDTO dto = helpService.getFaqs().get(0);
 
 		// Then
-		assertEquals(7, dto.getOpenCount());
+		assertEquals(7L, dto.getOpenCount());
 	}
 
 	@Test
@@ -752,7 +752,7 @@ class HelpServiceImplTest {
 		HelpContentResponseDTO dto = helpService.getFaqs().get(0);
 
 		// Then
-		assertEquals(0, dto.getOpenCount());
+		assertEquals(0L, dto.getOpenCount());
 	}
 
 	@Test
@@ -765,7 +765,7 @@ class HelpServiceImplTest {
 		List<HelpContentResponseDTO> faqs = helpService.getFaqs();
 
 		// Then
-		assertEquals(List.of(0, 5), faqs.stream().map(HelpContentResponseDTO::getOpenCount).toList());
+		assertEquals(List.of(0L, 5L), faqs.stream().map(HelpContentResponseDTO::getOpenCount).toList());
 	}
 
 	// ---------- helpId (열기 주소, help_stat 대상 번호에 쓰는 값) ----------
@@ -889,7 +889,7 @@ class HelpServiceImplTest {
 		helpService.openFaq(201L);
 
 		// Then
-		assertEquals(1, savedStat().getOpenCount());
+		assertEquals(1L, savedStat().getOpenCount());
 	}
 
 	@Test
@@ -902,8 +902,8 @@ class HelpServiceImplTest {
 
 		// Then
 		HelpStat stat = savedStat();
-		assertEquals(0, stat.getHelpfulCount());
-		assertEquals(0, stat.getUnhelpfulCount());
+		assertEquals(0L, stat.getHelpfulCount());
+		assertEquals(0L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1232,7 +1232,7 @@ class HelpServiceImplTest {
 	private HelpStat givenFeedbackStat(int helpful, int unhelpful) {
 		givenFeedbackTarget();
 		HelpStat stat = HelpStat.builder().statId(1L).targetType(HelpType.FAQ).targetKey("201")
-				.openCount(5).helpfulCount(helpful).unhelpfulCount(unhelpful).build();
+				.openCount(5L).helpfulCount((long) helpful).unhelpfulCount((long) unhelpful).build();
 		when(helpStatRepository.findByTargetKeyAndTargetType("201", HelpType.FAQ)).thenReturn(Optional.of(stat));
 		return stat;
 	}
@@ -1287,8 +1287,8 @@ class HelpServiceImplTest {
 
 		// Then
 		HelpStat stat = savedStat();
-		assertEquals(1, stat.getHelpfulCount());
-		assertEquals(0, stat.getUnhelpfulCount());
+		assertEquals(1L, stat.getHelpfulCount());
+		assertEquals(0L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1301,8 +1301,8 @@ class HelpServiceImplTest {
 
 		// Then
 		HelpStat stat = savedStat();
-		assertEquals(0, stat.getHelpfulCount());
-		assertEquals(1, stat.getUnhelpfulCount());
+		assertEquals(0L, stat.getHelpfulCount());
+		assertEquals(1L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1314,7 +1314,7 @@ class HelpServiceImplTest {
 		feedback(Vote.UP, false);
 
 		// Then
-		assertEquals(0, savedStat().getOpenCount());
+		assertEquals(0L, savedStat().getOpenCount());
 	}
 
 	@Test
@@ -1327,8 +1327,8 @@ class HelpServiceImplTest {
 
 		// Then
 		HelpStat stat = savedStat();
-		assertEquals(0, stat.getHelpfulCount());
-		assertEquals(0, stat.getUnhelpfulCount());
+		assertEquals(0L, stat.getHelpfulCount());
+		assertEquals(0L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1340,8 +1340,8 @@ class HelpServiceImplTest {
 		feedback(Vote.UP, false);
 
 		// Then
-		assertEquals(4, stat.getHelpfulCount());
-		assertEquals(2, stat.getUnhelpfulCount());
+		assertEquals(4L, stat.getHelpfulCount());
+		assertEquals(2L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1353,8 +1353,8 @@ class HelpServiceImplTest {
 		feedback(Vote.DOWN, false);
 
 		// Then
-		assertEquals(3, stat.getHelpfulCount());
-		assertEquals(3, stat.getUnhelpfulCount());
+		assertEquals(3L, stat.getHelpfulCount());
+		assertEquals(3L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1366,8 +1366,8 @@ class HelpServiceImplTest {
 		feedback(Vote.UP, true);
 
 		// Then
-		assertEquals(2, stat.getHelpfulCount());
-		assertEquals(2, stat.getUnhelpfulCount());
+		assertEquals(2L, stat.getHelpfulCount());
+		assertEquals(2L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1379,8 +1379,8 @@ class HelpServiceImplTest {
 		feedback(Vote.DOWN, true);
 
 		// Then
-		assertEquals(3, stat.getHelpfulCount());
-		assertEquals(1, stat.getUnhelpfulCount());
+		assertEquals(3L, stat.getHelpfulCount());
+		assertEquals(1L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1393,8 +1393,8 @@ class HelpServiceImplTest {
 		feedback(Vote.DOWN, true);
 
 		// Then
-		assertEquals(0, stat.getHelpfulCount());
-		assertEquals(0, stat.getUnhelpfulCount());
+		assertEquals(0L, stat.getHelpfulCount());
+		assertEquals(0L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1406,7 +1406,7 @@ class HelpServiceImplTest {
 		feedback(Vote.UP, true);
 
 		// Then
-		assertEquals(3, stat.getUnhelpfulCount());
+		assertEquals(3L, stat.getUnhelpfulCount());
 	}
 
 	@Test
@@ -1418,7 +1418,7 @@ class HelpServiceImplTest {
 		feedback(Vote.DOWN, true);
 
 		// Then
-		assertEquals(3, stat.getHelpfulCount());
+		assertEquals(3L, stat.getHelpfulCount());
 	}
 
 	@Test
@@ -1430,7 +1430,7 @@ class HelpServiceImplTest {
 		helpService.addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, Vote.UP, null));
 
 		// Then
-		assertEquals(4, stat.getHelpfulCount());
+		assertEquals(4L, stat.getHelpfulCount());
 	}
 
 	@Test
@@ -1442,7 +1442,7 @@ class HelpServiceImplTest {
 		helpService.addFeedback(new FeedbackRequestDTO(HelpType.FAQ, 201L, Vote.UP, null));
 
 		// Then
-		assertEquals(1, savedStat().getHelpfulCount());
+		assertEquals(1L, savedStat().getHelpfulCount());
 	}
 
 	@Test
@@ -1467,6 +1467,6 @@ class HelpServiceImplTest {
 		feedback(Vote.UP, false);
 
 		// Then
-		assertEquals(5, stat.getOpenCount());
+		assertEquals(5L, stat.getOpenCount());
 	}
 }

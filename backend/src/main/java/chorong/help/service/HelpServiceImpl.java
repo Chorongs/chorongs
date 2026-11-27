@@ -100,7 +100,7 @@ public class HelpServiceImpl implements HelpService {
         for (HelpContent faq : faqList) {
 
             Optional<HelpStat> faqStat = helpStatRepository.findByTargetKeyAndTargetType( faq.getHelpId().toString(), HelpType.FAQ);
-            int openCount = faqStat.map(HelpStat::getOpenCount).orElse(0);
+            Long openCount = faqStat.map(HelpStat::getOpenCount).orElse(0L);
 
             responseDTOList.add(new HelpContentResponseDTO(faq.getHelpId(), faq.getHelpNo(), faq.getCategory(),
                     faq.getTitle(), faq.getContent(), null, null, openCount));
@@ -123,9 +123,9 @@ public class HelpServiceImpl implements HelpService {
             HelpStat newStat = HelpStat.builder()
                     .targetType(HelpType.FAQ)
                     .targetKey(faq.getHelpId().toString())
-                    .openCount(1)
-                    .helpfulCount(0)
-                    .unhelpfulCount(0)
+                    .openCount(1L)
+                    .helpfulCount(0L)
+                    .unhelpfulCount(0L)
                     .build();
             try {
                 helpStatRepository.save(newStat);
@@ -206,9 +206,9 @@ public class HelpServiceImpl implements HelpService {
                  addHelpStat = HelpStat.builder()
                         .targetType(request.getType())
                         .targetKey(request.getTargetKey().toString())
-                        .openCount(0)
-                        .helpfulCount(request.getVote().equals(Vote.UP) && !request.getCancel() ? 1 : 0)
-                        .unhelpfulCount(request.getVote().equals(Vote.DOWN) && !request.getCancel() ? 1 : 0)
+                        .openCount(0L)
+                        .helpfulCount(request.getVote().equals(Vote.UP) && !request.getCancel() ? 1L : 0L)
+                        .unhelpfulCount(request.getVote().equals(Vote.DOWN) && !request.getCancel() ? 1L : 0L)
                         .build();
 
             try {

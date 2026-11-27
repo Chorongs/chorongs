@@ -21,7 +21,7 @@ public class TermRequest {
     @NotNull
     private String termWord;
     @NotNull
-    private int requestCount;
+    private Integer requestCount;
     @NotNull
     private LocalDateTime createdAt;
     @NotNull
