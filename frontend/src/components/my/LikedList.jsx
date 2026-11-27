@@ -6,6 +6,7 @@ import useMyStore from '../../store/useMyStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
+import { toLoading } from '../../utils/loadingState'
 import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
@@ -55,10 +56,13 @@ function LikedList() {
     }
   }, [page, attempt])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [], total: 0 })
+  // 다시 받기 ([다시 시도], 이미 취소된 찜을 취소하려 했을 때): 1쪽부터 다시, 보여 준 목록이 있으면 받는 동안 흐리게 남김
+  // 상단 찜 개수(ST-02)도 서버와 다시 맞춤
+  const reload = () => {
+    setResult(toLoading)
     setPage(1)
     setAttempt((count) => count + 1)
+    useMyStore.getState().loadLikes()
   }
 
   const handleMore = () => {
@@ -90,7 +94,9 @@ function LikedList() {
       removeWord="취소"
       description="찜은 30개까지 할 수 있어요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.product.productId}
       getItemLabel={(item) => item.product.productName}

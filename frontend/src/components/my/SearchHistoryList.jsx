@@ -11,7 +11,7 @@ import MySection, { RecordRow } from './MySection'
 // 줄 위 글: 저장된 조건(searchCondition)을 쉼표로 이음. 앞 SHOWN_CONDITIONS개만 보이고 나머지는 '외 N개', 한 줄 넘으면 말줄임
 //   (저장된 글 searchLabel은 조건을 읽지 못할 때만 씀) / 줄 아래 글: '상세 검색' 또는 '간편 검색', 검색 날짜
 // 줄 → 그 조건으로 다시 검색: 상세 검색 /search?{조건}, 간편 검색 /search/simple?kw= (API-22 searchCondition으로 주소를 만듦)
-// 줄 X → API-22 DELETE /{searchId} (404면 목록 다시 불러옴) / [전체 삭제] → API-22 DELETE (전체) / 알림은 MySection (MY-03)
+// 줄 X → API-22 DELETE /{searchId} (404면 MySection이 '이미 삭제한' 알림 + 목록 다시 받음) / [전체 삭제] → API-22 DELETE (전체) / 알림은 MySection (MY-03)
 // 맞춤 추천 입력은 기록 안 함 (기록 저장은 상품 찾기 화면이 함)
 const SHOWN_CONDITIONS = 3
 
@@ -97,14 +97,8 @@ function SearchHistoryList() {
   }
 
   const handleRemove = async (item) => {
-    try {
-      await myApi.deleteSearch(item.searchId)
-      setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.searchId !== item.searchId) }))
-    } catch (error) {
-      // 이미 지워진 기록이면 목록을 다시 받음 (API-22)
-      if (error.response?.status === 404) reload()
-      else throw error
-    }
+    await myApi.deleteSearch(item.searchId)
+    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.searchId !== item.searchId) }))
   }
 
   const handleClearAll = async () => {
@@ -126,6 +120,7 @@ function SearchHistoryList() {
       status={result.status}
       hasShown={result.hasShown}
       onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.searchId}
       getItemLabel={getConditionSummary}

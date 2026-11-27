@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import useMyStore, { LIKE_MAX } from '../../store/useMyStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, IconButton } from '../../styles/common'
+import { getGoneText, isGoneError } from '../../utils/removeText'
 import requireLogin, { LIKE_LOGIN_TEXT } from '../../utils/requireLogin'
 import Icon from '../ui/Icon'
 
@@ -37,7 +38,9 @@ function LikeButton({ productId, hasLabel = false }) {
     } catch (error) {
       // 401은 axiosInstance가 로그인 안내 창을 띄움 (E4)
       if (error.response?.status === 401) return
-      if (error.response?.data?.code === 'LIKE_FULL') showToast(LIKE_FULL_TEXT)
+      // 다른 탭, 다른 단말기에서 이미 취소한 찜 (404): 하트는 빈 하트로 맞춰짐
+      if (isGoneError(error)) showToast(getGoneText('찜', '취소'))
+      else if (error.response?.data?.code === 'LIKE_FULL') showToast(LIKE_FULL_TEXT)
       else showToast('찜하지 못했어요. 다시 시도해 주세요')
     } finally {
       setIsPending(false)

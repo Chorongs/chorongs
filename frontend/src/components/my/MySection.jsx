@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, Tag, busyStyle } from '../../styles/common'
+import { getGoneText, isGoneError } from '../../utils/removeText'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
@@ -13,6 +14,10 @@ import LoadingText from '../ui/LoadingText'
 // (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7)
 // [선택 삭제] → 줄마다 체크칸 → [N개 삭제] → 확인 창 → 고른 기록을 한 건씩 차례로 onRemove (서버는 한 건 지우기만 있음)
 //   + '{구역 이름}에서 N개를 삭제했어요' / 하나라도 실패하면 거기서 멈추고 알림 (지운 것까지는 목록에서 빠짐) / [취소] → 선택 끝
+// 이미 지워진 기록(다른 탭, 다른 단말기에서 먼저 지움, 서버 404): 실패로 보지 않음
+//   줄 X → 알림 '이미 {removeWord}한 {itemName}이에요' + 창 닫기 / 선택 삭제 → 다음 기록으로 계속, 다 지운 뒤 같은 알림
+//   (섞이면 '{N}개를 삭제했어요. {M}개는 이미 삭제한 {itemName}이에요') / 둘 다 끝나면 onReload()로 목록을 다시 받음
+// 다른 탭, 창에 갔다가 이 탭으로 돌아오면 (visibilitychange) onReload()로 목록을 다시 받음: 다른 탭에서 저장, 삭제한 것을 반영
 // title이 구역 이름 (찜한 대출, 최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
 // onRemove를 안 넘기면 X, [선택 삭제]를, onClearAll을 안 넘기면 [전체 삭제]를 안 그림
 // hasRowRemove가 false면 줄 X만 안 그리고 [선택 삭제]는 둠 (찜한 대출: 줄마다 하트가 있어 X가 겹침)
@@ -178,6 +183,7 @@ function MySection({
   status,
   hasShown = false,
   onRetry,
+  onReload,
   items = [],
   getKey,
   getItemLabel,
@@ -204,6 +210,16 @@ function MySection({
   // 지금 목록에 남아 있는 것만 (지운 기록, 다시 불러온 목록에 없는 기록은 빠짐)
   const selectedItems = items.filter((item) => selectedKeys.includes(getKey(item)))
 
+  // 이 탭으로 돌아오면 목록을 다시 받음 (다 받은 목록을 보여 주는 중일 때만: 받는 중, 실패 화면에서는 안 함)
+  useEffect(() => {
+    if (!onReload || status !== 'done') return undefined
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') onReload()
+    }
+    document.addEventListener('visibilitychange', handleVisible)
+    return () => document.removeEventListener('visibilitychange', handleVisible)
+  }, [onReload, status])
+
   // 버튼, 확인 창, 알림 글 (메뉴마다 itemName, removeWord로 맞춤)
   const isDelete = removeWord === '삭제'
   const actionLabel = isDelete ? '삭제' : `${itemName} ${removeWord}`
@@ -229,15 +245,29 @@ function MySection({
   const handleRemoveSelected = async () => {
     setIsPending(true)
     let removedCount = 0
+    let goneCount = 0
     try {
       for (const item of selectedItems) {
-        await onRemove(item)
-        removedCount += 1
+        try {
+          await onRemove(item)
+          removedCount += 1
+        } catch (error) {
+          // 이미 지워진 기록은 실패로 보지 않고 다음 기록으로
+          if (!isGoneError(error)) throw error
+          goneCount += 1
+        }
       }
-      showToast(isDelete ? `${title}에서 ${removedCount}개를 삭제했어요` : `${itemName} ${removedCount}개를 ${removeWord}했어요`)
+      // 알림: 지운 것만 '{N}개를 삭제했어요' / 이미 지워진 것만 줄 X와 같은 '이미 삭제한 {itemName}이에요' / 섞이면 둘을 이어서
+      const doneText = isDelete ? `${title}에서 ${removedCount}개를 삭제했어요` : `${itemName} ${removedCount}개를 ${removeWord}했어요`
+      const goneText = getGoneText(itemName, removeWord)
+      if (goneCount === 0) showToast(doneText)
+      else if (removedCount === 0) showToast(goneText)
+      else showToast(`${doneText}. ${goneCount}개는 ${goneText}`)
       stopSelecting()
+      if (goneCount > 0) onReload?.()
     } catch (error) {
       if (error.response?.status !== 401) showToast(failText)
+      if (goneCount > 0) onReload?.()
     } finally {
       setIsSelectConfirmOpen(false)
       setIsPending(false)
@@ -251,7 +281,11 @@ function MySection({
       showToast(`${title}에서 삭제했어요`)
       setRemoveTarget(null)
     } catch (error) {
-      if (error.response?.status !== 401) showToast(failText)
+      if (isGoneError(error)) {
+        showToast(getGoneText(itemName, removeWord))
+        setRemoveTarget(null)
+        onReload?.()
+      } else if (error.response?.status !== 401) showToast(failText)
     } finally {
       setIsPending(false)
     }

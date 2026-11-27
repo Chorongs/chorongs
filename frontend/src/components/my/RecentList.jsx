@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import { toLoading } from '../../utils/loadingState'
 import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
@@ -31,8 +32,9 @@ function RecentList() {
     }
   }, [attempt])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [] })
+  // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때): 보여 준 목록이 있으면 받는 동안 흐리게 남김
+  const reload = () => {
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -52,7 +54,9 @@ function RecentList() {
       itemName="상품"
       description="상세 창을 연 상품을 최근 10개까지 보여 줘요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.product.productId}
       getItemLabel={(item) => item.product.productName}

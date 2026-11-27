@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { Button, Tag } from '../../styles/common'
 import { formatDate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
 import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
@@ -68,8 +69,9 @@ function SavedRecList() {
     }
   }, [attempt])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [] })
+  // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때): 보여 준 목록이 있으면 받는 동안 흐리게 남김
+  const reload = () => {
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -122,7 +124,9 @@ function SavedRecList() {
       itemName="추천 결과"
       description="저장한 추천 결과를 10개까지 보관해요. 상품은 지금 정보로 보여 줘요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(save) => save.saveId}
       getItemLabel={(save) => save.conditionLabel}

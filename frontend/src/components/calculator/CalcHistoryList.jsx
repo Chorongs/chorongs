@@ -7,7 +7,9 @@ import useUiStore from '../../store/useUiStore'
 import { Button, IconButton } from '../../styles/common'
 import { HOME_REGIONS } from '../../utils/finance'
 import { formatDate, formatMoney, formatRate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
 import { CALC_METHODS } from '../../utils/loanMath'
+import { getGoneText, isGoneError } from '../../utils/removeText'
 import ConfirmDialog from '../common/ConfirmDialog'
 import MySection, { RecordRow } from '../my/MySection'
 import Icon from '../ui/Icon'
@@ -292,7 +294,8 @@ const DialogTarget = styled.p`
 `
 
 // 계산기 화면 오른쪽 칸의 계산 기록 (items가 1개 이상일 때만 그려짐): 카드를 누르면 onLoad(item), X는 확인 창 뒤에 onRemove
-function CalcHistoryRail({ config, items, onLoad, onRemove }) {
+// 이미 지워진 기록(404)은 MySection과 같이 '이미 삭제한 계산 기록이에요' + 창 닫기 + onReload()
+function CalcHistoryRail({ config, items, onLoad, onRemove, onReload }) {
   const showToast = useUiStore((state) => state.showToast)
   const [page, setPage] = useState(0)
   const [removeTarget, setRemoveTarget] = useState(null)
@@ -311,7 +314,11 @@ function CalcHistoryRail({ config, items, onLoad, onRemove }) {
       showToast(`${groupTitle}에서 삭제했어요`)
       setRemoveTarget(null)
     } catch (error) {
-      if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
+      if (isGoneError(error)) {
+        showToast(getGoneText('계산 기록'))
+        setRemoveTarget(null)
+        onReload()
+      } else if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
     } finally {
       setIsPending(false)
     }
@@ -416,8 +423,10 @@ function CalcHistoryList({
     }
   }, [isMember, attempt, refreshKey, config, onItemsChange])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [] })
+  // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때)
+  // MY 목록은 보여 준 목록이 있으면 받는 동안 흐리게 남김 / 계산기 화면 칸은 'done'이 아니면 사라지므로 상태를 그대로 두고 새 목록으로 바꿈
+  const reload = () => {
+    if (!isOnlyWithItems) setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -446,7 +455,7 @@ function CalcHistoryList({
   if (authStatus === 'checking') return null
   if (isOnlyWithItems) {
     if (!isMember || result.status !== 'done' || result.items.length === 0) return null
-    return <CalcHistoryRail config={config} items={result.items} onLoad={handleLoad} onRemove={handleRemove} />
+    return <CalcHistoryRail config={config} items={result.items} onLoad={handleLoad} onRemove={handleRemove} onReload={reload} />
   }
 
   if (!isMember) {
@@ -464,7 +473,9 @@ function CalcHistoryList({
       itemName="계산 기록"
       description="[결과 저장]을 누른 기록이에요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item[config.idKey]}
       getItemLabel={(item) => getItemLabel(config, item)}

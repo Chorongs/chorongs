@@ -9,7 +9,7 @@ import { toLoading } from '../../utils/loadingState'
 import MySection, { ProductStatusTag } from './MySection'
 
 // MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / [선택 삭제] [전체 삭제]
-// 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / [전체 삭제] → API-23 DELETE (전체) / 알림은 MySection (MY-03)
+// 줄 X → API-23 DELETE /{compareId} (404면 MySection이 '이미 삭제한' 알림 + 목록 다시 받음) / [전체 삭제] → API-23 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료, 숨긴 상품이 있으면 딱지 + 안내
 // '다시 비교' → useCompareStore.setPair(productA.productId, productB.productId) 후 /compare (ST-04)
 const Row = styled.div`
@@ -98,14 +98,8 @@ function CompareHistoryList() {
   }
 
   const handleRemove = async (item) => {
-    try {
-      await myApi.deleteCompare(item.compareId)
-      setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.compareId !== item.compareId) }))
-    } catch (error) {
-      // 이미 지워진 기록이면 목록을 다시 받음 (API-23)
-      if (error.response?.status === 404) reload()
-      else throw error
-    }
+    await myApi.deleteCompare(item.compareId)
+    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.compareId !== item.compareId) }))
   }
 
   const handleClearAll = async () => {
@@ -141,6 +135,7 @@ function CompareHistoryList() {
       status={result.status}
       hasShown={result.hasShown}
       onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.compareId}
       getItemLabel={(item) => `${item.productA.productName} vs ${item.productB.productName}`}
