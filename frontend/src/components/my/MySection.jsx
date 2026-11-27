@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
-import styled, { css } from 'styled-components'
+import { useState } from 'react'
+import styled from 'styled-components'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, IconButton, StatusText, Tag } from '../../styles/common'
+import { Button, EmptyBox, IconButton, Tag, busyStyle } from '../../styles/common'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
 import Icon from '../ui/Icon'
+import LoadingText from '../ui/LoadingText'
 
 // MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 [선택 삭제] [전체 삭제] / 목록(줄마다 X) 또는 빈 상태
 // 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 삭제했어요' / [전체 삭제] → 확인 창 → onClearAll() + '{구역 이름}을(를) 삭제했어요'
@@ -19,15 +20,14 @@ import Icon from '../ui/Icon'
 //   → '이 {itemName}을(를) 삭제할까요?', '선택한 {itemName} N개를 삭제할까요?'
 // removeWord: 지우는 동작 말 (기본 '삭제'. 찜한 대출은 '취소' → [선택해서 찜 취소], [N개 찜 취소], '선택한 찜 N개를 취소할까요?' [닫기] [찜 취소], '찜 N개를 취소했어요')
 // status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
-//   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
-//   흐리게는 0.3초가 넘게 걸릴 때만 (응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
+//   'loading'이고 hasShown(다 받은 결과를 한 번이라도 보여 줌, utils/loadingState의 toLoading)이면 다시 받는 중:
+//   이전 목록(빈 목록 포함)과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
+//   흐리게는 0.3초가 넘게 걸릴 때만 (busyStyle, 응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
 
-// 다시 받는 중 흐리게 (목록, 제목 줄 버튼): 흐려질 때만 0.3초 뒤에 시작 (LoadingText와 같은 기다림), 돌아올 때는 바로
-// 0.3초 안에 다 받으면 흐려지기 전에 끝나서 화면이 바뀌지 않음
-const busyStyle = css`
-  opacity: ${({ $isBusy }) => ($isBusy ? 0.45 : 1)};
-  transition: ${({ $isBusy }) => ($isBusy ? 'opacity 0.15s 0.3s' : 'opacity 0.15s')};
+// 목록 자리 (다시 받는 중이면 흐리게)
+const Body = styled.div`
+  ${busyStyle}
 `
 
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
@@ -37,7 +37,6 @@ const List = styled.ul`
   border-top: 1px solid var(--line);
   container-type: inline-size;
   container-name: plist;
-  ${busyStyle}
 `
 
 // 고르는 중 줄 앞 체크칸 자리 (체크칸은 공통 Checkbox(UI-12), 칸 이름은 화면 낭독기용으로만)
@@ -164,19 +163,6 @@ export function ProductStatusTag({ product }) {
   return null
 }
 
-// 불러오는 중 글 (MY 구역, 내 진단 리포트가 같이 씀): 처음 LOADING_TEXT_DELAY_MS 동안은 빈칸, 그 뒤에도 불러오는 중이면 '불러오는 중이에요'
-// (보통은 그 안에 끝나서, 메뉴를 옮길 때 '불러오는 중이에요'가 번쩍 보였다 빈 상태 글로 바뀌는 깜빡임이 없음)
-const LOADING_TEXT_DELAY_MS = 300
-
-export function LoadingText() {
-  const [isShown, setIsShown] = useState(false)
-  useEffect(() => {
-    const timer = setTimeout(() => setIsShown(true), LOADING_TEXT_DELAY_MS)
-    return () => clearTimeout(timer)
-  }, [])
-  return <StatusText role="status">{isShown ? '불러오는 중이에요' : '\u00a0'}</StatusText>
-}
-
 const REMOVE_FAIL_TEXT = '삭제하지 못했어요. 다시 시도해 주세요'
 
 // 받침이 있으면 '을', 없으면 '를' (한글이 아닌 글자로 끝나면 '을(를)')
@@ -190,6 +176,7 @@ function MySection({
   title,
   description,
   status,
+  hasShown = false,
   onRetry,
   items = [],
   getKey,
@@ -283,8 +270,8 @@ function MySection({
     }
   }
 
-  // 다시 받는 중 (이전 줄이 남아 있음). 이전 줄이 없으면(처음 열 때, 실패 뒤 다시 시도) LoadingText
-  const isBusy = status === 'loading' && items.length > 0
+  // 다시 받는 중 (이전 목록이 남아 있음). 보여 준 결과가 없으면(처음 열 때, 실패 뒤 다시 시도) LoadingText
+  const isBusy = status === 'loading' && hasShown
 
   let body
   if (status === 'loading' && !isBusy) {
@@ -302,7 +289,7 @@ function MySection({
     body = <EmptyBox>{emptyContent}</EmptyBox>
   } else {
     body = (
-      <List $isBusy={isBusy} inert={isBusy} aria-busy={isBusy}>
+      <List>
         {items.map((item) => (
           <Item key={getKey(item)}>
             {isSelecting && (
@@ -363,7 +350,9 @@ function MySection({
         )}
       </SectionHeader>
 
-      {body}
+      <Body $isBusy={isBusy} inert={isBusy} aria-busy={isBusy}>
+        {body}
+      </Body>
 
       {hasMore && status === 'done' && (
         <More>

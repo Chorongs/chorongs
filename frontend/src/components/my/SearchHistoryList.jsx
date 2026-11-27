@@ -4,6 +4,7 @@ import * as myApi from '../../api/myApi'
 import { SEARCH_FILTERS, getKeywordLabel } from '../../constants/options'
 import useUiStore from '../../store/useUiStore'
 import { formatDate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
 import MySection, { RecordRow } from './MySection'
 
 // MY-06 최근 검색 (검색 기록 10개): 기록 줄 (줄마다 X) / [선택 삭제] [전체 삭제]
@@ -89,9 +90,9 @@ function SearchHistoryList() {
     }
   }, [attempt])
 
-  // 다시 받을 때 이전 줄을 남김 (받는 동안 MySection이 흐리게 둠)
+  // 다시 받을 때 이전 목록을 남김 (보여 준 적이 있으면 받는 동안 MySection이 흐리게 둠)
   const reload = () => {
-    setResult((prev) => ({ ...prev, status: 'loading' }))
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -123,6 +124,7 @@ function SearchHistoryList() {
       itemName="검색 기록"
       description="상품 찾기에서 검색한 조건을 최근 10개까지 보여 줘요."
       status={result.status}
+      hasShown={result.hasShown}
       onRetry={reload}
       items={result.items}
       getKey={(item) => item.searchId}

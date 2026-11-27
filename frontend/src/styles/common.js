@@ -486,6 +486,13 @@ export const StatusText = styled.p`
   text-align: center;
 `
 
+// 다시 받는 중 흐리게 ($isBusy): 흐려질 때만 0.3초 뒤에 시작 (LoadingText와 같은 기다림), 다시 밝게는 바로
+// 0.3초 안에 다 받으면 흐려지기 전에 끝나서 화면이 바뀌지 않음 / 누르기는 그 자리에 inert를 같이 줘서 막음
+export const busyStyle = css`
+  opacity: ${({ $isBusy }) => ($isBusy ? 0.45 : 1)};
+  transition: ${({ $isBusy }) => ($isBusy ? 'opacity 0.15s 0.3s' : 'none')};
+`
+
 // 글자 입력칸 하나: label 안에 칸 이름 글자 + input + 칸 아래 글 (닉네임, 생년월일 칸이 같이 씀)
 // input에 aria-invalid="true"면 테두리 빨간색 (틀린 칸 표시, NumberField와 같은 색)
 export const InputField = styled.label`

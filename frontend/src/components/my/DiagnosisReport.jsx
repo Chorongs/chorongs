@@ -9,7 +9,7 @@ import { formatDate } from '../../utils/format'
 import { recommendWithBand } from '../../utils/recommend'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
-import { LoadingText } from './MySection'
+import LoadingText from '../ui/LoadingText'
 
 // MY-09 내 진단 리포트: 저장한 신용 구간 + 진단 시각 / [이 구간으로 추천받기] / [삭제]
 // 삭제 → 확인 후 API-25 DELETE / 없으면(204) 빈 상태 + '신용 셀프 진단 하기' (E11)

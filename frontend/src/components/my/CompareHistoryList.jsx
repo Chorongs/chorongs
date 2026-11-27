@@ -5,6 +5,7 @@ import * as myApi from '../../api/myApi'
 import useCompareStore from '../../store/useCompareStore'
 import { Button } from '../../styles/common'
 import { formatDate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
 import MySection, { ProductStatusTag } from './MySection'
 
 // MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / [선택 삭제] [전체 삭제]
@@ -90,9 +91,9 @@ function CompareHistoryList() {
     }
   }, [attempt])
 
-  // 다시 받을 때 이전 줄을 남김 (받는 동안 MySection이 흐리게 둠)
+  // 다시 받을 때 이전 목록을 남김 (보여 준 적이 있으면 받는 동안 MySection이 흐리게 둠)
   const reload = () => {
-    setResult((prev) => ({ ...prev, status: 'loading' }))
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -138,6 +139,7 @@ function CompareHistoryList() {
       itemName="비교 내역"
       description="저장한 비교를 최근 10개까지 보여 줘요."
       status={result.status}
+      hasShown={result.hasShown}
       onRetry={reload}
       items={result.items}
       getKey={(item) => item.compareId}
