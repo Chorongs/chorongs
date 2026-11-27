@@ -2,7 +2,7 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
-import useAuthStore from '../../store/useAuthStore'
+import useAuthStore, { reloadToMainWithToast } from '../../store/useAuthStore'
 import useCompareStore from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
@@ -16,7 +16,7 @@ import Checkbox from '../ui/Checkbox'
 // MY-11 회원 정보: 닉네임, 생년월일 수정 (API-28 PATCH, 바꾼 것만 보냄) / [회원 탈퇴] (API-28 DELETE)
 // 닉네임 2~12자, 앞뒤 공백 제거 (같은 닉네임 허용) / 생년월일 형식, 미래 날짜, 만 19세 미만 → 오류 문구 (E2) / 400 → 서버 문구
 // 탈퇴: 확인 창 필수 (되돌릴 수 없음) → '위 내용을 확인했어요' 체크 + 칸에 '탈퇴할게요' 입력(앞뒤 공백 무시) 후 [탈퇴하기] → sessionStorage 비움
-//   → 안내 창 → 닫으면 새로고침하며 메인(/)으로 (로그아웃과 같은 방식) / 누르는 중 잠금 (E5)
+//   → 새로고침하며 메인(/)으로 → 메인에서 알림 '탈퇴했어요. 개인정보와 이용 기록을 모두 지웠어요' (로그아웃과 같은 방식, reloadToMainWithToast) / 누르는 중 잠금 (E5)
 // 검사 규칙 (명세서 MY-11, 회원 관리 기획서 3-7, 4-5, 5-4):
 //   - 닉네임: 앞뒤 공백을 뺀 2자 이상 12자 이하 (isValidNickname), 글자 종류 제한 없음, 같은 닉네임 허용
 //   - 생년월일: 숫자 8자리 입력 (BirthDateField) → 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전, 만 19세 이상 (isAdultBirthDate)
@@ -104,8 +104,8 @@ function MemberInfo() {
   const [isSaving, setIsSaving] = useState(false)
   // 생년월일을 다시 치기 전에 [저장]을 눌렀는지 (비었거나 덜 친 날짜를 그때 오류로 보임)
   const [isSaveTried, setIsSaveTried] = useState(false)
-  // 탈퇴 창 단계: null 닫힘 / 'confirm' 확인 / 'done' 끝남 안내
-  const [withdrawStep, setWithdrawStep] = useState(null)
+  // 탈퇴 확인 창 열림
+  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false)
   const [isChecked, setIsChecked] = useState(false)
   const [withdrawText, setWithdrawText] = useState('')
   const [withdrawError, setWithdrawError] = useState('')
@@ -165,7 +165,7 @@ function MemberInfo() {
     setIsChecked(false)
     setWithdrawText('')
     setWithdrawError('')
-    setWithdrawStep('confirm')
+    setIsWithdrawOpen(true)
   }
 
   const handleWithdraw = async () => {
@@ -178,7 +178,8 @@ function MemberInfo() {
       useCompareStore.getState().setPickSlot(null)
       useCompareStore.getState().setPair(null, null)
       sessionStorage.clear()
-      setWithdrawStep('done')
+      // 새로고침하며 메인으로: 메모리의 스토어 값이 한꺼번에 비워짐
+      reloadToMainWithToast('탈퇴했어요. 개인정보와 이용 기록을 모두 지웠어요')
     } catch (error) {
       // 401은 axiosInstance가 로그인 안내 창을 띄우므로 화면 글을 겹쳐 띄우지 않음 (E4)
       if (error.response?.status !== 401) setWithdrawError('탈퇴하지 못했어요.\n다시 시도해 주세요')
@@ -186,9 +187,6 @@ function MemberInfo() {
       setIsWithdrawing(false)
     }
   }
-
-  // 새로고침하며 메인으로: 메모리의 스토어 값이 한꺼번에 비워짐
-  const handleDoneClose = () => window.location.replace('/')
 
   return (
     <section>
@@ -225,8 +223,8 @@ function MemberInfo() {
       </Card>
 
       <ConfirmDialog
-        isOpen={withdrawStep === 'confirm'}
-        onClose={() => setWithdrawStep(null)}
+        isOpen={isWithdrawOpen}
+        onClose={() => setIsWithdrawOpen(false)}
         label="회원 탈퇴"
         title="회원 탈퇴"
         titleSize="lg"
@@ -260,22 +258,6 @@ function MemberInfo() {
           <ErrorText>{withdrawError}</ErrorText>
         </DialogBody>
       </ConfirmDialog>
-
-      <ConfirmDialog
-        isOpen={withdrawStep === 'done'}
-        onClose={handleDoneClose}
-        label="탈퇴 완료"
-        title={
-          <>
-            탈퇴했어요.
-            <br />
-            개인정보와 이용 기록을 모두 지웠어요
-          </>
-        }
-        confirmLabel="확인"
-        onConfirm={handleDoneClose}
-        cancelLabel={null}
-      />
     </section>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import useMyStore from '../../store/useMyStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { Button } from '../../styles/common'
@@ -9,7 +10,8 @@ import ProductRow from '../common/ProductRow'
 import MySection, { ProductStatusTag } from './MySection'
 
 // MY-04 찜한 대출 (최대 30개): 상품 목록, 쪽 나눔 (E7) / 빈 상태 '맞춤 추천 받기'
-// 찜 취소는 줄의 하트(LikeButton)로 함 (X, [선택 삭제], [전체 삭제] 없음)
+// 찜 취소는 줄의 하트(LikeButton)로 한 개씩, 또는 [선택 삭제]로 여러 개를 골라 한 번에 (MY-03, 줄 X와 [전체 삭제]는 없음: X는 하트와 겹치고, 찜은 일부러 모은 것이라 한 번에 다 지우는 버튼은 두지 않음)
+// [선택 삭제]로 고른 상품: 아직 찜 상태면 찜 취소(API-20 DELETE, 상단 찜 개수도 같이 줄어듦), 하트로 이미 취소한 상품은 목록에서만 뺌
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
 // 찜 목록 응답은 공통 PageInfo { list, total, page, size }
 // '맞춤 추천 받기'는 LY-05 '캐링 추천'과 같음: 추천받기 전이면 추천 창, 받은 뒤면 /recommend (hasResult = useRecommendStore result 유무)
@@ -64,6 +66,17 @@ function LikedList() {
     setPage((current) => current + 1)
   }
 
+  const handleRemove = async (item) => {
+    const id = item.product.productId
+    const { likedIds, toggleLike } = useMyStore.getState()
+    if (likedIds.includes(id)) await toggleLike(id)
+    setResult((prev) => ({
+      ...prev,
+      items: prev.items.filter((one) => one.product.productId !== id),
+      total: Math.max(0, prev.total - 1),
+    }))
+  }
+
   // 추천받기 전이면 추천 창 열기, 받은 뒤면 /recommend 이동 (LY-05)
   const handleRecommend = () => {
     if (hasResult) navigate('/recommend')
@@ -78,6 +91,9 @@ function LikedList() {
       onRetry={handleRetry}
       items={result.items}
       getKey={(item) => item.product.productId}
+      getItemLabel={(item) => item.product.productName}
+      onRemove={handleRemove}
+      hasRowRemove={false}
       renderItem={(item) => (
         <>
           <StatusLine>

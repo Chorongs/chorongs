@@ -65,7 +65,7 @@ function LoginPage() {
     <AuthLayout
       mark="logo"
       title="로그인"
-      description={errorText ?? '로그인 방법을 선택하세요'}
+      description={errorText ?? '로그인 방법을 선택해 주세요'}
       isError={Boolean(errorText)}
     >
       <Social>

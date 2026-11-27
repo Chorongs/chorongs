@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { MY_MENU_GROUPS, getMyMenuPath } from '../../constants/menu'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAdminStore, { ADMIN_LOGGED_IN_TEXT } from '../../store/useAdminStore'
-import useAuthStore from '../../store/useAuthStore'
+import useAuthStore, { reloadToMainWithToast, takeReloadToast } from '../../store/useAuthStore'
 import useMyStore from '../../store/useMyStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, CountBadge } from '../../styles/common'
@@ -20,8 +20,8 @@ import { isComparing } from '../../store/useCompareStore'
 // 모바일(900px 미만)은 작은 메뉴 대신 /my 이동 / 바깥 클릭, Esc(Popover), 화면 이동(key=주소) 시 메뉴 닫기
 // 로그아웃: 메뉴는 창 열기(openLogout)만. 창은 아래 LogoutDialog를 Layout이 한 번만 그림
 //   (상단바(z-index 50) 안에서 그리면 하단 탭바(55), 비교함 띠(58) 아래에 깔려서. UI-15 'createPortal 안 쓰고 Layout에서 그림')
-// LogoutDialog: 확인 창 '로그아웃할까요?' → API-16 + sessionStorage 비우기 → 안내 창 → 닫으면 새로고침하며 메인(/)으로
-// (새로고침하면 메모리의 알림이 지워지므로 알림 대신 안내 창을 먼저 띄움)
+// LogoutDialog: 확인 창 '로그아웃할까요?' → API-16 + sessionStorage 비우기 → 새로고침하며 메인(/)으로 → 메인에서 알림 '로그아웃했어요'
+//   (새로고침하면 메모리의 알림이 지워져서, 알림 글을 reloadToMainWithToast로 넘기고 LogoutDialog가 처음 그려질 때 꺼내 보임. 탈퇴 알림도 같음)
 const MOBILE_QUERY = '(max-width: 899px)'
 // 한눈에 보기(key null, /my) 링크의 이 메뉴 안 글
 const MY_HOME_LABEL = '마이페이지'
@@ -124,8 +124,14 @@ export function LogoutDialog() {
   const logoutOpen = useUiStore((state) => state.logoutOpen)
   const closeLogout = useUiStore((state) => state.closeLogout)
   const logout = useAuthStore((state) => state.logout)
+  const showToast = useUiStore((state) => state.showToast)
   const [isPending, setIsPending] = useState(false)
-  const [isDone, setIsDone] = useState(false)
+
+  // 새로고침 전에 적어 둔 알림 (로그아웃, 탈퇴)이 있으면 한 번 보임
+  useEffect(() => {
+    const message = takeReloadToast()
+    if (message) showToast(message)
+  }, [showToast])
 
   const handleLogout = async (event) => {
     // 대출 비교에 담은 상품이 있으면 확인 창을 먼저. [예]면 상품을 비우고 이 버튼을 다시 눌러 로그아웃 (Layout)
@@ -137,41 +143,20 @@ export function LogoutDialog() {
     }
     setIsPending(true)
     await logout()
-    setIsPending(false)
-    setIsDone(true)
+    // 새로고침하며 메인으로: 메모리의 스토어 값(추천 결과, 비교 화면 상품, 찜 등)이 한꺼번에 비워짐
+    reloadToMainWithToast('로그아웃했어요')
   }
 
-  // 새로고침하며 메인으로: 메모리의 스토어 값(추천 결과, 비교함, 찜 등)이 한꺼번에 비워짐
-  const handleDoneClose = () => window.location.replace('/')
-
   return (
-    <>
-      <ConfirmDialog
-        isOpen={logoutOpen && !isDone}
-        onClose={closeLogout}
-        label="로그아웃 확인"
-        title="로그아웃할까요?"
-        confirmLabel="로그아웃"
-        onConfirm={handleLogout}
-        isConfirmDisabled={isPending}
-      />
-
-      <ConfirmDialog
-        isOpen={isDone}
-        onClose={handleDoneClose}
-        label="로그아웃 완료"
-        title={
-          <>
-            로그아웃했어요.
-            <br />
-            메인 페이지로 이동할게요
-          </>
-        }
-        confirmLabel="확인"
-        onConfirm={handleDoneClose}
-        cancelLabel={null}
-      />
-    </>
+    <ConfirmDialog
+      isOpen={logoutOpen}
+      onClose={closeLogout}
+      label="로그아웃 확인"
+      title="로그아웃할까요?"
+      confirmLabel="로그아웃"
+      onConfirm={handleLogout}
+      isConfirmDisabled={isPending}
+    />
   )
 }
 

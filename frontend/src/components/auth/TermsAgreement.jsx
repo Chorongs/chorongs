@@ -19,7 +19,7 @@ import BirthDateField from './BirthDateField'
 //   - 필수 약관 2개(이용약관, 개인정보 수집/이용)를 모두 체크해야 함 → 아니면 맨 아래 '필수 약관에 동의해 주세요.' (문구 1)
 //   - 생년월일(needBirth일 때만, 필수): 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전, 만 19세 이상 (isAdultBirthDate)
 //   - 생년월일 칸은 숫자 8자리 입력, 칸 아래 안내는 치는 동안 바로 바뀜 (BirthDateField, MY 회원 정보와 같이 씀):
-//     비었거나 치는 중 → 회색 안내(6-1) / 틀림 → '입력한 생년월일을 확인해주세요'(6-2) / 정상 → '생년월일 입력 완료'(6-3)
+//     비었거나 치는 중 → 회색 안내(6-1) / 틀림 → '입력한 생년월일을 확인해 주세요'(6-2) / 정상 → '생년월일 입력 완료'(6-3)
 //   - [시작하기]를 눌렀는데 비었거나 덜 침, 서버 400 INVALID_INPUT도 6-2 (다시 치기 시작하면 실시간 안내로 돌아감)
 //   - [시작하기]가 막히면(약관 빠짐, 생년월일 틀림) 보내지 않고 알림 RECHECK_INPUT_TEXT + 틀린 곳 표시:
 //     체크 안 한 [필수] 약관 글 빨간색 (체크하면 바로 돌아옴), 생년월일 칸 테두리 빨간색 (InputField aria-invalid)
@@ -132,7 +132,7 @@ function TermsAgreement({ needBirth, onDone }) {
     } catch (err) {
       const code = err.response?.data?.code
       if (code === 'SIGNUP_EXPIRED') {
-        showToast('시간이 만료되었어요. 다시 진행 해주세요.')
+        showToast('가입 시간이 지났어요. 다시 로그인해 주세요')
         navigate('/login', { replace: true })
         return
       }

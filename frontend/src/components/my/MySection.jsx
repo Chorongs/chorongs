@@ -12,8 +12,9 @@ import Icon from '../ui/Icon'
 // (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7)
 // [선택 삭제] → 줄마다 체크칸 → [N개 삭제] → 확인 창 → 고른 기록을 한 건씩 차례로 onRemove (서버는 한 건 지우기만 있음)
 //   + '{구역 이름}에서 N개를 삭제했어요' / 하나라도 실패하면 거기서 멈추고 알림 (지운 것까지는 목록에서 빠짐) / [취소] → 선택 끝
-// title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
-// onRemove, onClearAll을 안 넘기면 X, [선택 삭제], [전체 삭제]를 안 그림 (찜한 대출)
+// title이 구역 이름 (찜한 대출, 최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
+// onRemove를 안 넘기면 X, [선택 삭제]를, onClearAll을 안 넘기면 [전체 삭제]를 안 그림
+// hasRowRemove가 false면 줄 X만 안 그리고 [선택 삭제]는 둠 (찜한 대출: 줄마다 하트가 있어 X가 겹침)
 // status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
 //   'loading'인데 items가 남아 있으면 다시 받는 중: 이전 줄과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
 //   흐리게는 0.3초가 넘게 걸릴 때만 (응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
@@ -193,6 +194,7 @@ function MySection({
   renderItem,
   onRemove,
   onClearAll,
+  hasRowRemove = true,
   emptyContent,
   hasMore = false,
   onMore,
@@ -307,7 +309,7 @@ function MySection({
             >
               {renderItem(item)}
             </ItemBody>
-            {onRemove && !isSelecting && (
+            {onRemove && hasRowRemove && !isSelecting && (
               <IconButton aria-label={`${getItemLabel(item)} 삭제`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
                 <Icon name="close" size={16} />
               </IconButton>

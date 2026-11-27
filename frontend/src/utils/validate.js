@@ -61,7 +61,7 @@ export const isAdultBirthDate = (text, today = new Date()) => {
 export const RECHECK_INPUT_TEXT = '입력한 내용을 다시 확인해 주세요'
 
 // 생년월일 오류 문구 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 기획서 문구 6-2)
-export const BIRTH_ERROR = '입력한 생년월일을 확인해주세요'
+export const BIRTH_ERROR = '입력한 생년월일을 확인해 주세요'
 
 // 생년월일 칸 안내 (가입 단계 AU-03, MY 회원 정보 MY-11 같이 씀, 비었거나 치는 중이고 틀린 곳이 없을 때 회색)
 export const BIRTH_GUIDE = "생년월일을 '-' 없이 다음과 같이 입력해 주세요 (예: 19900101)"

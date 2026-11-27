@@ -7,6 +7,24 @@ import { useRecommendStore } from './useRecommendStore'
 // ST-01 로그인 정보 (저장 안 함: 로그인은 서버 쿠키 세션, E14)
 // user: { memberNickname, loginType, birthYear, birthDay } (비회원 null) / status: checking, guest, member
 // 가입 완료(API-50), 회원 정보 수정(API-28)처럼 서버가 MemberResponseDTO를 돌려주면 쓰는 쪽에서 setState({ user })로 바꾼다.
+
+// 로그아웃, 탈퇴 뒤 새로고침하며 메인(/)으로 간 다음 한 번만 보일 알림 글
+// 새로고침하면 메모리의 알림이 지워져서 sessionStorage에 글만 잠깐 둠 (개인정보 아님, 꺼내면 바로 지움)
+const RELOAD_TOAST_KEY = 'chorong-reload-toast'
+
+// 알림 글을 적고 새로고침하며 메인으로 (메모리의 스토어 값이 한꺼번에 비워짐). sessionStorage를 비운 뒤에 부름
+export function reloadToMainWithToast(message) {
+  sessionStorage.setItem(RELOAD_TOAST_KEY, message)
+  window.location.replace('/')
+}
+
+// 화면을 처음 그릴 때 한 번: 적어 둔 알림 글을 꺼내고 지움 (없으면 null)
+export function takeReloadToast() {
+  const message = sessionStorage.getItem(RELOAD_TOAST_KEY)
+  sessionStorage.removeItem(RELOAD_TOAST_KEY)
+  return message
+}
+
 const useAuthStore = create((set) => ({
   user: null,
   status: 'checking',
@@ -33,7 +51,7 @@ const useAuthStore = create((set) => ({
 
   // API-16 로그아웃 + 이 탭의 임시 저장값(sessionStorage: 추천 입력, 신용 진단 답, 소비 습관 입력, 비교 화면 상품 등) 비우기
   // 서버 로그아웃이 실패해도 화면 쪽 값은 비운다 (E6)
-  // 메모리의 스토어 값은 부르는 쪽이 안내 창을 닫을 때 새로고침하며 메인(/)으로 가서 한꺼번에 비운다.
+  // 메모리의 스토어 값은 부르는 쪽이 reloadToMainWithToast로 새로고침하며 메인(/)으로 가서 한꺼번에 비운다.
   logout: async () => {
     try {
       await authApi.postLogout()
