@@ -66,7 +66,7 @@ public class MemberServiceImpl implements MemberService {
         recentViewRepository.deleteByMemberId(memberId);
         searchHistoryRepository.deleteByMemberId(memberId);
         compareHistoryRepository.deleteByMemberId(memberId);
-        recommendResultRepository.deleteByMemberId(memberId); // 추천 결과 삭제
+        recommendResultRepository.deleteByMemberId(memberId);
         diagnosisReportRepository.findByMemberId(memberId).ifPresent(diagnosisReportRepository::delete);
         calcHistoryRepository.deleteByMemberId(memberId);
         dsrLoanRepository.deleteByMemberId(memberId);
