@@ -2,22 +2,18 @@ import { useState } from 'react'
 import { Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../api/authApi'
-import kakaoSymbol from '../assets/images/kakao_symbol.svg'
-import naverSymbol from '../assets/images/naver_symbol.png'
 import useAdminStore from '../store/useAdminStore'
 import useAuthStore from '../store/useAuthStore'
 import useUiStore from '../store/useUiStore'
+import SocialLoginButtons from '../components/auth/SocialLoginButtons'
 import AuthLayout from '../components/layout/AuthLayout'
-import { Button } from '../styles/common'
-import { ADMIN_SESSION_TEXT, ALREADY_LOGGED_IN_TEXT, LOGIN_OFFLINE_TEXT, checkSocialLogin } from '../utils/requireLogin'
+import { ADMIN_LOGIN_GUIDE_TEXT, ALREADY_LOGGED_IN_TEXT, LOGIN_OFFLINE_TEXT, checkSocialLogin } from '../utils/requireLogin'
 
 // AU-01 로그인 화면 (/login): 소셜 로그인 시작. 자체 회원가입, 비밀번호 없음
-// 이미 로그인 → /my / 버튼 → API-18 (카카오, 네이버 로그인 화면으로 이동)
+// 이미 로그인 → /my / 버튼(SocialLoginButtons) → API-18 (카카오, 네이버 로그인 화면으로 이동)
 // 주소의 error 값(API-19가 붙임, SIGNUP_EXPIRED는 가입 단계가 붙임)으로 안내 한 줄을 바꿈. 정해진 값이 아니면 기본 안내
-// 소셜 버튼: 카카오 로그인 디자인 가이드의 문구('카카오 로그인' 또는 '로그인')와 받은 네이버 공식 리소스 문구('네이버 로그인')를 따름
-//   심볼은 공식 파일 그대로(모양, 비율, 색 변경 금지), 글자가 있으니 alt=""(꾸밈 그림)
 const ERROR_TEXT = {
-  ADMIN_LOGGED_IN: ADMIN_SESSION_TEXT,
+  ADMIN_LOGGED_IN: ADMIN_LOGIN_GUIDE_TEXT,
   CANCELLED: '로그인을 취소했어요',
   FAILED: '로그인에 실패했어요.\n다시 시도해 주세요',
   SIGNUP_EXPIRED: '가입 시간이 지났어요.\n다시 로그인해 주세요',
@@ -43,7 +39,10 @@ function LoginPage() {
   const [isAdminBlocked, setIsAdminBlocked] = useState(false)
   // 관리자 세션이 있는 것을 알면 버튼을 잠가 서버에 다시 묻지 않음 (안내 한 줄은 관리자 안내)
   const isAdminSession = isAdminAuthed || isAdminBlocked
-  const errorText = isAdminSession ? ERROR_TEXT.ADMIN_LOGGED_IN : ERROR_TEXT[searchParams.get('error')]
+  // 정해진 error 값만 (주소에 아무 값이나 붙여도 객체 기본 속성을 읽지 않게)
+  const errorCode = searchParams.get('error')
+  const urlErrorText = errorCode && Object.hasOwn(ERROR_TEXT, errorCode) ? ERROR_TEXT[errorCode] : undefined
+  const errorText = isAdminSession ? ERROR_TEXT.ADMIN_LOGGED_IN : urlErrorText
 
   // 확인하는 동안(checking)에도 로그인 버튼을 보여 줌 (서버 응답이 늦어도 화면이 멈춰 보이지 않게)
   // 누르는 순간 아래 handleLogin이 서버에 다시 확인하므로 이미 로그인 중이면 소셜 로그인으로 보내지 않음
@@ -70,14 +69,7 @@ function LoginPage() {
       isError={Boolean(errorText)}
     >
       <Social>
-        <Button $variant="kakao" onClick={() => handleLogin('kakao')} disabled={isChecking || isAdminSession}>
-          <img src={kakaoSymbol} alt="" />
-          카카오 로그인
-        </Button>
-        <Button $variant="naver" onClick={() => handleLogin('naver')} disabled={isChecking || isAdminSession}>
-          <img src={naverSymbol} alt="" />
-          네이버 로그인
-        </Button>
+        <SocialLoginButtons onLogin={handleLogin} disabled={isChecking || isAdminSession} />
       </Social>
     </AuthLayout>
   )

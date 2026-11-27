@@ -6,8 +6,8 @@ import CalcHistoryList from '../calculator/CalcHistoryList'
 
 // MY-10 계산 기록: 맨 위 계산기 종류 칩 5개 (CALC_RECORD_KINDS, 처음은 대출 이자) / 칩을 누르면 그 종류 목록만
 // 고른 종류는 주소 /my/calcs?kind={key}에 둠 (MY 왼쪽 메뉴 '계산 기록' 아래 하위 메뉴로 바로 열고, 새로고침해도 유지). 없거나 틀린 값이면 대출 이자
-// 목록: 다섯 종류 모두 CalcHistoryList (CA-07) 하나에 계산기 종류(kind)만 바꿔 씀 (API-24, 56부터 59까지)
-//   칩을 바꾸면 목록을 새로 그림 (key): 다른 종류의 줄이 남아 보이지 않고 처음 열 때처럼 받음. [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
+// 목록: 다섯 종류 모두 CalcHistoryList (CA-07) 하나에 계산기 종류(kind)만 바꿔 씀 (API-24, API-56부터 API-59까지)
+//   칩을 바꾸면 새 목록이 올 때까지 이전 목록을 흐리게 둠 (E7). [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
 // CALC_RECORD_KINDS 칩 key → CalcHistoryList kind
 const LIST_KINDS = { interest: 'LOAN', change: 'CHANGE', dsr: 'DSR', home: 'HOME', reverse: 'REVERSE' }
 const KINDS = CALC_RECORD_KINDS.map((kind) => ({ ...kind, listKind: LIST_KINDS[kind.key] }))
@@ -37,7 +37,7 @@ function CalcRecords() {
           </Chip>
         ))}
       </Chips>
-      <CalcHistoryList key={kind.key} kind={kind.listKind} title={title} />
+      <CalcHistoryList kind={kind.listKind} title={title} />
     </section>
   )
 }

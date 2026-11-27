@@ -39,10 +39,10 @@ function getConditionTexts(item) {
   return texts
 }
 
-// 줄 위 글: 앞 SHOWN_CONDITIONS개를 쉼표로 잇고 나머지는 '외 N개' (조건을 읽지 못하면 저장된 글)
+// 줄 위 글: 앞 SHOWN_CONDITIONS개를 쉼표로 잇고 나머지는 '외 N개' (조건을 읽지 못하면 저장된 글, 그것도 없으면 '검색 기록')
 function getConditionSummary(item) {
   const texts = getConditionTexts(item)
-  if (texts.length === 0) return item.searchLabel
+  if (texts.length === 0) return item.searchLabel || '검색 기록'
   const shown = texts.slice(0, SHOWN_CONDITIONS).join(', ')
   return texts.length > SHOWN_CONDITIONS ? `${shown} 외 ${texts.length - SHOWN_CONDITIONS}개` : shown
 }

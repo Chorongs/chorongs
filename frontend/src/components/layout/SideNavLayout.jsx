@@ -2,7 +2,7 @@ import { Link, NavLink } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 
 // 옆 메뉴 + 본문 두 칸 틀 (MY, 관리자가 같이 씀)
-// 웹: 왼쪽 230px 메뉴(묶음 제목 + 링크, 스크롤해도 따라옴) / 900px 미만: 메뉴가 위에 가로 알약으로
+// 웹: 왼쪽 메뉴(묶음 제목 + 링크, 스크롤해도 따라옴) 폭 1180px 이상 230px, 900부터 1179px까지 200px / 900px 미만: 메뉴가 위에 가로 알약으로
 // groups: [{ title, items: [{ to, label, end, count, countLabel }] }]
 //   title이 없는 묶음: 묶음 제목 없이 링크만, 웹에서는 링크 글자 크기와 굵기를 묶음 제목과 같게 (밑줄 없음, MY '한눈에 보기')
 //   end: 그 주소일 때만 현재 메뉴로 표시 (예: '/my'가 '/my/liked'에서도 켜지지 않게)
@@ -26,12 +26,17 @@ const Grid = styled.div`
   }
 `
 
+// 따라올 때 위 자리: 상단 바(Header) 높이 68px + 여백 24px
+// 화면 세로가 760px 이하면 따라오지 않음: MY 메뉴(계산 기록 하위 메뉴 포함) 높이가 약 630px라 92px 아래에 다 들어가지 않아 아래쪽이 잘림
 const Menu = styled.nav`
   position: sticky;
   top: 92px;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  @media (max-height: 760px) {
+    position: static;
+  }
   @media (max-width: 899px) {
     position: static;
     flex-flow: row wrap;

@@ -9,12 +9,12 @@ import { HOME_REGIONS } from '../../utils/finance'
 import { formatDate, formatMoney, formatRate } from '../../utils/format'
 import { toLoading } from '../../utils/loadingState'
 import { CALC_METHODS } from '../../utils/loanMath'
-import { getGoneText, isGoneError } from '../../utils/removeText'
+import { getGoneText, isGoneError, REMOVE_FAIL_TEXT } from '../../utils/removeText'
 import ConfirmDialog from '../common/ConfirmDialog'
 import MySection, { RecordRow } from '../my/MySection'
 import Icon from '../ui/Icon'
 
-// CA-07 계산 기록 목록: 저장한 기록 줄 / [불러오기] / 줄마다 X / [선택 삭제] [전체 삭제] (API-24, 56부터 59까지)
+// CA-07 계산 기록 목록: 저장한 기록 줄 / [불러오기] / 줄마다 X / [선택 삭제] [전체 삭제] (API-24, API-56부터 API-59까지)
 // 목록 틀(제목, 삭제 확인 창, 불러오는 중, 실패, 빈 상태)과 기록 한 줄(RecordRow)은 MY의 MySection(MY-03)을 다시 씀 (삭제는 확인 창 뒤에, E3, E11)
 // - 비회원: API를 부르지 않고 '로그인하면 저장 가능' 문구만 (확인 중에는 아무것도 안 그림)
 // - 기록 줄: 위 굵은 글 main(item) / 아래 작은 글 subs(item) (빈 값은 빼고 쉼표로 이음) + 저장 시각 / [불러오기]
@@ -130,8 +130,6 @@ const getSubText = (config, item) => config.subs(item).filter(Boolean).join(', '
 
 // 삭제 확인 창, 버튼 이름에 쓰는 기록 이름
 const getItemLabel = (config, item) => `${config.main(item)}, ${formatDate(item.calcAt)} 저장`
-
-const REMOVE_FAIL_TEXT = '삭제하지 못했어요. 다시 시도해 주세요'
 
 const Guest = styled.section`
   display: flex;
@@ -398,9 +396,12 @@ function CalcHistoryList({
   const authStatus = useAuthStore((state) => state.status)
   const isMember = authStatus === 'member'
   const [attempt, setAttempt] = useState(0)
+  // result.kind: 지금 보여 주는 줄이 어느 계산기 기록인지 (MY에서 칩을 바꾼 뒤 새 목록이 올 때까지 이전 줄을 그 모양대로 흐리게 둠, E7)
   const [result, setResult] = useState(() =>
-    initialItems ? { status: 'done', items: initialItems } : { status: 'loading', items: [] },
+    initialItems ? { status: 'done', items: initialItems, kind } : { status: 'loading', items: [], kind },
   )
+  if (!isOnlyWithItems && result.kind !== kind && result.status !== 'loading') setResult(toLoading)
+  const itemConfig = KINDS[result.kind] ?? config
 
   useEffect(() => {
     if (!isMember) return undefined
@@ -410,18 +411,18 @@ function CalcHistoryList({
       .then((data) => {
         if (isCancelled) return
         const items = data?.items ?? []
-        setResult({ status: 'done', items })
+        setResult({ status: 'done', items, kind })
         onItemsChange?.(items)
       })
       .catch(() => {
         if (isCancelled) return
-        setResult({ status: 'error', items: [] })
+        setResult({ status: 'error', items: [], kind })
         onItemsChange?.(undefined)
       })
     return () => {
       isCancelled = true
     }
-  }, [isMember, attempt, refreshKey, config, onItemsChange])
+  }, [isMember, attempt, refreshKey, config, kind, onItemsChange])
 
   // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때)
   // MY 목록은 보여 준 목록이 있으면 받는 동안 흐리게 남김 / 계산기 화면 칸은 'done'이 아니면 사라지므로 상태를 그대로 두고 새 목록으로 바꿈
@@ -430,16 +431,18 @@ function CalcHistoryList({
     setAttempt((count) => count + 1)
   }
 
+  // 목록에서 빼기는 직전 상태(prev)에서: [선택 삭제]가 같은 함수를 연달아 불러도 먼저 지운 줄이 되살아나지 않음
+  // onItemsChange(계산기 화면 칸)는 한 건씩만 지우므로 지금 목록에서 뺀 값을 알림
   const handleRemove = async (item) => {
-    await config.remove(item[config.idKey])
-    const nextItems = result.items.filter((one) => one[config.idKey] !== item[config.idKey])
-    setResult((prev) => ({ ...prev, items: nextItems }))
-    onItemsChange?.(nextItems)
+    const { idKey } = itemConfig
+    await itemConfig.remove(item[idKey])
+    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one[idKey] !== item[idKey]) }))
+    onItemsChange?.(result.items.filter((one) => one[idKey] !== item[idKey]))
   }
 
   const handleClearAll = async () => {
-    await config.clearAll()
-    setResult({ status: 'done', items: [] })
+    await itemConfig.clearAll()
+    setResult((prev) => ({ ...prev, status: 'done', items: [] }))
     onItemsChange?.([])
   }
 
@@ -448,8 +451,8 @@ function CalcHistoryList({
       onLoad(item)
       return
     }
-    const state = config.stateKeys ? Object.fromEntries(config.stateKeys.map((key) => [key, item[key]])) : item
-    navigate(config.path, { state })
+    const state = itemConfig.stateKeys ? Object.fromEntries(itemConfig.stateKeys.map((key) => [key, item[key]])) : item
+    navigate(itemConfig.path, { state })
   }
 
   if (authStatus === 'checking') return null
@@ -467,8 +470,10 @@ function CalcHistoryList({
     )
   }
 
+  // key: 칩을 바꾸면 고르는 중, 열린 확인 창은 새로 시작 (이전 목록은 result로 흐리게 남음)
   return (
     <MySection
+      key={kind}
       title={title}
       itemName="계산 기록"
       description="[결과 저장]을 누른 기록이에요."
@@ -477,12 +482,12 @@ function CalcHistoryList({
       onRetry={reload}
       onReload={reload}
       items={result.items}
-      getKey={(item) => item[config.idKey]}
-      getItemLabel={(item) => getItemLabel(config, item)}
+      getKey={(item) => item[itemConfig.idKey]}
+      getItemLabel={(item) => getItemLabel(itemConfig, item)}
       renderItem={(item) => (
         <RecordRow
-          main={config.main(item)}
-          sub={[getSubText(config, item), formatDate(item.calcAt)].filter(Boolean).join(', ')}
+          main={itemConfig.main(item)}
+          sub={[getSubText(itemConfig, item), formatDate(item.calcAt)].filter(Boolean).join(', ')}
           action={
             <Button $size="sm" $variant="outline" onClick={() => handleLoad(item)}>
               불러오기

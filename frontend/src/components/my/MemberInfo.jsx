@@ -2,12 +2,10 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
-import useAuthStore, { reloadToMainWithToast } from '../../store/useAuthStore'
-import useCompareStore from '../../store/useCompareStore'
-import { useRecommendStore } from '../../store/useRecommendStore'
+import useAuthStore, { clearMemberData, reloadToMainWithToast } from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, Card, InlineError, InputField } from '../../styles/common'
-import { BIRTH_ERROR, RECHECK_INPUT_TEXT, isAdultBirthDate, isValidNickname } from '../../utils/validate'
+import { RECHECK_INPUT_TEXT, isAdultBirthDate, isValidNickname } from '../../utils/validate'
 import BirthDateField from '../auth/BirthDateField'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
@@ -24,9 +22,12 @@ import Checkbox from '../ui/Checkbox'
 //   - 오류는 칸 바로 아래에 치는 동안 바로 보임 (닉네임 글, 생년월일 칸 안내는 BirthDateField), 틀린 칸은 테두리도 빨간색 (InputField aria-invalid)
 //     오류가 남은 채 [저장]을 누르면 보내지 않고 '입력한 내용을 다시 확인해 주세요' 알림 (생년월일이 비었거나 덜 쳤으면 그때 칸 아래도 오류로)
 //   - [저장]은 하나: 원래 값과 비교해 바뀐 칸만 보냄 (아무것도 안 바뀌면 보내지 않고 '바뀐 내용이 없어요')
-//   - 서버 400 → 서버 문구를 맨 아래에 표시
-//   - 생년월일 칸, 오류 문구 BIRTH_ERROR는 가입 단계와 같이 씀 (BirthDateField, utils/validate.js)
+//   - 서버 400 → 서버 문구를 맨 아래에 표시 (문구가 없으면 '입력한 내용을 다시 확인해 주세요': 어느 칸 때문인지 모르므로)
+//   - 생년월일 칸과 그 오류 문구는 가입 단계와 같이 씀 (BirthDateField, utils/validate.js)
+//   - 닉네임 칸은 12자보다 길게 칠 수 있게 둠 (NICKNAME_INPUT_MAX): 잘리지 않고 칸 아래 오류 문구로 알림
 const NICKNAME_ERROR = '닉네임은 2~12자로 입력해 주세요'
+// 닉네임 칸에 칠 수 있는 글자 수 (규칙 12자를 넘겨도 오류 문구가 보이게 조금 넉넉히, 너무 긴 붙여 넣기만 막음)
+const NICKNAME_INPUT_MAX = 20
 // 탈퇴 확인 창에서 한 번 더 받는 글 (실수로 탈퇴하지 않게)
 const WITHDRAW_PHRASE = '탈퇴할게요'
 // 탈퇴 때 지워지는 것 (명세서 MY-11 기록 7종 + 회원 관리 기획서 3-9의 닉네임, 생년월일, 소셜 연결 정보)
@@ -154,7 +155,7 @@ function MemberInfo() {
       setNickname(updated.memberNickname)
       showToast('회원 정보를 저장했어요')
     } catch (err) {
-      if (err.response?.status === 400) setError(err.response.data?.message ?? BIRTH_ERROR)
+      if (err.response?.status === 400) setError(err.response.data?.message ?? RECHECK_INPUT_TEXT)
       else if (err.response?.status !== 401) setError('저장하지 못했어요.\n다시 시도해 주세요')
     } finally {
       setIsSaving(false)
@@ -173,11 +174,8 @@ function MemberInfo() {
     setWithdrawError('')
     try {
       await myApi.deleteMe()
-      // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()'), 비교 화면 두 상품, 고르는 중 비우기 (ST-04) 뒤 이 탭의 임시 저장값 전부 비움
-      useRecommendStore.getState().clear()
-      useCompareStore.getState().setPickSlot(null)
-      useCompareStore.getState().setPair(null, null)
-      sessionStorage.clear()
+      // 로그아웃과 같이 추천 입력, 비교 화면 상품, 이 탭의 임시 저장값을 비움
+      clearMemberData()
       // 새로고침하며 메인으로: 메모리의 스토어 값이 한꺼번에 비워짐
       reloadToMainWithToast('탈퇴했어요. 개인정보와 이용 기록을 모두 지웠어요')
     } catch (error) {
@@ -197,7 +195,7 @@ function MemberInfo() {
             닉네임
             <input
               value={nickname}
-              maxLength={20}
+              maxLength={NICKNAME_INPUT_MAX}
               aria-invalid={nicknameError !== ''}
               onChange={(event) => setNickname(event.target.value)}
             />
@@ -205,7 +203,7 @@ function MemberInfo() {
           </InputField>
           <ReadOnly>
             로그인 방법
-            <b>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType}</b>
+            <b>{LOGIN_TYPE_LABEL[user.loginType] ?? '소셜'}</b>
           </ReadOnly>
           <BirthDateField value={birth} onChange={handleBirthChange} forceError={isSaveTried && isBirthWrong}>
             <Hint>상품의 나이 조건 확인에만 써요</Hint>

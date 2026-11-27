@@ -7,6 +7,7 @@ import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox } from '../../styles/common'
 import { formatDate } from '../../utils/format'
 import { recommendWithBand } from '../../utils/recommend'
+import { REMOVE_FAIL_TEXT } from '../../utils/removeText'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import LoadingText from '../ui/LoadingText'
@@ -107,7 +108,7 @@ function DiagnosisReport() {
       setIsConfirmOpen(false)
       showToast('내 진단 리포트를 삭제했어요')
     } catch (error) {
-      if (error.response?.status !== 401) showToast('삭제하지 못했어요. 다시 시도해 주세요')
+      if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
     } finally {
       setIsPending(false)
     }

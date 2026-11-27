@@ -40,8 +40,9 @@ export default requireLogin
 export const LIKE_LOGIN_TEXT = '찜하기는 회원 전용이에요.'
 export const ALREADY_LOGGED_IN_TEXT = '이미 로그인되어 있어요'
 export const LOGIN_OFFLINE_TEXT = '로그인하지 못했어요. 다시 시도해 주세요'
-// 회원 로그인을 시작하려는데 관리자 세션이 있을 때 (화면 글은 두 줄, 알림에서는 한 줄로 보임)
-export const ADMIN_SESSION_TEXT = '관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요'
+// 로그인 화면, 로그인 안내 창, 가입 단계에서 소셜 로그인을 시작하려는데 관리자 세션이 있을 때 (AU-01, AU-03, CM-17. 화면 글은 두 줄, 알림에서는 한 줄로 보임)
+// 회원 전용 버튼, 계정 메뉴의 [로그인]을 누를 때는 useAdminStore의 ADMIN_LOGGED_IN_TEXT (CM-22, LY-08, MY-01)
+export const ADMIN_LOGIN_GUIDE_TEXT = '관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요'
 
 // 소셜 로그인으로 보내기 전 확인 (로그인 화면 AU-01, 로그인 안내 창 CM-17이 같이 씀)
 // 서버(API-17)에 한 번 더 물어 이미 로그인 중이면 보내지 않음 (다시 로그인, 다른 계정 가입 막음) → 로그인 상태를 다시 채움

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError } from '../../styles/common'
-import { ADMIN_SESSION_TEXT } from '../../utils/requireLogin'
+import { Button, InlineError, ScreenReaderText } from '../../styles/common'
+import { ADMIN_LOGIN_GUIDE_TEXT } from '../../utils/requireLogin'
 import { RECHECK_INPUT_TEXT, isAdultBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
 import AuthLayout from '../layout/AuthLayout'
@@ -24,10 +24,23 @@ import BirthDateField from './BirthDateField'
 //   - [시작하기]가 막히면(약관 빠짐, 생년월일 틀림) 보내지 않고 알림 RECHECK_INPUT_TEXT + 틀린 곳 표시:
 //     체크 안 한 [필수] 약관 글 빨간색 (체크하면 바로 돌아옴), 생년월일 칸 테두리 빨간색 (InputField aria-invalid)
 
-// [필수] 약관 글: [시작하기]를 눌렀는데 체크 안 했으면 빨간색
+// [필수] 약관 글: [시작하기]를 눌렀는데 체크 안 했으면 빨간색 (화면 낭독기에는 '동의가 필요해요'를 같이 읽힘)
 const RequiredLabel = styled.span`
   ${({ $isMissing }) => $isMissing && 'color: var(--bad);'}
 `
+
+const TERMS_REQUIRED_TEXT = '필수 약관에 동의해 주세요.'
+const SIGNUP_FAIL_TEXT = '가입하지 못했어요.\n다시 시도해 주세요'
+
+// [필수] 약관 체크칸 이름 (빠졌으면 화면 낭독기용 안내를 붙임)
+function RequiredTermLabel({ text, isMissing }) {
+  return (
+    <RequiredLabel $isMissing={isMissing}>
+      {text}
+      {isMissing && <ScreenReaderText> 동의가 필요해요</ScreenReaderText>}
+    </RequiredLabel>
+  )
+}
 
 const AgreeList = styled.div`
   display: flex;
@@ -83,6 +96,8 @@ function TermsAgreement({ needBirth, onDone }) {
   const [isStartTried, setIsStartTried] = useState(false)
 
   const isAllAgreed = agreeService && agreePrivacy
+  // 약관 안내는 두 칸을 다 체크하면 바로 지움 ([시작하기]를 다시 누르기 전에도)
+  const shownError = error === TERMS_REQUIRED_TEXT && isAllAgreed ? '' : error
   const isBirthDone = isAdultBirthDate(birth) && !isServerBirthError
   // 눌렀는데 아직 맞는 날짜가 아님, 서버가 거절함 → 칸 아래를 오류로 (그 밖은 BirthDateField가 치는 동안 정함)
   const isBirthForcedError = isServerBirthError || (isSubmitted && !isAdultBirthDate(birth))
@@ -103,7 +118,7 @@ function TermsAgreement({ needBirth, onDone }) {
     setIsStartTried(true)
     // 필수 약관 2개 모두 체크 (문구 1)
     if (!isAllAgreed) {
-      setError('필수 약관에 동의해 주세요.')
+      setError(TERMS_REQUIRED_TEXT)
       showToast(RECHECK_INPUT_TEXT)
       return
     }
@@ -124,7 +139,7 @@ function TermsAgreement({ needBirth, onDone }) {
       const user = await authApi.postSignup(body)
       // 성공인데 회원 정보가 없으면 가입 실패로 안내 (화면이 멈추지 않게)
       if (!user?.memberNickname) {
-        setError('가입하지 못했어요.\n다시 시도해 주세요')
+        setError(SIGNUP_FAIL_TEXT)
         setIsPending(false)
         return
       }
@@ -136,11 +151,12 @@ function TermsAgreement({ needBirth, onDone }) {
         navigate('/login?error=SIGNUP_EXPIRED', { replace: true })
         return
       }
-      if (code === 'INVALID_INPUT') {
+      // 400 INVALID_INPUT은 생년월일 칸 아래 오류로 (생년월일 칸이 없으면 가입 실패 안내)
+      if (code === 'INVALID_INPUT' && needBirth) {
         setError('')
         setIsServerBirthError(true)
-      } else if (code === 'ADMIN_LOGGED_IN') setError(ADMIN_SESSION_TEXT)
-      else setError('가입하지 못했어요.\n다시 시도해 주세요')
+      } else if (code === 'ADMIN_LOGGED_IN') setError(ADMIN_LOGIN_GUIDE_TEXT)
+      else setError(SIGNUP_FAIL_TEXT)
       setIsPending(false)
     }
   }
@@ -153,7 +169,7 @@ function TermsAgreement({ needBirth, onDone }) {
           <Checkbox
             checked={agreeService}
             onChange={setAgreeService}
-            label={<RequiredLabel $isMissing={isStartTried && !agreeService}>[필수] 이용약관</RequiredLabel>}
+            label={<RequiredTermLabel text="[필수] 이용약관" isMissing={isStartTried && !agreeService} />}
           />
           <ViewButton aria-label="이용약관 보기" onClick={() => setTermsKind('service')}>
             보기
@@ -163,7 +179,7 @@ function TermsAgreement({ needBirth, onDone }) {
           <Checkbox
             checked={agreePrivacy}
             onChange={setAgreePrivacy}
-            label={<RequiredLabel $isMissing={isStartTried && !agreePrivacy}>[필수] 개인정보 수집/이용</RequiredLabel>}
+            label={<RequiredTermLabel text="[필수] 개인정보 수집/이용" isMissing={isStartTried && !agreePrivacy} />}
           />
           <ViewButton aria-label="개인정보 수집/이용 보기" onClick={() => setTermsKind('privacy')}>
             보기
@@ -180,7 +196,7 @@ function TermsAgreement({ needBirth, onDone }) {
         />
       )}
 
-      <ErrorText>{error}</ErrorText>
+      <ErrorText>{shownError}</ErrorText>
 
       <Actions>
         <Button $variant="outline" onClick={() => navigate('/login')}>

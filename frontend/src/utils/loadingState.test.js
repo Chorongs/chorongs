@@ -12,14 +12,29 @@ describe('toLoading', () => {
   })
 
   it('처음 받는 중이면 hasShown이 false다', () => {
-    expect(toLoading({ status: 'loading', items: [] }).hasShown).toBe(false)
+    // Given
+    const prev = { status: 'loading', items: [] }
+    // When
+    const next = toLoading(prev)
+    // Then
+    expect(next.hasShown).toBe(false)
   })
 
   it('실패 뒤 다시 받으면 hasShown이 false다', () => {
-    expect(toLoading({ status: 'error', items: [] }).hasShown).toBe(false)
+    // Given
+    const prev = { status: 'error', items: [] }
+    // When
+    const next = toLoading(prev)
+    // Then
+    expect(next.hasShown).toBe(false)
   })
 
   it('받는 중에 또 다시 받아도 hasShown을 그대로 둔다', () => {
-    expect(toLoading({ status: 'loading', items: [1], hasShown: true }).hasShown).toBe(true)
+    // Given
+    const prev = { status: 'loading', items: [1], hasShown: true }
+    // When
+    const next = toLoading(prev)
+    // Then
+    expect(next.hasShown).toBe(true)
   })
 })

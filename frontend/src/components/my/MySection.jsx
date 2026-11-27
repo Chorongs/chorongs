@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, IconButton, Tag, busyStyle } from '../../styles/common'
-import { getGoneText, isGoneError } from '../../utils/removeText'
+import { Button, EmptyBox, IconButton, ScreenReaderText, Tag, busyStyle } from '../../styles/common'
+import { getGoneText, isGoneError, REMOVE_FAIL_TEXT, withObjectParticle } from '../../utils/removeText'
 import ConfirmDialog from '../common/ConfirmDialog'
 import SectionHeader from '../common/SectionHeader'
 import Checkbox from '../ui/Checkbox'
@@ -48,16 +48,6 @@ const List = styled.ul`
 const SelectSpot = styled.div`
   flex: none;
   margin-top: 10px;
-`
-
-// 화면에는 안 보이고 화면 낭독기만 읽는 글
-const ScreenReaderText = styled.span`
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
 `
 
 // 제목 줄 오른쪽 버튼 묶음
@@ -166,15 +156,6 @@ export function ProductStatusTag({ product }) {
   if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
   if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
   return null
-}
-
-const REMOVE_FAIL_TEXT = '삭제하지 못했어요. 다시 시도해 주세요'
-
-// 받침이 있으면 '을', 없으면 '를' (한글이 아닌 글자로 끝나면 '을(를)')
-function withObjectParticle(word) {
-  const code = word.charCodeAt(word.length - 1) - 0xac00
-  if (code < 0 || code > 11171) return `${word}을(를)`
-  return `${word}${code % 28 === 0 ? '를' : '을'}`
 }
 
 function MySection({

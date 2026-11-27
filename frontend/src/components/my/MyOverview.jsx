@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
+import { getMyMenuPath } from '../../constants/menu'
 import { LOGIN_TYPE_LABEL } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
 import useUiStore from '../../store/useUiStore'
@@ -13,13 +14,13 @@ import { Button } from '../../styles/common'
 // 로그아웃 → LY-08과 같은 창을 엶 (openLogout. 창은 Layout이 그리는 LogoutDialog 하나를 같이 씀)
 // keys: 더해서 보여 줄 응답 칸. 계산 기록은 서버가 계산기 5종 개수를 따로 주므로 합계
 const COUNTS = [
-  { keys: ['wishCount'], label: '찜한 대출', to: '/my/liked' },
-  { keys: ['recentViewCount'], label: '최근 본 대출', to: '/my/recent' },
-  { keys: ['compareCount'], label: '비교 내역', to: '/my/compares' },
+  { keys: ['wishCount'], label: '찜한 대출', to: getMyMenuPath('liked') },
+  { keys: ['recentViewCount'], label: '최근 본 대출', to: getMyMenuPath('recent') },
+  { keys: ['compareCount'], label: '비교 내역', to: getMyMenuPath('compares') },
   {
     keys: ['calcCount', 'changeCount', 'dsrCount', 'homeLimitCount', 'reversCalcCount'],
     label: '계산 기록',
-    to: '/my/calcs',
+    to: getMyMenuPath('calcs'),
   },
 ]
 
@@ -141,7 +142,7 @@ function MyOverview({ onLogin }) {
       <Profile>
         <ProfileText>
           <b>{user.memberNickname}님</b>
-          <p>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType} 계정으로 로그인했어요</p>
+          <p>{LOGIN_TYPE_LABEL[user.loginType] ?? '소셜'} 계정으로 로그인했어요</p>
         </ProfileText>
         <Button $size="sm" $variant="outline" onClick={openLogout}>
           로그아웃

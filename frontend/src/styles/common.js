@@ -486,6 +486,16 @@ export const StatusText = styled.p`
   text-align: center;
 `
 
+// 화면에는 안 보이고 화면 낭독기만 읽는 글 (체크칸 이름, 빠진 필수 항목 안내 등)
+export const ScreenReaderText = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+`
+
 // 다시 받는 중 흐리게 ($isBusy): 흐려질 때만 0.3초 뒤에 시작 (LoadingText와 같은 기다림), 다시 밝게는 바로
 // 0.3초 안에 다 받으면 흐려지기 전에 끝나서 화면이 바뀌지 않음 / 누르기는 그 자리에 inert를 같이 줘서 막음
 export const busyStyle = css`
@@ -518,7 +528,7 @@ export const InputField = styled.label`
   }
 `
 
-// 개수 딱지: 높이 16 주황 알약 + 흰 숫자 (상단 찜 하트 LY-07, 계정 메뉴 '찜한 대출' LY-08이 같이 씀)
+// 개수 딱지: 높이 16 주황 알약 + --on-brand 색 숫자 (상단 찜 하트 LY-07, 계정 메뉴 '찜한 대출' LY-08이 같이 씀)
 export const CountBadge = styled.span`
   min-width: 16px;
   height: 16px;

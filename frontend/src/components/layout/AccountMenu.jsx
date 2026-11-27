@@ -55,12 +55,15 @@ const NameButton = styled.button.attrs({ type: 'button' })`
 `
 
 // 메뉴 판: 2칸 (윗줄과 제목 없는 묶음은 두 칸 전체)
+// 세로가 짧은 화면에서는 판 안에서 스크롤 (124px: 판이 열리는 위치 약 62px + 판 안 위아래 여백 44px + 화면 아래 여백 18px)
 const MenuPanel = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   width: 376px;
   max-width: calc(100vw - 76px);
+  max-height: calc(100vh - 124px);
+  overflow-y: auto;
 `
 
 const Who = styled.div`
@@ -206,7 +209,7 @@ function AccountMenu() {
           <Who>
             <div>
               <b>{user.memberNickname}님</b>
-              <small>{LOGIN_TYPE_LABEL[user.loginType] ?? user.loginType} 로그인</small>
+              <small>{LOGIN_TYPE_LABEL[user.loginType] ?? '소셜'} 로그인</small>
             </div>
             <Button
               $size="sm"

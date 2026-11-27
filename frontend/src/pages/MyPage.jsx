@@ -67,13 +67,15 @@ function MyPage() {
   if (status === 'checking') return <StatusText role="status">확인하는 중이에요</StatusText>
 
   // 비회원 [로그인]: 관리자로 로그인 중이면 /login으로 보내지 않고 알림 (SCR-16 비고)
-  //   아니면 로그인 뒤 보던 /my 주소로 돌아오게 지금 주소를 로그인 화면에 넘김 (기획서 3-7, 7-1 9번)
+  //   아니면 로그인 뒤 보던 /my 주소로 돌아오게 지금 주소를 로그인 화면에 넘김 (기획서 3-7, 7-1 9번, ?kind= 같은 주소 뒤 값까지)
   const handleGuestLogin = () => {
     if (useAdminStore.getState().status === 'authed') {
       useUiStore.getState().showToast(ADMIN_LOGGED_IN_TEXT)
       return
     }
-    navigate('/login', { state: { returnPath: section ? `/my/${section}` : '/my' } })
+    const query = searchParams.toString()
+    const path = section ? `/my/${section}` : '/my'
+    navigate('/login', { state: { returnPath: query ? `${path}?${query}` : path } })
   }
 
   if (status !== 'member') {

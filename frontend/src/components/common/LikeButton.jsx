@@ -11,7 +11,7 @@ import Icon from '../ui/Icon'
 // hasLabel: false(목록) 하트만 / true(상세 창) 글자 버튼
 // 누르는 중 잠금 (E5). 성공했을 때만 하트가 바뀌므로 실패하면 원래 모양 그대로 + 알림 (E3)
 // 상품 줄 안에서 눌러도 상세 창이 열리지 않게 클릭을 줄까지 안 퍼지게 함 (CM-04)
-const LIKE_FULL_TEXT = '찜은 30개까지 할 수 있어요. MY에서 정리해 주세요'
+const LIKE_FULL_TEXT = `찜은 ${LIKE_MAX}개까지 할 수 있어요. MY에서 정리해 주세요`
 
 const Heart = styled.span`
   display: inline-flex;
@@ -38,8 +38,9 @@ function LikeButton({ productId, hasLabel = false }) {
     } catch (error) {
       // 401은 axiosInstance가 로그인 안내 창을 띄움 (E4)
       if (error.response?.status === 401) return
-      // 다른 탭, 다른 단말기에서 이미 취소한 찜 (404): 하트는 빈 하트로 맞춰짐
-      if (isGoneError(error)) showToast(getGoneText('찜', '취소'))
+      // 찜 취소 404: 다른 탭, 다른 단말기에서 이미 취소한 찜 (하트는 빈 하트로 맞춰짐)
+      // 찜하기 404는 판매 중이 아닌 상품이라 아래의 실패 알림
+      if (isLiked && isGoneError(error)) showToast(getGoneText('찜', '취소'))
       else if (error.response?.data?.code === 'LIKE_FULL') showToast(LIKE_FULL_TEXT)
       else showToast('찜하지 못했어요. 다시 시도해 주세요')
     } finally {
