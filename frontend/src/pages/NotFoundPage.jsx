@@ -8,7 +8,6 @@ import { Button } from '../styles/common'
 // 아직 화면이 올라오지 않은 주소면 '찾을 수 없음' 대신 준비 중 안내
 //   그 화면 Route가 App.jsx(LY-01)에 생기면 목록에서 그 줄을 지움 (LY-16)
 const PREPARING_PATHS = [
-  '/calc', // 계산기 하위 화면 (대출 갈아타기, DSR, 내 집 대출한도, 상환능력 기반 대출. /calc는 있음)
   '/diagnosis/habit', // 소비 습관 분석
   '/help', // 도움말
 ]

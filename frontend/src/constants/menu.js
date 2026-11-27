@@ -47,7 +47,7 @@ export const NAV_MENU = [
       { label: '대출 이자', to: '/calc', end: true },
       { label: '대출 갈아타기', to: '/calc/change' },
       { label: 'DSR', to: '/calc/dsr' },
-      { label: '내 집 대출한도', to: '/calc/home' },
+      { label: '집 살 때 대출한도', to: '/calc/home' },
       { label: '상환능력 기반 대출', to: '/calc/reverse' },
     ],
   },
@@ -88,7 +88,7 @@ export const FULL_MENU = [
       { label: '대출 이자 계산기', to: '/calc', end: true, icon: 'calc' },
       { label: '대출 갈아타기 계산기', to: '/calc/change', icon: 'refresh' },
       { label: 'DSR 계산기', to: '/calc/dsr', icon: 'chart' },
-      { label: '내 집 대출한도 계산기', to: '/calc/home', icon: 'home' },
+      { label: '집 살 때 대출한도 계산기', to: '/calc/home', icon: 'home' },
       { label: '상환능력 기반 대출 계산기', to: '/calc/reverse', icon: 'coin' },
     ],
   },
@@ -108,7 +108,7 @@ export const CALC_RECORD_KINDS = [
   { key: 'interest', label: '대출 이자' },
   { key: 'change', label: '대출 갈아타기' },
   { key: 'dsr', label: 'DSR' },
-  { key: 'home', label: '내 집 대출한도' },
+  { key: 'home', label: '집 살 때 대출한도' },
   { key: 'reverse', label: '상환능력 기반 대출' },
 ]
 

@@ -14,6 +14,21 @@ export function formatNumber(value) {
   return number.toLocaleString('ko-KR')
 }
 
+// 원 단위 금액을 읽기 쉽게 억, 만, 원으로 끊어 씀 (입력칸 아래 표시용): 12345678 → '1,234만 5,678원', 120000000 → '1억 2,000만원', 5000 → '5,000원'
+export function formatWonReadable(value) {
+  const number = toNumber(value)
+  if (number === null) return EMPTY
+
+  const eok = Math.floor(number / 100000000)
+  const man = Math.floor((number % 100000000) / 10000)
+  const rest = number % 10000
+  const parts = []
+  if (eok > 0) parts.push(`${formatNumber(eok)}억`)
+  if (man > 0) parts.push(`${formatNumber(man)}만`)
+  if (rest > 0 || parts.length === 0) parts.push(formatNumber(rest))
+  return `${parts.join(' ')}원`
+}
+
 // 금액 글: unit '만원'(기본)이면 만원 단위 값, '원'이면 원 단위 값을 받는다.
 // 10,000만원 이상은 억으로 묶음: 12000(만원) → '1억 2,000만원', 10000 → '1억원'
 // 원 단위 값이 만원 단위로 딱 떨어지지 않으면 '12,345,678원'처럼 그대로 쓴다.

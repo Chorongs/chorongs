@@ -12,6 +12,7 @@ import {
   formatRateRange,
   formatTagValues,
   formatTime,
+  formatWonReadable,
 } from './format'
 
 describe('formatNumber', () => {
@@ -370,5 +371,88 @@ describe('formatBirthInput', () => {
     const result = formatBirthInput(text)
     // Then
     expect(result).toBe('')
+  })
+})
+
+describe('formatWonReadable', () => {
+  it('억, 만, 원으로 끊어 쓴다', () => {
+    // Given
+    const value = 12345678
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1,234만 5,678원')
+  })
+
+  it('억과 만이 있으면 억 만원으로 쓴다', () => {
+    // Given
+    const value = 120000000
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1억 2,000만원')
+  })
+
+  it('딱 떨어지는 억은 억원으로 쓴다', () => {
+    // Given
+    const value = 100000000
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1억원')
+  })
+
+  it('딱 떨어지는 만은 만원으로 쓴다', () => {
+    // Given
+    const value = 10000
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1만원')
+  })
+
+  it('1만원 미만은 원으로만 쓴다', () => {
+    // Given
+    const value = 5000
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('5,000원')
+  })
+
+  it('억, 만, 원이 모두 있으면 세 칸을 다 쓴다', () => {
+    // Given
+    const value = 123456789012
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1,234억 5,678만 9,012원')
+  })
+
+  it('만 단위가 0인 억은 만을 건너뛴다', () => {
+    // Given 1억 0만 5,000원
+    const value = 100005000
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('1억 5,000원')
+  })
+
+  it('0은 0원이다', () => {
+    // Given
+    const value = 0
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('0원')
+  })
+
+  it('값이 없으면 하이픈이다', () => {
+    // Given
+    const value = ''
+    // When
+    const text = formatWonReadable(value)
+    // Then
+    expect(text).toBe('-')
   })
 })

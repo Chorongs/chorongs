@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Collections;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -56,12 +58,26 @@ class HomeLimitCalcHistoryControllerTest {
 		String body = """
 				{"housePrice": 500000000, "homeRegion": "REGULATED", "firstHome": "Y", "annualIncome": 80000000,
 				 "otherInterest": 2000000, "interestRate": 4.5, "loanYears": 30, "repayMethod": "EQUAL_PI",
-				 "maxLoan": 300000000, "ltvLimit": 250000000, "dtiLimit": 300000000}
+				 "maxLoan": 300000000, "ltvLimit": 250000000, "dtiLimit": 300000000, "rateType": "VARIABLE"}
 				""";
 		for (int i = 0; i < replaces.length; i += 2) {
 			body = body.replaceAll("\"" + replaces[i] + "\": [^,}]+", "\"" + replaces[i] + "\": " + replaces[i + 1]);
 		}
 		return body;
+	}
+
+	/** 올바른 본문 + 다른 대출 목록 (JSON 배열 글자 그대로) */
+	private static String bodyWithLoans(String loansJson) {
+		return body().replace("\"rateType\": \"VARIABLE\"}", "\"rateType\": \"VARIABLE\", \"otherLoans\": " + loansJson + "}");
+	}
+
+	/** 다른 대출 1건 (값을 바꿀 칸은 "칸이름" -> 새 값) */
+	private static String loan(String... replaces) {
+		String loan = "{\"loanKind\": \"CREDIT\", \"repayMethod\": \"EQUAL_PI\", \"loanAmount\": 30000000, \"interestRate\": 5, \"loanMonths\": 60}";
+		for (int i = 0; i < replaces.length; i += 2) {
+			loan = loan.replaceAll("\"" + replaces[i] + "\": [^,}]+", "\"" + replaces[i] + "\": " + replaces[i + 1]);
+		}
+		return loan;
 	}
 
 	private void assertPostStatus(String body, int expected) throws Exception {
@@ -235,5 +251,87 @@ class HomeLimitCalcHistoryControllerTest {
 	void 본문_형식이_틀리면_400() throws Exception {
 		// Given, When, Then
 		assertPostStatus("{not json", 400);
+	}
+
+	// ---- 금리 유형, 다른 대출 (2026-11-26, B2) ----
+
+	@Test
+	void 금리_유형이_없으면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(body().replace(", \"rateType\": \"VARIABLE\"", ""), 400);
+	}
+
+	@Test
+	void 모르는_금리_유형_코드면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(body("rateType", "\"STRESS\""), 400);
+	}
+
+	@Test
+	void 금리_유형_3개는_통과한다() throws Exception {
+		// Given, When, Then
+		assertPostStatus(body("rateType", "\"MIXED\""), 201);
+		assertPostStatus(body("rateType", "\"FIXED\""), 201);
+	}
+
+	@Test
+	void 다른_대출을_넣으면_201() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[" + loan() + ", " + loan("loanKind", "\"OTHER\"", "repayMethod", "\"BULLET\"") + "]"), 201);
+	}
+
+	@Test
+	void 다른_대출이_빈_목록이면_201() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[]"), 201);
+	}
+
+	@Test
+	void 다른_대출이_11건이면_400() throws Exception {
+		// Given
+		String loans = "[" + String.join(", ", Collections.nCopies(11, loan())) + "]";
+
+		// When, Then
+		assertPostStatus(bodyWithLoans(loans), 400);
+	}
+
+	@Test
+	void 다른_대출_잔액이_0이거나_상한을_넘으면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[" + loan("loanAmount", "0") + "]"), 400);
+		assertPostStatus(bodyWithLoans("[" + loan("loanAmount", "10000000000") + "]"), 400);
+	}
+
+	@Test
+	void 다른_대출_금리가_0_미만이거나_20_초과면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[" + loan("interestRate", "-0.1") + "]"), 400);
+		assertPostStatus(bodyWithLoans("[" + loan("interestRate", "20.01") + "]"), 400);
+	}
+
+	@Test
+	void 다른_대출_남은_기간이_1_미만이거나_600_초과면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[" + loan("loanMonths", "0") + "]"), 400);
+		assertPostStatus(bodyWithLoans("[" + loan("loanMonths", "601") + "]"), 400);
+	}
+
+	@Test
+	void 다른_대출_종류나_상환_방식_코드를_모르면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[" + loan("loanKind", "\"CARD\"") + "]"), 400);
+		assertPostStatus(bodyWithLoans("[" + loan("repayMethod", "\"UNKNOWN\"") + "]"), 400);
+	}
+
+	@Test
+	void 다른_대출_칸이_빠지면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[{\"loanKind\": \"CREDIT\"}]"), 400);
+	}
+
+	@Test
+	void 다른_대출_목록에_빈_항목이_있으면_400() throws Exception {
+		// Given, When, Then
+		assertPostStatus(bodyWithLoans("[null]"), 400);
 	}
 }

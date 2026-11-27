@@ -3,23 +3,14 @@ import styled from 'styled-components'
 import { CALC_RECORD_KINDS } from '../../constants/menu'
 import { Chip } from '../../styles/common'
 import CalcHistoryList from '../calculator/CalcHistoryList'
-import ChangeHistoryList from '../calculator/ChangeHistoryList'
-import DsrHistoryList from '../calculator/DsrHistoryList'
-import HomeLimitHistoryList from '../calculator/HomeLimitHistoryList'
-import ReverseHistoryList from '../calculator/ReverseHistoryList'
 
 // MY-10 계산 기록: 맨 위 계산기 종류 칩 5개 (CALC_RECORD_KINDS, 처음은 대출 이자) / 칩을 누르면 그 종류 목록만
 // 고른 종류는 주소 /my/calcs?kind={key}에 둠 (MY 왼쪽 메뉴 '계산 기록' 아래 하위 메뉴로 바로 열고, 새로고침해도 유지). 없거나 틀린 값이면 대출 이자
-// 목록: 대출 이자 CalcHistoryList(API-24), 나머지는 ChangeHistoryList, DsrHistoryList, HomeLimitHistoryList, ReverseHistoryList (API-56부터 59까지)
-//   다섯 목록 모두 CalcRecordList 한 틀을 씀. [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
-const LISTS = {
-  interest: CalcHistoryList,
-  change: ChangeHistoryList,
-  dsr: DsrHistoryList,
-  home: HomeLimitHistoryList,
-  reverse: ReverseHistoryList,
-}
-const KINDS = CALC_RECORD_KINDS.map((kind) => ({ ...kind, list: LISTS[kind.key] }))
+// 목록: 다섯 종류 모두 CalcHistoryList (CA-07) 하나에 계산기 종류(kind)만 바꿔 씀 (API-24, 56부터 59까지)
+//   칩을 바꾸면 목록을 새로 그림 (key): 다른 종류의 줄이 남아 보이지 않고 처음 열 때처럼 받음. [불러오기]는 그 계산기 탭으로 이동하며 값을 넘김
+// CALC_RECORD_KINDS 칩 key → CalcHistoryList kind
+const LIST_KINDS = { interest: 'LOAN', change: 'CHANGE', dsr: 'DSR', home: 'HOME', reverse: 'REVERSE' }
+const KINDS = CALC_RECORD_KINDS.map((kind) => ({ ...kind, listKind: LIST_KINDS[kind.key] }))
 
 const Chips = styled.div`
   display: flex;
@@ -31,7 +22,6 @@ const Chips = styled.div`
 function CalcRecords() {
   const [searchParams, setSearchParams] = useSearchParams()
   const kind = KINDS.find((item) => item.key === searchParams.get('kind')) ?? KINDS[0]
-  const List = kind.list
   // 구역 이름 '{칩 이름} 계산 기록' (MY-03): 삭제 확인 창, 알림 글에도 그대로 쓰임
   const title = `${kind.label} 계산 기록`
 
@@ -47,7 +37,7 @@ function CalcRecords() {
           </Chip>
         ))}
       </Chips>
-      <List title={title} />
+      <CalcHistoryList key={kind.key} kind={kind.listKind} title={title} />
     </section>
   )
 }

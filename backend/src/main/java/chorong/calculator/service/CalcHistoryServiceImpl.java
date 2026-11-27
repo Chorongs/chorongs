@@ -1,8 +1,9 @@
 package chorong.calculator.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import chorong.calculator.entity.RepayMethod;
 import chorong.calculator.repository.CalcHistoryRepository;
 import chorong.common.exception.BusinessException;
 import chorong.common.exception.ErrorCode;
+import chorong.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 
 /*
@@ -25,31 +27,44 @@ import lombok.RequiredArgsConstructor;
 public class CalcHistoryServiceImpl implements CalcHistoryService {
 
 	private static final int MAX_CALCS = 10;	// 회원당 기록 수
-	private static final Set<Integer> LOAN_MONTHS = Set.of(12, 36, 60, 120, 180);	// 고를 수 있는 대출 기간
+	private static final String MSG_ALREADY_SAVED = "이미 저장한 계산 기록이에요";	// 같은 기록 다시 저장 409 (B9)
+	private static final int MIN_MONTHS = 1;	// 대출 기간 (개월): 화면이 칩 대신 직접 입력 1-600 (2026-11-26 사용자 결정)
+	private static final int MAX_MONTHS = 600;
 
 	private final CalcHistoryRepository calcHistoryRepository;
+	private final MemberRepository memberRepository;
 
 	@Override
 	@Transactional
 	public void saveCalc(Long memberId, CalcHistoryRequestDTO request) {
-		// 1. 값 확인 (칸마다 범위는 DTO에서 확인함, 기간 목록과 칸 사이 규칙은 여기서)
+		// 1. 값 확인 (칸마다 범위는 DTO에서 확인함, 기간 범위와 칸 사이 규칙은 여기서)
 		validate(request);
 
-		// 2. 저장
-		calcHistoryRepository.save(request.toEntity(memberId, LocalDateTime.now().withNano(0)));
+		// 2. 회원 행 잠금 (B9): 같은 회원의 저장은 한 번에 하나씩 -> 다른 탭, 단말기에서 동시에 눌러도 같은 기록 확인과 10개 정리가 맞음
+		memberRepository.findLockedByMemberId(memberId)
+				.orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_REQUIRED));
 
-		// 3. 10개 넘으면 가장 오래된 기록부터 삭제
+		// 3. 저장할 모양을 먼저 만들어 내 기록과 비교: 입력 12칸 (기본 5칸 + 옵션 7칸)이 모두 같으면 409 (결과 칸, 계산 시각은 비교 안 함)
+		CalcHistory calc = request.toEntity(memberId, LocalDateTime.now().withNano(0));
+		if (calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(memberId).stream().anyMatch(saved -> isSameInput(saved, calc))) {
+			throw new BusinessException(ErrorCode.CONFLICT, MSG_ALREADY_SAVED);
+		}
+
+		// 4. 저장
+		calcHistoryRepository.save(calc);
+
+		// 5. 10개 넘으면 가장 오래된 기록부터 삭제
 		List<CalcHistory> calcs = calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(memberId);
 		if (calcs.size() > MAX_CALCS) {
 			calcHistoryRepository.deleteAll(calcs.subList(MAX_CALCS, calcs.size()));
 		}
 	}
 
-	// 칸 사이 규칙 (화면 규칙과 같게): 기간 목록, 거치, 만기일시, 증가율, 중도상환 4칸, 금리 변동 2칸
+	// 칸 사이 규칙 (화면 규칙과 같게): 기간 1-600개월, 거치, 만기일시, 증가율, 중도상환 4칸, 금리 변동 2칸
 	// 중도상환액이 남은 원금 이하인지는 상환 계산이 필요해 화면에서만 확인함
 	private void validate(CalcHistoryRequestDTO request) {
 		int months = request.getLoanMonths();
-		if (!LOAN_MONTHS.contains(months)) {
+		if (months < MIN_MONTHS || months > MAX_MONTHS) {
 			throw invalid("대출 기간을 확인해 주세요.");
 		}
 		if (request.getGraceMonths() >= months) {
@@ -94,6 +109,35 @@ public class CalcHistoryServiceImpl implements CalcHistoryService {
 
 	private static BusinessException invalid(String message) {
 		return new BusinessException(ErrorCode.INVALID_INPUT, message);
+	}
+
+	// 같은 기록을 이미 저장했는지 (읽기만 하므로 잠그지 않음, 저장은 잠근 뒤 다시 확인)
+	@Override
+	@Transactional(readOnly = true)
+	public boolean hasSavedCalc(Long memberId, CalcHistoryRequestDTO request) {
+		CalcHistory calc = request.toEntity(memberId, null);
+		return calcHistoryRepository.findByMemberIdOrderByCalcIdDesc(memberId).stream().anyMatch(saved -> isSameInput(saved, calc));
+	}
+
+	// 같은 기록인지: 입력 12칸 (기본 5칸 + 옵션 7칸)이 모두 같음 (금리는 저장할 때처럼 소수 2자리로 맞춘 toEntity 값끼리)
+	private static boolean isSameInput(CalcHistory a, CalcHistory b) {
+		return Objects.equals(a.getLoanAmount(), b.getLoanAmount())
+				&& Objects.equals(a.getLoanMonths(), b.getLoanMonths())
+				&& sameNumber(a.getInterestRate(), b.getInterestRate())
+				&& a.getRepayMethod() == b.getRepayMethod()
+				&& Objects.equals(a.getGraceMonths(), b.getGraceMonths())
+				&& sameNumber(a.getGrowthRate(), b.getGrowthRate())
+				&& Objects.equals(a.getPrepayRound(), b.getPrepayRound())
+				&& Objects.equals(a.getPrepayAmount(), b.getPrepayAmount())
+				&& sameNumber(a.getPrepayFeeRate(), b.getPrepayFeeRate())
+				&& a.getPrepayMode() == b.getPrepayMode()
+				&& Objects.equals(a.getChangeRound(), b.getChangeRound())
+				&& sameNumber(a.getChangeRate(), b.getChangeRate());
+	}
+
+	// 소수 칸 비교: 5.5와 5.50은 같음 (equals는 소수 자리 수까지 봐서 compareTo), 둘 다 null이면 같고 한쪽만 null이면 다름
+	private static boolean sameNumber(BigDecimal a, BigDecimal b) {
+		return a == null ? b == null : b != null && a.compareTo(b) == 0;
 	}
 
 	@Override
