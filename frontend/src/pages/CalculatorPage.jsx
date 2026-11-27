@@ -14,7 +14,7 @@ import { getInitialCalc } from '../utils/loanMath'
 //   (loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod)은 대출 이자 계산기 처음 값으로 쓴다.
 //   범위 밖이거나 이상한 값은 getInitialCalc가 무시하고 기본값을 씀
 // 값을 넘기며 다시 들어오면 (location.key가 바뀜) 입력 칸이 새 값으로 시작하도록 탭 내용을 새로 그림. 값 없이 탭만 옮길 때는 그대로
-// 계산 기록 (CA-07): 지금 탭 계산기의 저장 기록을 Layout 오른쪽 칸(#page-side, 1180 미만은 본문 아래)에 띄움. 저장한 기록이 있을 때만 보임 (빈 상자가 자리를 차지하지 않게)
+// 계산 기록 (CA-07): 지금 탭 계산기의 저장 기록을 Layout 오른쪽 칸(#page-side, 1180 미만은 본문 아래)에 띄움. 저장한 기록이 있을 때만 보임 (2026-11-26 사용자 결정)
 //   [불러오기] → 그 기록 한 줄을 navigate state로 넘겨 같은 주소로 다시 들어옴 (위의 '값을 넘기며 다시 들어오면'과 같음) + 맨 위로 + 알림 '기록을 불러왔어요'
 //   계산기가 [결과 저장]에 성공하면 Outlet context의 onSaved()를 불러 목록을 다시 받음
 // kind: CalcHistoryList가 받는 계산기 종류
@@ -46,7 +46,7 @@ function CalculatorPage() {
   const sideEl = useSyncExternalStore(subscribeNothing, getSideEl, () => null)
   const tab = TABS.find((one) => one.to === location.pathname.replace(/\/$/, '')) ?? TABS[0]
 
-  // 계산기 종류별로 마지막에 받은 기록 목록: 탭을 옮길 때 오른쪽 칸이 비어 화면이 움직이지 않게 먼저 보여 주는 복사본
+  // 계산기 종류별로 마지막에 받은 기록 목록: 탭을 옮길 때 오른쪽 칸이 비어 화면이 움직이지 않게 먼저 보여 주는 복사본 (2026-11-26 사용자 결정)
   // 기록 칸이 서버에서 다시 받으면 바꿔 끼우고, 다시 받기가 실패하면 버림 (틀린 목록을 남기지 않음). 저장, 409 판단은 늘 서버 값
   // owner: 그 목록을 받은 로그인 정보 (다른 회원으로 다시 로그인하면 달라져 버림) / 계산기 화면을 벗어나거나 새로고침하면 사라짐
   const user = useAuthStore((state) => state.user)

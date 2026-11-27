@@ -25,14 +25,14 @@ import NumberField from '../ui/NumberField'
 import Segmented from '../ui/Segmented'
 
 // CA-10 상환능력 기반 대출 계산기 (SCR-23, /calc/reverse): 매달 갚을 수 있는 돈으로 최대 대출 금액 역산. 계산은 프론트에서 (utils/finance.js)
-// 왼쪽 입력: 상환 방식 2개 (원리금균등, 원금균등. 만기일시는 매달 이자만 내서 빌릴 수 있는 금액이 지나치게 크게 나오므로 뺌) → 매달 갚을 돈, 연 이자율, 대출 기간(칩 없이 1-600개월 직접 입력) → [계산하기] [결과 저장]
+// 왼쪽 입력: 상환 방식 2개 (원리금균등, 원금균등, 만기일시는 뺌 2026-11-26 사용자 결정) → 매달 갚을 돈, 연 이자율, 대출 기간(칩 없이 1-600개월 직접 입력) → [계산하기] [결과 저장]
 // 오른쪽 결과: 요약 3칸 (최대 대출 금액, 총 이자, 총 갚는 돈) → 기간별 빌릴 수 있는 금액 → [대출 이자 계산기로 이동] → 고지 (좁은 화면은 입력 아래)
 // 계산 시점은 CA-02와 같다: 입력칸 값(form)과 결과에 쓰는 값(applied)을 나눠 들고, [계산하기]를 눌렀을 때만 form을 applied로 옮긴다.
 //   입력을 바꾸고 안 눌렀으면 결과 위에 안내를 띄우고 [결과 저장], [대출 이자 계산기로 이동]은 막음 (화면에 보이는 결과와 저장, 넘기는 값이 다르지 않게)
 // 처음 값: MY 계산 기록 [불러오기]가 넘긴 navigate state가 있으면 그 값 (범위 밖 칸은 기본값, CA-01), 없으면 기본값 / 열자마자 처음 값으로 한 번 계산해 보여 줌
 // [결과 저장] → 회원: 입력과 결과를 저장 (API-58, 요청 중 버튼 잠금 E5) / 비회원: 로그인 안내 창 (CM-17 '계산 기록 저장은 회원 전용이에요.')
 //   201(저장 성공), 409(같은 입력의 기록이 이미 있음) → 버튼을 '저장했어요'로 잠금, 409는 오류 알림 대신 '이미 저장한 계산 기록이에요'
-//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음. 입력이 바뀌면 다른 계산이라 다시 저장할 수 있어야 함)
+//   잠금은 그 계산 값(applied)에만: 입력을 바꿔 [계산하기]를 다시 누르면 풀림 (대출 이자 계산기 API-24와 같음, 2026-11-26 사용자 결정)
 //   회원이면 결과가 나올 때마다 이미 저장한 계산인지 서버에 물어봄 (API-58 check): true면 처음부터 '저장했어요' (다른 탭, 다른 단말기, 새로고침 전에 저장한 것도)
 const Actions = styled.div`
   display: flex;
@@ -103,7 +103,7 @@ function ReverseCalculator() {
   const [form, setForm] = useState(() => getInitialReverse(location.state))
   const [applied, setApplied] = useState(() => getInitialReverse(location.state))
   // [계산하기]를 눌러 결과를 낸 적이 있는지. 처음 값이 계산할 수 있는 값이면(기록 불러오기, 다른 화면이 넘긴 값) 처음부터 결과를 보임,
-  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (예시 값으로 낸 결과를 내 결과로 오해하지 않게)
+  // 빈칸으로 열면 [계산하기]를 누를 때까지 결과 자리에 안내만 (2026-11-26 사용자 결정)
   const [isCalculated, setIsCalculated] = useState(() => Object.keys(getReverseErrors(form)).length === 0)
   const [hasTried, setHasTried] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -154,14 +154,14 @@ function ReverseCalculator() {
     }
     setApplied(form)
     setIsCalculated(true)
-    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (두 열이면 결과가 이미 입력 옆에 보이므로 내려가지 않음)
+    // 입력과 결과가 세로 한 줄(CalcLayout 열이 1개)일 때만 결과 자리로 내려감. 배치가 화면 폭이 아니라 계산기 칸 폭으로 바뀌어서 열 수로 봄 (2026-11-26 사용자 요청)
     const resultEl = resultRef.current
     if (resultEl && getComputedStyle(resultEl.parentElement).gridTemplateColumns.split(' ').length === 1) {
       resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
-  // [결과 저장] (API-58): 입력과 결과 값을 보냄 (입력 값은 원 단위로 들고 있어 그대로 보냄, 만원은 입력칸에서만 씀)
+  // [결과 저장] (API-58): 입력과 결과 값을 보냄 (화면과 서버 모두 원 단위)
   const saveResult = async () => {
     if (isSaving || isSaved || !result) return
     setIsSaving(true)
@@ -284,14 +284,13 @@ function ReverseCalculator() {
           <NumberField
             isLabelInside
             label="매달 갚을 돈"
-            unit="만원"
-            isManwon
+            unit="원"
             value={form.monthly}
             onChange={(monthly) => handleChange({ monthly })}
             hasComma
             showReadable
             isRequired
-            placeholder="예: 100"
+            placeholder="예: 1,000,000"
             error={errors.monthly}
           />
           <NumberField

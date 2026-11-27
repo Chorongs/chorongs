@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import Checkbox from '../ui/Checkbox'
 import NumberField from '../ui/NumberField'
 
-// CA-03 옵션 입력: 거치 기간 / 중도상환(회차, 금액, 수수료율) / 금리 변동(회차, 변동 후 금리). 셋 다 체크하면 칸이 펼쳐짐 (거치 기간도 체크로 둔 것은 거치를 쓰지 않는 경우 칸이 늘지 않게. 해제하면 0개월)
+// CA-03 옵션 입력: 거치 기간 / 중도상환(회차, 금액, 수수료율) / 금리 변동(회차, 변동 후 금리). 셋 다 체크하면 칸이 펼쳐짐 (거치 기간 체크는 2026-11-25 사용자 결정, 해제하면 0개월)
 // 값은 부모(LoanCalculator)가 들고 있고, 바꾸면 onChange({ 바뀐 칸 })로 알린다 (상태 값: 부모 값)
 // 오류 문구(errors)도 부모가 getCalcErrors로 검사해서 내려준다 (E2): 회차는 1~대출 기간, 중도상환액은 그때 남은 원금 이하
 // - 만기일시는 매달 이자만 내서 거치 기간 칸이 없다
@@ -91,13 +91,12 @@ function LoanOptions({ form, errors, onChange }) {
               isLabelInside
               isCompact
               label="금액"
-              unit="만원"
-              isManwon
+              unit="원"
               value={form.prepayAmount}
               onChange={(prepayAmount) => onChange({ prepayAmount })}
               hasComma
               showReadable
-              placeholder="예: 300"
+              placeholder="예: 3,000,000"
               error={errors.prepayAmount}
             />
           </Pair>

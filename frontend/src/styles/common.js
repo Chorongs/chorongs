@@ -256,7 +256,7 @@ export const FormLabelNote = styled.small`
 // 계산기 5종(CA-02, 08–11)이 같이 쓰는 모양 (가안 .calc-grid, .calc-form)
 // CalcLayout: 왼쪽 입력 판 + 오른쪽 결과 (좁으면 세로) / CalcPanel: 입력 판 / CalcFormStack: 입력칸을 세로로 (간격 16)
 // 크기는 화면 폭이 아니라 계산기 칸(CalculatorPage의 container 'calcarea') 폭으로 정함: 오른쪽에 계산 기록 칸(300 + 간격 48)이 생기면
-// 그만큼 좁아진 폭에 맞춰 바뀌어 결과(회차별 표)에 가로 스크롤이 생기지 않게 함
+// 그만큼 좁아진 폭에 맞춰 바뀌어 결과(회차별 표)에 가로 스크롤이 생기지 않게 함 (2026-11-26 사용자 요청)
 // 칸 폭 1037 이상: 왼쪽 392, 간격 28 / 900-1036: 왼쪽 356, 간격 20 (결과 열 524 이상) / 900 미만: 세로 한 줄
 export const CalcLayout = styled.div`
   display: grid;

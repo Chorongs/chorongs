@@ -6,10 +6,7 @@ import { formatWonReadable } from '../../utils/format'
 // UI-09 숫자 입력칸: 라벨 + 숫자 + 단위. 값은 부모가 관리
 // value: 숫자 또는 '' (빈 값) / onChange(숫자 또는 '')
 // quickValues: 빠른 금액 칩 [{ label: '300만', value: 3000000 }]
-// isManwon: 값(value, onChange)은 원 단위 그대로 두고, 칸에는 만원 단위로 보이고 입력받음 (계산기 금액 칸: 계산, 저장 API는 원 단위)
-//   1을 넣으면 onChange(10000). 원 단위 값이 만원으로 딱 떨어지지 않으면 소수로 보임 (소수 4자리 = 원 단위까지)
-// showReadable: 금액 칸에서 입력칸 바로 아래 오른쪽 끝에 읽기 쉬운 금액 글을 보임 (12345678원 → '1,234만 5,678원')
-//   원 단위 칸은 1만원 이상일 때, 만원 단위 칸은 1억원 이상이거나 만원으로 딱 떨어지지 않을 때만 (그 밖에는 칸의 숫자와 같아서)
+// showReadable: 원 단위 금액 칸에서 입력칸 바로 아래 오른쪽 끝에 읽기 쉬운 금액 글을 보임 (12345678 → '1,234만 5,678원', 1만원 이상일 때만)
 // isLabelInside: 이름을 입력칸 위가 아니라 칸 안 왼쪽 회색 칸에 보임 (계산기 모양, 가안 .inp .lab) / isCompact: 칸 높이 48 (상자 안 입력칸)
 // error: 서버가 400으로 돌려준 문구
 // capMessage: 주면 max를 넘는 값은 아예 입력되지 않고, 넘기려 하면 이 경고를 보여 줌 (대출 비교 빌릴 금액)
@@ -104,11 +101,7 @@ const Readable = styled.small`
   font-weight: 600;
 `
 
-const MANWON = 10000 // 만원 → 원
-const MANWON_DECIMALS = 4 // 만원 칸의 소수 자릿수 (원 단위까지)
-
-// 값 → 입력 글자 (scale: 칸 한 단위가 값으로 얼마인지, 만원 칸이면 10000)
-const toText = (value, scale = 1) => (value === '' || value == null ? '' : String(value / scale))
+const toText = (value) => (value === '' || value == null ? '' : String(value))
 
 // 입력 글자 → 숫자. 아직 숫자가 안 된 글자('', '-', '.')는 '' (빈 값)
 const toNumber = (text) => (/\d/.test(text) ? Number(text) : '')
@@ -151,22 +144,13 @@ function NumberField({
   isRequired = false,
   isLabelInside = false,
   isCompact = false,
-  isManwon = false,
   showReadable = false,
   placeholder,
   error,
 }) {
   const inputId = useId()
   const errorId = useId()
-  const scale = isManwon ? MANWON : 1
-  const inputDecimals = isManwon ? MANWON_DECIMALS : decimals
-  // 입력 글자 → 부모에게 줄 값 (만원 칸이면 원으로, 소수 계산 오차는 반올림으로 없앰)
-  const toValue = (nextText) => {
-    const number = toNumber(nextText)
-    return number === '' || scale === 1 ? number : Math.round(number * scale)
-  }
-
-  const [text, setText] = useState(toText(value, scale))
+  const [text, setText] = useState(toText(value))
   const [prevValue, setPrevValue] = useState(value)
   const [isTouched, setIsTouched] = useState(false)
   const [isOverCap, setIsOverCap] = useState(false) // 방금 max를 넘기려 했는지
@@ -174,16 +158,16 @@ function NumberField({
   // 부모가 값을 바꾸면 (예: 초기화) 입력 글자도 맞춤
   if (value !== prevValue) {
     setPrevValue(value)
-    if ((value ?? '') !== toValue(text)) setText(toText(value, scale))
+    if ((value ?? '') !== toNumber(text)) setText(toText(value))
   }
 
   const applyText = (nextText) => {
     setText(nextText)
-    onChange(toValue(nextText))
+    onChange(toNumber(nextText))
   }
 
   const handleChange = (event) => {
-    const nextText = cleanText(event.target.value, inputDecimals, min < 0)
+    const nextText = cleanText(event.target.value, decimals, min < 0)
     const isOver = Boolean(capMessage) && max !== undefined && toNumber(nextText) > max
     setIsOverCap(isOver)
     if (!isOver) applyText(nextText)
@@ -205,11 +189,7 @@ function NumberField({
     localError = `${max.toLocaleString('ko-KR')}${unit ?? ''} 이하로 입력해 주세요`
   }
   const message = error || (isOverCap ? capMessage : '') || (isTouched ? localError : '')
-  const won = toValue(text)
-  const isReadableShown =
-    showReadable &&
-    won !== '' &&
-    (isManwon ? won >= 100000000 || won % MANWON !== 0 : won >= MANWON)
+  const isReadableShown = showReadable && number !== '' && number >= 10000
 
   return (
     <Wrap>
@@ -219,7 +199,7 @@ function NumberField({
         <Input
           id={inputId}
           type="text"
-          inputMode={inputDecimals > 0 ? 'decimal' : 'numeric'}
+          inputMode={decimals > 0 ? 'decimal' : 'numeric'}
           autoComplete="off"
           value={hasComma ? addComma(text) : text}
           placeholder={placeholder}
@@ -233,7 +213,7 @@ function NumberField({
         />
         {unit && <Unit>{unit}</Unit>}
       </Box>
-      {isReadableShown && <Readable>{formatWonReadable(won)}</Readable>}
+      {isReadableShown && <Readable>{formatWonReadable(number)}</Readable>}
       {quickValues.length > 0 && (
         <Quick>
           {quickValues.map((quick) => (

@@ -13,10 +13,10 @@ const isInRange = (value, min, max) => isNumber(value) && value >= min && value 
 // 대출 갈아타기 (CA-08)
 // ---------------------------------------------------------------------------
 
-// 갈아타기 입력 한도: 기간 1-600개월, 금리 0-20%, 수수료 0-5% (명세서). 금액은 대출 이자 계산기와 같은 1만원-10억원, 값은 원 단위이고 칸은 만원 단위로 입력 (위쪽 한도는 명세서에 없어 정한 값)
+// 갈아타기 입력 한도: 기간 1-600개월, 금리 0-20%, 수수료 0-5% (명세서). 금액은 대출 이자 계산기와 같은 1만원-10억원, 원 단위 (위쪽 한도는 명세서에 없어 정한 값)
 export const CHANGE_LIMITS = { ...CALC_LIMITS, monthsMin: 1, monthsMax: 600 }
 
-// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 선택 사항인 수수료율과 기타 비용은 0, 상환 방식은 원리금균등 ([계산하기]를 눌러야 결과가 나옴. 예시 값으로 낸 결과를 내 결과로 오해하지 않게)
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 선택 사항인 수수료율과 기타 비용은 0, 상환 방식은 원리금균등 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const CHANGE_DEFAULTS = {
   currentMethod: 'EQUAL_PI',
   balance: '',
@@ -125,7 +125,7 @@ export function getChangeResult(form) {
   }
 }
 
-// [결과 저장]으로 보낼 값 (API-56): 입력 값을 원 단위로 들고 있어 그대로 보냄 (만원은 입력칸에서만 씀). 수수료율, 기타 비용의 빈 칸은 0
+// [결과 저장]으로 보낼 값 (API-56): 화면과 서버가 같은 원 단위라 그대로 보냄. 수수료율, 기타 비용의 빈 칸은 0
 export function toChangeRecord(form, result) {
   return {
     currentRepayMethod: form.currentMethod,
@@ -147,7 +147,7 @@ export function toChangeRecord(form, result) {
 // 내 집 대출한도 (CA-11)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 금리 0-20%, 기간 1-50년 (명세서). 금액 값은 원 단위로 1만원 이상 (칸은 만원 단위로 입력), 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
+// 입력 한도: 금리 0-20%, 기간 1-50년 (명세서). 금액은 원 단위로 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
 export const HOME_LIMITS = {
   amountMin: 10000,
   amountMax: 9999990000,
@@ -169,19 +169,19 @@ export const HOME_REGIONS = [
 ]
 
 // 지역별 LTV 비율(%): ltv는 일반 무주택, firstLtv는 생애 첫 집 (예시 값, 실제 값은 담당자가 개발 때 정함)
-// 2025년 10.15 대책 기준: 규제 지역 40%, 규제 지역 첫 집 70% (40%라는 해설도 있어 확인 필요), 그 외 지역 70%, 첫 집 80%
-// 소득 기준은 지역과 관계없이 은행 DSR 기준 (DSR_BASELINES.bank. 은행 대출 심사가 DTI가 아니라 DSR 기준이라 DTI 대신 씀)
+// 2025년 10.15 대책 기준: 규제 지역 40%, 규제 지역 첫 집 70% (40%라는 해설도 있어 확인 필요), 그 외 지역 70%, 첫 집 80% (2026-11-25 사용자 결정)
+// 소득 기준은 지역과 관계없이 은행 DSR 기준 (DSR_BASELINES.bank, 2026-11-25 사용자 결정으로 DTI에서 바꿈)
 export const HOME_RATIOS = {
   OTHER: { ltv: 70, firstLtv: 80 },
   REGULATED: { ltv: 40, firstLtv: 70 },
 }
 
-// 다른 대출의 1년 상환액(DSR에 넣을 값)은 DSR 계산기와 같은 방법(getDsrLoanYearly)으로 계산: 종류, 상환 방식, 잔액을 남은 기간으로 (두 계산기에서 같은 대출의 상환액이 다르게 나오지 않게)
+// 다른 대출의 1년 상환액(DSR에 넣을 값)은 DSR 계산기와 같은 방법(getDsrLoanYearly)으로 계산: 종류, 상환 방식, 잔액을 남은 기간으로 (2026-11-26 사용자 결정)
 // 남은 기간을 비우면 5년(60개월)
 export const HOME_OTHER_MONTHS = 60
 
 // 다른 대출은 여러 건 넣을 수 있다 (최대 10건, DSR 계산기와 같음). 건마다 { kind 종류, method 상환 방식, balance 원, rate %, months 개월 }, 새 줄의 처음 값
-// 숫자 칸은 빈칸 (잔액을 비우면 0, 남은 기간을 비우면 5년으로 봄)
+// 숫자 칸은 빈칸 (잔액을 비우면 0, 남은 기간을 비우면 5년으로 봄, 2026-11-26 사용자 결정)
 export const HOME_MAX_OTHER_LOANS = 10
 export const HOME_OTHER_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', balance: '', rate: '', months: '' }
 
@@ -220,7 +220,7 @@ export const HOME_RATE_TYPES = [
   },
 ]
 
-// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 고르는 칸(지역, 생애 첫 집, 금리 유형)은 그대로 ([계산하기]를 눌러야 결과가 나옴. 예시 값으로 낸 결과를 내 결과로 오해하지 않게)
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 고르는 칸(지역, 생애 첫 집, 금리 유형)은 그대로 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const HOME_DEFAULTS = {
   housePrice: '',
   region: 'OTHER',
@@ -382,7 +382,7 @@ export function getHomeResult(form) {
   const ratios = HOME_RATIOS[form.region]
   const rateType = HOME_RATE_TYPES.find((type) => type.code === form.rateType)
   if (!ratios || !rateType) return null
-  // 숫자 칸이 비어 있으면 계산하지 않음 (빈칸 + 스트레스 금리가 글자 이어 붙이기가 되어 멈추던 것 방지)
+  // 숫자 칸이 비어 있으면 계산하지 않음 (빈칸 + 스트레스 금리가 글자 이어 붙이기가 되어 멈추던 것 방지, 처음 값이 빈칸이 된 2026-11-26부터)
   if (![form.housePrice, form.annualIncome, form.rate, form.years].every(isNumber)) return null
 
   const ltvRate = form.isFirstHome ? ratios.firstLtv : ratios.ltv
@@ -427,7 +427,7 @@ export function getHomeResult(form) {
   }
 }
 
-// [결과 저장]으로 보낼 값 (API-59): 입력 값을 원 단위로 들고 있어 그대로 보냄 (만원은 입력칸에서만 씀)
+// [결과 저장]으로 보낼 값 (API-59): 화면과 서버가 같은 원 단위라 그대로 보냄
 // 다른 대출은 건별 otherLoans (종류, 상환 방식 포함, 잔액이 있는 건만, 입력 순서대로, 남은 기간을 비웠으면 5년)와 모든 건의 1년 이자 합계 otherInterest를 같이 보냄 (체크 안 했으면 [] 와 0)
 // 상환 방식은 원리금균등 고정, 금리 유형 rateType 저장, 서버 칸 이름 dtiLimit에는 소득 기준(DSR) 한도를 넣음 / LTV, DSR 비율, 스트레스 금리는 저장하지 않음 (금리 유형으로 다시 정해짐)
 export function toHomeRecord(form, result) {
@@ -462,16 +462,16 @@ export function toHomeRecord(form, result) {
 // 상환능력 기반 대출 (CA-10)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 매달 갚을 돈 값은 원 단위로 1만원 이상, 칸은 만원 단위로 입력 (위쪽은 서버가 받는 한도 9,999,999,999원 안의 99억 9,999만원), 금리 0-20%, 대출 기간 1-600개월 (직접 입력)
+// 입력 한도: 매달 갚을 돈은 원 단위로 1만원 이상 (위쪽은 서버가 받는 한도 9,999,999,999원 안의 99억 9,999만원), 금리 0-20%, 대출 기간 1-600개월 (직접 입력)
 export const REVERSE_LIMITS = { amountMin: 10000, amountMax: 9999990000, rateMax: 20, monthsMin: 1, monthsMax: 600 }
 
 // 기간별 표에 보일 기간 (개월): 12, 36, 60, 120, 180 (입력한 기간이 이 안에 없으면 표에 끼워 넣음)
 export const REVERSE_TERMS = [...new Set([...MONTHS_OPTIONS_DEFAULT, ...MONTHS_OPTIONS_HOUSING])].sort((a, b) => a - b)
 
-// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 상환 방식은 원리금균등 ([계산하기]를 눌러야 결과가 나옴. 예시 값으로 낸 결과를 내 결과로 오해하지 않게)
+// 바로 열었을 때 처음 값: 숫자 칸은 빈칸, 상환 방식은 원리금균등 (2026-11-26 사용자 결정, [계산하기]를 눌러야 결과가 나옴)
 export const REVERSE_DEFAULTS = { method: 'EQUAL_PI', monthly: '', rate: '', months: '' }
 
-// 상환 방식은 원리금균등, 원금균등 2개 (명세서 CA-10 '상환 방식 3개'와 다름: 만기일시는 매달 이자만 내서 빌릴 수 있는 금액이 지나치게 크게 나오므로 뺌)
+// 상환 방식은 원리금균등, 원금균등 2개 (2026-11-26 사용자 결정, 명세서 CA-10 '상환 방식 3개'와 다름)
 // 만기일시는 매달 이자만 내서 '매달 갚을 돈'으로 원금이 정해지지 않고(기간과 관계없이 이자 / 월 금리) 금액이 지나치게 크게 나와 뺌
 export const REVERSE_METHODS = REPAY_METHODS.filter((method) => method.code !== 'BULLET')
 const REVERSE_METHOD_CODES = REVERSE_METHODS.map((method) => method.code)
@@ -533,7 +533,7 @@ export function getReverseResult(form) {
   return { maxLoan, totalInterest: plan.totalInterest, totalPayment: maxLoan + plan.totalInterest, byTerm }
 }
 
-// [결과 저장]으로 보낼 값 (API-58): 입력 값을 원 단위로 들고 있어 그대로 보냄 (만원은 입력칸에서만 씀). 기간별 표는 저장하지 않음
+// [결과 저장]으로 보낼 값 (API-58): 화면과 서버가 같은 원 단위라 그대로 보냄. 기간별 표는 저장하지 않음
 export function toReverseRecord(form, result) {
   return {
     repayMethod: form.method,
@@ -546,10 +546,9 @@ export function toReverseRecord(form, result) {
 
 // [대출 이자 계산기로 이동]이 넘길 navigate state (CA-01 이름): 최대 대출 금액, 기간, 금리, 상환 방식
 // 대출 이자 계산기는 금액 위쪽 한도(10억원)를 넘으면 그 칸을 무시하므로, 넘으면 한도 금액으로 넘긴다
-// 금액 칸은 만원 단위로 입력받으므로 만원 아래는 버림 (최대 금액이라 올리면 갚을 수 있는 돈을 넘음)
 export function toLoanCalcState(form, result) {
   return {
-    loanAmount: Math.floor(Math.min(result.maxLoan, CALC_LIMITS.amountMax) / 10000) * 10000,
+    loanAmount: Math.min(result.maxLoan, CALC_LIMITS.amountMax),
     loanMonths: form.months,
     interestRate: form.rate,
     repayMethod: form.method,
@@ -560,10 +559,10 @@ export function toLoanCalcState(form, result) {
 // DSR (CA-09)
 // ---------------------------------------------------------------------------
 
-// 입력 한도: 금리 0-20%, 기간 1-600개월 (명세서). 금액 값은 원 단위로 1만원 이상 (칸은 만원 단위로 입력), 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
+// 입력 한도: 금리 0-20%, 기간 1-600개월 (명세서). 금액은 원 단위로 1만원 이상, 위쪽은 서버가 받는 한도(9,999,999,999원) 안의 99억 9,999만원
 export const DSR_LIMITS = { amountMin: 10000, amountMax: 9999990000, rateMax: 20, monthsMin: 1, monthsMax: 600 }
 
-// 대출은 1건부터 최대 10건 (서버 API-57 loans 1-10건과 같게)
+// 대출은 1건부터 최대 10건 (사용자 결정, API-57 loans 1-10건)
 export const DSR_MAX_LOANS = 10
 
 // 대출 종류 (코드는 API-57 loanKind)
@@ -579,7 +578,7 @@ export const DSR_BASELINES = { bank: 40, second: 50 }
 // 만기일시 신용대출은 원금을 5년(60개월)에 나눠 갚는다고 봄 (명세서)
 const DSR_CREDIT_BULLET_MONTHS = 60
 
-// 대출 한 줄의 처음 값 (처음 한 줄과 [+ 대출 추가]): 종류 신용대출, 원리금균등, 숫자 칸은 빈칸 (다른 계산기의 처음 값과 같게)
+// 대출 한 줄의 처음 값 (처음 한 줄과 [+ 대출 추가]): 종류 신용대출, 원리금균등, 숫자 칸은 빈칸 (2026-11-26 사용자 결정)
 export const DSR_LOAN_DEFAULT = { kind: 'CREDIT', method: 'EQUAL_PI', amount: '', rate: '', months: '' }
 
 // 바로 열었을 때 처음 값: 연소득 빈칸, 빈 대출 1건 ([계산하기]를 눌러야 결과가 나옴)
@@ -704,7 +703,7 @@ export function getDsrResult(form) {
   return { dsrRate, yearlyPayment, level, extraRoom, loanPayments }
 }
 
-// [결과 저장]으로 보낼 값 (API-57): 입력 값을 원 단위로 들고 있어 그대로 보냄 (만원은 입력칸에서만 씀). 대출은 입력한 건수만큼 입력 순서대로
+// [결과 저장]으로 보낼 값 (API-57): 화면과 서버가 같은 원 단위라 그대로 보냄. 대출은 입력한 건수만큼 입력 순서대로
 // 화면에서 줄을 구별하려고 붙인 id 같은 값은 보내지 않음
 export function toDsrRecord(form, result) {
   return {

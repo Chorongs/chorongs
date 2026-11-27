@@ -20,15 +20,15 @@ import Modal from '../ui/Modal'
 // - kind: 어느 계산기의 기록인지 (LOAN 대출 이자 API-24, CHANGE 갈아타기 API-56, DSR API-57, REVERSE 상환능력 API-58, HOME 집 살 때 대출한도 API-59). 처음 값 LOAN
 // - initialItems: 기억해 둔 목록이 있으면 '불러오는 중' 대신 그 목록으로 시작하고 서버에서 다시 받아 바꿈 (계산기 탭을 옮길 때 칸이 비지 않게)
 // - onItemsChange(items): 목록을 받거나 지울 때마다 알림 (다시 받기가 실패하면 undefined = 기억해 둔 목록을 버림)
-// - isOnlyWithItems: 저장한 기록이 있을 때만 그림 (계산기 화면 오른쪽 칸, CalculatorPage). 비회원, 불러오는 중, 실패, 빈 목록이면 아무것도 안 그림 (기록이 없을 때 빈 상자가 오른쪽 칸을 차지하지 않게)
+// - isOnlyWithItems: 저장한 기록이 있을 때만 그림 (계산기 화면 오른쪽 칸, CalculatorPage). 비회원, 불러오는 중, 실패, 빈 목록이면 아무것도 안 그림 (2026-11-26 사용자 결정)
 //   모양은 대출 비교의 '비교할 상품 고르기'(CP-07 CompareSidebar)와 같게: 접었다 펴는 상자 ('{계산기 이름} 계산 기록' + 건수, 위 제목 없음) / 카드 3개씩 쪽 넘김. 카드를 누르면 불러오기
-//   카드마다 X (지우기, MY와 같이 확인 창 뒤에, MySection과 같은 알림 글). 전체 지우기는 계산기 화면에 두지 않고 MY에만 둠 (계산하다가 실수로 기록을 모두 지우지 않게)
+//   카드마다 X (지우기, MY와 같이 확인 창 뒤에, MySection과 같은 알림 글). 전체 지우기는 계산기 화면에 두지 않음 (MY에만, 2026-11-26 사용자 결정)
 // TODO(API-24, CHORONG-48 BE): 계산 기록 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const METHOD_LABEL = Object.fromEntries(CALC_METHODS.map((method) => [method.code, method.label]))
 const REGION_LABEL = Object.fromEntries(HOME_REGIONS.map((region) => [region.code, region.label]))
 
 // 계산기별 이름 (오른쪽 칸 상자 제목), 목록 API, 기록 번호 칸, [불러오기]로 갈 계산기 주소, 줄에 보일 글 (main: 굵은 첫 줄, sub: 둘째 줄, 저장 시각은 공통으로 뒤에 붙임)
-// 대출 이자 외 4개의 줄 글은 MY-10 명세서 '줄 모양'을 따름 (MY의 계산 기록과 같은 글로 보이게)
+// 대출 이자 외 4개의 줄 글은 MY-10 명세서 '줄 모양'을 따름 (2026-11-26 사용자 결정)
 // 넘긴 기록 한 줄은 그 계산기가 처음 값으로 씀 (CalculatorPage getInitialCalc, getInitialChange 등, 맞지 않는 값은 무시)
 const KINDS = {
   LOAN: {
@@ -299,7 +299,7 @@ function CalcHistoryRail({ config, items, onLoad, onRemove }) {
   const pageCount = Math.max(1, Math.ceil(items.length / RAIL_PAGE_SIZE))
   const current = Math.min(page, pageCount - 1)
   const visibleItems = items.slice(current * RAIL_PAGE_SIZE, current * RAIL_PAGE_SIZE + RAIL_PAGE_SIZE)
-  // 상자 제목 (예: '대출 이자 계산 기록'. 탭을 옮겨도 어느 계산기의 기록인지 바로 알 수 있게)
+  // 상자 제목 (예: '대출 이자 계산 기록', 2026-11-26 사용자 결정)
   const groupTitle = `${config.name} 계산 기록`
 
   // 지우기 공통: 요청 → 알림, 창 닫기 / 실패하면 알림 (401은 로그인 안내 창이 뜨므로 알림 안 함, MySection과 같음)

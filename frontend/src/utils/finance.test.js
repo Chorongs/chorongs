@@ -145,7 +145,7 @@ describe('getChangeResult (갈아타기 계산)', () => {
 
 describe('getChangeErrors (갈아타기 입력 검사)', () => {
   it('처음 값은 남은 대출금이 빈칸이라 입력 안내가 난다', () => {
-    // Given 숫자 칸은 빈칸으로 열림
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     const form = getInitialChange()
     // When
     const errors = getChangeErrors(form)
@@ -806,7 +806,7 @@ describe('getHomeResult (집 살 때 대출한도 계산)', () => {
 
 describe('getHomeErrors (내 집 입력 검사)', () => {
   it('처음 값은 집값이 빈칸이라 입력 안내가 난다', () => {
-    // Given 숫자 칸은 빈칸으로 열림
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getHomeErrors(HOME_DEFAULTS)
     // Then
@@ -1404,7 +1404,7 @@ describe('getReverseResult (상환능력 기반 대출 계산)', () => {
   })
 
   it('만기일시는 상환 방식에서 빼서 계산하지 않고 null이다', () => {
-    // Given 만기일시, 연 12% (상환능력 계산기는 원리금균등, 원금균등만)
+    // Given 만기일시, 연 12% (2026-11-26 사용자 결정으로 원리금균등, 원금균등만)
     // When
     const result = getReverseResult(makeReverse({ method: 'BULLET', rate: 12 }))
     // Then
@@ -1487,7 +1487,7 @@ describe('getReverseResult (상환능력 기반 대출 계산)', () => {
 
 describe('getReverseErrors (상환능력 입력 검사)', () => {
   it('처음 값은 매달 갚을 돈이 빈칸이라 입력 안내가 난다', () => {
-    // Given 숫자 칸은 빈칸으로 열림
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getReverseErrors(REVERSE_DEFAULTS)
     // Then
@@ -1726,17 +1726,6 @@ describe('toLoanCalcState (대출 이자 계산기로 넘기는 값)', () => {
     expect(state.loanAmount).toBe(1000000000)
   })
 
-  it('만원 아래는 버리고 넘긴다 (금액 칸이 만원 단위)', () => {
-    // Given 매달 12만 3,456원, 연 5%, 36개월 → 최대 대출 금액이 만원으로 딱 떨어지지 않음
-    const form = makeReverse({ monthly: 123456, rate: 5, months: 36 })
-    const { maxLoan } = getReverseResult(form)
-    // When
-    const state = toLoanCalcState(form, getReverseResult(form))
-    // Then
-    expect(maxLoan % 10000).not.toBe(0)
-    expect(state.loanAmount).toBe(Math.floor(maxLoan / 10000) * 10000)
-  })
-
   it('기간, 금리, 상환 방식을 그대로 넘긴다', () => {
     // Given 원금균등, 연 4.5%, 60개월
     const form = makeReverse({ method: 'EQUAL_P', rate: 4.5, months: 60 })
@@ -1916,7 +1905,7 @@ describe('getDsrResult (DSR 계산)', () => {
 
 describe('getDsrErrors (DSR 입력 검사)', () => {
   it('처음 값은 연소득이 빈칸이라 입력 안내가 난다', () => {
-    // Given 숫자 칸은 빈칸으로 열림
+    // Given 숫자 칸은 빈칸으로 열림 (2026-11-26)
     // When
     const errors = getDsrErrors(DSR_DEFAULTS)
     // Then
