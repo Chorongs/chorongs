@@ -45,6 +45,13 @@ public class CalcHistoryController {
 		return ResponseEntity.status(HttpStatus.CREATED).build();
 	}
 
+	// 같은 기록을 이미 저장했는지 -> 200 + true/false (읽기만, 저장할 때와 같은 본문). 계산기 화면이 결과를 보여 줄 때 [결과 저장] 버튼을 미리 잠그려고 씀
+	@PostMapping("/check")
+	public ResponseEntity<ApiResponse<Boolean>> checkCalc(@Valid @RequestBody CalcHistoryRequestDTO request, HttpSession session) {
+		Long memberId = LoginUtil.getMemberId(session);
+		return ResponseEntity.ok(ApiResponse.success(calcHistoryService.hasSavedCalc(memberId, request)));
+	}
+
 	// 1건 삭제 -> 204 (남의 기록, 없는 기록 404)
 	@DeleteMapping("/{calcId}")
 	public ResponseEntity<Void> deleteCalc(@PathVariable Long calcId, HttpSession session) {

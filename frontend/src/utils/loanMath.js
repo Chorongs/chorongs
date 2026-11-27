@@ -1,5 +1,5 @@
 import { MONTHS_OPTIONS_DEFAULT, MONTHS_OPTIONS_HOUSING, REPAY_METHOD_CODE } from '../constants/options'
-import { formatMoney, formatNumber } from './format'
+import { formatMoney } from './format'
 
 // 대출 계산 함수 (화면 없는 계산)
 // 위쪽은 비교 화면(CP-02, 03, 05)이 쓰는 상환 방식별(원리금균등, 원금균등, 만기일시) 계산과 유리 판정,
@@ -135,8 +135,9 @@ export function getLoanResult(product, amountMan, months, method) {
 }
 
 // 비교 화면을 처음 열 때 넣어 둘 금액(만원), 기간(개월)과 그 근거
-// 금액: ① 맞춤 추천에서 입력한 필요 금액 → ② 두 상품이 모두 빌려 주는 최대 한도(한도 중 작은 값) → ③ 한도 정보가 없으면 1,000만원
-//   (③은 상세 창 [이자 계산]의 기본 금액과 같은 값). 추천 금액이 한도보다 크면 한도로 줄이고 근거는 '한도'
+// 금액: ① 맞춤 추천에서 입력한 필요 금액 → ② 없으면 1,000만원 (상세 창 [이자 계산]의 기본 금액과 같은 값)
+//   ①, ②가 두 상품이 모두 빌려 주는 최대 한도(한도 중 작은 값)보다 크면 그 한도로 줄이고 근거는 '한도'
+//   (한도를 처음 금액으로 쓰지 않음: 한도가 아주 큰 상품은 120억원처럼 입력 범위를 넘는 값이 들어가서)
 // 기간: ① 맞춤 추천에서 입력한 기간(0은 '잘 모르겠어요'라 제외, 선택지 안이고 두 상품 최대 기간 이내일 때) → ② 두 상품 최대 기간 안에서 가장 긴 선택지 → ③ 맞는 선택지가 없으면 첫 선택지
 // recommend: { need 만원, months 개월 } 또는 없음 / 근거: 'recommend' 맞춤 추천 입력, 'limit' 최대 한도, 'term' 최대 기간, 'fallback' 기본값
 export const FALLBACK_AMOUNT_MAN = 1000
@@ -152,9 +153,6 @@ export function getCompareDefaults(productA, productB, termOptions, recommend) {
   if (isNumber(recommend?.need) && recommend.need > 0) {
     amount = recommend.need
     amountSource = 'recommend'
-  } else if (minLimit !== null) {
-    amount = minLimit
-    amountSource = 'limit'
   }
   if (minLimit !== null && amount > minLimit) {
     amount = minLimit
@@ -227,8 +225,10 @@ export function getCompareWinners(productA, productB, resultA, resultB, isSameMe
 // 대출 이자 계산기 (CA-01~07, CHORONG-49)
 // ---------------------------------------------------------------------------
 
-// 계산기 입력 한도 (금액은 만원 단위, 나머지는 %). 금액 위, 수수료율, 증가율 한도는 명세서에 없어 정한 값
-export const CALC_LIMITS = { amountMin: 1, amountMax: 100000, rateMax: 20, feeMax: 5, growthMax: 20 }
+// 계산기 입력 한도 (금액은 원 단위, 기간은 개월, 나머지는 %). 금액 위, 수수료율, 증가율 한도는 명세서에 없어 정한 값
+// 금액 입력은 원 단위 (2026-11-25 사용자 결정, 명세서 '화면은 만원으로 입력받고 보낼 때 원으로 바꿈'과 다름): 화면과 서버(API-24)가 같은 단위
+// 기간은 칩에 없는 값을 [직접 입력]으로 받을 때의 범위 (1-600개월, 사용자 결정으로 칩 유지 + 직접 입력 추가)
+export const CALC_LIMITS = { amountMin: 10000, amountMax: 1000000000, rateMax: 20, feeMax: 5, growthMax: 20, monthsMin: 1, monthsMax: 600 }
 
 // 계산기 상환 방식 4개 (코드는 API-24 repayMethod와 같게)
 export const CALC_METHODS = [
@@ -238,8 +238,9 @@ export const CALC_METHODS = [
   { code: 'GRADUATED', label: '체증식' },
 ]
 
-// 바로 열었을 때 처음 값 (금액 만원, 기간 개월, 연 이자율 %)
-export const CALC_DEFAULTS = { amount: FALLBACK_AMOUNT_MAN, months: 36, rate: 5, method: 'EQUAL_PI' }
+// 바로 열었을 때 처음 값 (금액 원, 기간 개월, 연 이자율 %)
+// 숫자 칸은 빈칸으로 열고 [계산하기]를 눌러야 결과가 나옴 (2026-11-26 사용자 결정, 상환 방식은 원리금균등 그대로)
+export const CALC_DEFAULTS = { amount: '', months: '', rate: '', method: 'EQUAL_PI' }
 
 // 중도상환 후 방식 코드 (API-24 prepayMode와 같게): 월 납입액 줄이기, 기간 줄이기
 const PREPAY_MODES = ['REDUCE_PAYMENT', 'SHORTEN_TERM']
@@ -258,18 +259,19 @@ export function getCalcTermOptions(months) {
 }
 
 // 다른 화면에서 navigate state로 넘긴 값 → 계산기 처음 값 (CA-01)
-// state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 기본값
+// state: { loanAmount 원, loanMonths 개월, interestRate 연 %, repayMethod } / 범위 밖이거나 이상한 값은 무시하고 처음 값 (숫자 칸은 빈칸)
+//   기간은 칩에 없어도 1-600개월 정수면 받음 (칩에 없는 기간은 화면이 [직접 입력]으로 보여 줌)
 //   저장한 기록(API-24 한 줄)을 그대로 넘기면 옵션도 복원: graceMonths, growthRate, prepayRound, prepayAmount 원, prepayFeeRate, prepayMode, changeRound, changeRate
-// 결과: { amount 만원, months, rate, method, termOptions } + 옵션이 맞으면 { graceMonths, growth, prepay, rateChange }
+// 결과: { amount 원, months, rate, method, termOptions } + 옵션이 맞으면 { graceMonths, growth, prepay, rateChange }
 export function getInitialCalc(state) {
   const initial = { ...CALC_DEFAULTS, termOptions: ALL_TERM_MONTHS }
 
-  const amount = isNumber(state?.loanAmount) ? Math.round(state.loanAmount / 10000) : null
-  if (amount !== null && amount >= CALC_LIMITS.amountMin && amount <= CALC_LIMITS.amountMax) initial.amount = amount
+  if (isInRange(state?.loanAmount, CALC_LIMITS.amountMin, CALC_LIMITS.amountMax)) initial.amount = Math.round(state.loanAmount)
 
-  if (ALL_TERM_MONTHS.includes(state?.loanMonths)) {
-    initial.months = state.loanMonths
-    initial.termOptions = getCalcTermOptions(state.loanMonths)
+  const loanMonths = state?.loanMonths
+  if (Number.isInteger(loanMonths) && isInRange(loanMonths, CALC_LIMITS.monthsMin, CALC_LIMITS.monthsMax)) {
+    initial.months = loanMonths
+    initial.termOptions = getCalcTermOptions(loanMonths)
   }
 
   const rate = state?.interestRate
@@ -280,7 +282,7 @@ export function getInitialCalc(state) {
   return Object.assign(initial, getSavedOptions(state, initial))
 }
 
-// 계산기 입력 칸 묶음(form)의 처음 모양. 금액 만원, 중도상환액 만원, 나머지는 개월, 회차, %
+// 계산기 입력 칸 묶음(form)의 처음 모양. 금액 원, 중도상환액 원, 나머지는 개월, 회차, %
 // 칸이 비어 있으면 ''. 거치, 수수료율, 변동 회차의 빈 칸은 0으로 본다.
 // prepayMode: REDUCE_PAYMENT 월 납입액 줄이기 / SHORTEN_TERM 기간 줄이기
 // initial에 저장한 기록의 옵션(graceMonths, growth, prepay, rateChange)이 있으면 그 값으로 채움
@@ -291,8 +293,9 @@ export function createCalcForm(initial = getInitialCalc()) {
     amount: initial.amount,
     months: initial.months,
     rate: initial.rate,
+    isGrace: (initial.graceMonths ?? 0) > 0,
     graceMonths: initial.graceMonths ?? 0,
-    growth: initial.growth ?? 5,
+    growth: initial.growth ?? '',
     isPrepay: Boolean(prepay),
     prepayRound: prepay?.round ?? '',
     prepayAmount: prepay?.amount ?? '',
@@ -320,7 +323,7 @@ function getSavedOptions(state, { method, months }) {
   const growth = state?.growthRate
   if (method === 'GRADUATED' && isInRange(growth, 0, CALC_LIMITS.growthMax)) options.growth = growth
 
-  const amount = isNumber(state?.prepayAmount) ? Math.round(state.prepayAmount / 10000) : null
+  const amount = isNumber(state?.prepayAmount) ? Math.round(state.prepayAmount) : null
   const isPrepayValid =
     isRoundIn(state?.prepayRound, months) &&
     isInRange(amount, CALC_LIMITS.amountMin, CALC_LIMITS.amountMax) &&
@@ -369,14 +372,14 @@ const isRateChangeApplied = (form) => form.isRateChange && orZero(form.changeRou
 export function toScheduleParams(form) {
   return {
     method: form.method,
-    principal: form.amount * 10000,
+    principal: form.amount,
     rate: form.rate,
     months: form.months,
     graceMonths: orZero(form.graceMonths),
     growth: form.growth,
     prepayMode: form.prepayMode,
     prepay: isPrepayApplied(form)
-      ? { round: form.prepayRound, amount: orZero(form.prepayAmount) * 10000, feeRate: orZero(form.prepayFee) }
+      ? { round: form.prepayRound, amount: orZero(form.prepayAmount), feeRate: orZero(form.prepayFee) }
       : null,
     rateChange: isRateChangeApplied(form) ? { round: form.changeRound, rate: form.changeRate } : null,
   }
@@ -555,7 +558,7 @@ function getPrepayErrors(form) {
   } else if (!Number.isInteger(form.prepayRound) || form.prepayRound < 1 || form.prepayRound > months) {
     errors.prepayRound = `회차는 1회차부터 ${months}회차 사이로 입력해 주세요`
   }
-  if (isEmptyValue(form.prepayAmount) || form.prepayAmount < 1) {
+  if (isEmptyValue(form.prepayAmount) || form.prepayAmount < CALC_LIMITS.amountMin) {
     errors.prepayAmount = '중도상환액을 1만원 이상 입력해 주세요'
   }
   if (!isEmptyValue(form.prepayFee) && !isInRange(form.prepayFee, 0, CALC_LIMITS.feeMax)) {
@@ -588,7 +591,7 @@ export function getCalcErrors(form) {
   if (isEmptyValue(form.amount)) {
     errors.amount = '빌릴 금액을 입력해 주세요'
   } else if (!isInRange(form.amount, amountMin, amountMax)) {
-    errors.amount = `금액은 ${amountMin}만원 이상 ${formatNumber(amountMax)}만원 이하로 입력해 주세요`
+    errors.amount = `금액은 ${formatMoney(amountMin, '원')} 이상 ${formatMoney(amountMax, '원')} 이하로 입력해 주세요`
   }
 
   if (isEmptyValue(form.rate)) {
@@ -597,8 +600,14 @@ export function getCalcErrors(form) {
     errors.rate = `연 이자율은 0% 이상 ${rateMax}% 이하로 입력해 주세요`
   }
 
-  if (!Number.isInteger(form.months) || form.months < 1) {
-    errors.months = '상환 기간을 골라 주세요'
+  // 기간: 직접 입력 칸 하나
+  const { monthsMin, monthsMax } = CALC_LIMITS
+  if (isEmptyValue(form.months)) {
+    errors.months = '상환 기간을 입력해 주세요'
+    return errors
+  }
+  if (!Number.isInteger(form.months) || !isInRange(form.months, monthsMin, monthsMax)) {
+    errors.months = `상환 기간은 ${monthsMin}개월 이상 ${monthsMax}개월 이하로 입력해 주세요`
     return errors
   }
 
@@ -620,7 +629,7 @@ export function getCalcErrors(form) {
   if (Object.keys(errors).length === 0 && isPrepayApplied(form)) {
     const base = getSchedule({ ...toScheduleParams(form), prepay: null })
     const remaining = base?.rows[form.prepayRound - 1]?.balance
-    if (isNumber(remaining) && orZero(form.prepayAmount) * 10000 > remaining) {
+    if (isNumber(remaining) && orZero(form.prepayAmount) > remaining) {
       errors.prepayAmount = `중도상환액은 그때 남은 원금(${formatMoney(remaining, '원')}) 이하로 입력해 주세요`
     }
   }

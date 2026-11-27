@@ -5,7 +5,7 @@ import { postSearch } from '../../api/myApi'
 import { postKeywordSearch } from '../../api/recommendApi'
 import { getKeywordLabel, KEYWORD_ALL, KEYWORD_GROUPS, KEYWORD_MAX } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore from '../../store/useCompareStore'
+import useCompareStore, { getPinnedProduct, useCompareItems } from '../../store/useCompareStore'
 import { Button, EmptyBox, Panel } from '../../styles/common'
 import ProductList from '../common/ProductList'
 import PurposeFilterBanner from '../common/PurposeFilterBanner'
@@ -20,8 +20,8 @@ import SimpleSummary from './SimpleSummary'
     - 키워드가 0개면 안내 글만 (요청 안 보냄). 결과 0건이면 빈 상태 (E11), 실패면 문구 + [다시 시도] (E3)
     - 회원: 키워드가 바뀌고 0.7초 뒤 최근 검색 기록 (API-22 POST, SIMPLE) 한 번만. 실패해도 안내 안 함
       label '간편 검색 · A + B', condition 키워드 목록 (JSON 글)
-    - 비교함에 상품이 있으면 그 상품 번호를 cmp로 같이 보내 서버가 첫 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
-      위 띠는 '이 조건으로 보여 주는 중'이라는 설명만 (숨긴 개수는 안 보임: 상위 5개만 보여 주는 화면이라 쓸모가 없음). 프론트는 목록을 따로 거르지 않음. 비교함이 바뀌면 다시 추천
+    - 비교할 상품을 고르는 중이면 남겨 둔 상품 번호를 cmp로 같이 보내 서버가 그 상품과 자금 용도, 상환 방식이 안 겹치는 상품을 거름 (CM-10, E15, 요청서 A)
+      위 띠는 '이 조건으로 보여 주는 중'이라는 설명만 (숨긴 개수는 안 보임: 상위 5개만 보여 주는 화면이라 쓸모가 없음). 프론트는 목록을 따로 거르지 않음. 기준 상품이 바뀌면 다시 추천
     - 상품 한 줄에는 충족한 키워드 이유 문구 + 'N/M 일치' (ProductRow hits, total). 일치 개수는 이유 문구 개수로 셈
     - 서버 응답 칸 이름은 CHORONG-65 DTO가 올라올 때 맞춘다 (지금은 아래처럼 가정, docs/history/CHORONG-64/fe_search_history.md)
       API-07: { items: [{ product (ProductSummaryDTO), reasons (충족한 키워드별 이유 문구 목록) }], missedKeywords (1위 상품이 못 맞춘 키워드) }
@@ -73,7 +73,7 @@ function parseKeywords(text) {
 function SimpleSearch() {
   const [searchParams, setSearchParams] = useSearchParams()
   const authStatus = useAuthStore((state) => state.status)
-  const tray = useCompareStore((state) => state.tray)
+  const baseItems = useCompareItems() // 거르는 기준 상품 (비교 화면의 한 칸을 고르러 나온 중 남은 상품)
   const keywords = parseKeywords(searchParams.get('kw'))
 
   const handleChange = (next) => {
@@ -84,7 +84,7 @@ function SimpleSearch() {
 
   // 추천 요청 (API-07)
   const [attempt, setAttempt] = useState(0)
-  const cmp = tray.map((item) => item.productId).join(',') // 비교함 상품 번호 (첫 상품이 기준, 비면 '')
+  const cmp = baseItems.map((item) => item.productId).join(',') // 거르는 기준 상품 번호 (비면 '')
   const requestKey = keywords.length > 0 ? JSON.stringify({ keywords, cmp, attempt }) : ''
   const [result, setResult] = useState({ key: '', status: 'loading', items: [], missedKeywords: [] })
   useEffect(() => {
@@ -119,8 +119,9 @@ function SimpleSearch() {
     return () => clearTimeout(timer)
   }, [isMember, historyLabel, conditionText])
 
-  // 요약은 서버가 준 1위 기준 (비교함 기준으로 거른 뒤의 1위)
+  // 요약은 서버가 준 1위 기준 (거르는 중이면 거른 뒤의 1위)
   const best = view.items[0]
+  const pinned = useCompareStore(getPinnedProduct)
 
   const renderResults = () => {
     if (keywords.length === 0) {
@@ -137,12 +138,15 @@ function SimpleSearch() {
         </EmptyBox>
       )
     }
-    if (view.items.length === 0 && tray.length > 0) {
+    if (view.items.length === 0 && baseItems.length > 0) {
       return (
-        <EmptyBox>이 조합에 맞고 비교함 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 키워드를 줄여 보세요.</EmptyBox>
+        <EmptyBox>이 조합에 맞고 비교할 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 키워드를 줄여 보세요.</EmptyBox>
       )
     }
     if (view.items.length === 0) return <EmptyBox>이 조합에 맞는 상품이 없어요. 키워드를 줄여 보세요.</EmptyBox>
+    // 고르는 중에는 남겨 둔 상품을 맨 위에 고정 (결과에 없으면 일치 표시 없이 넣음)
+    const found = pinned ? view.items.find((item) => item.product.productId === pinned.productId) : null
+    const rows = pinned ? [found ?? { product: pinned, reasons: [] }, ...view.items.filter((item) => item !== found)] : view.items
     return (
       <>
         <SimpleSummary
@@ -154,8 +158,8 @@ function SimpleSearch() {
         <PurposeFilterBanner />
         <ListWrap>
           <ProductList
-            items={view.items.map((item) => item.product)}
-            getRowProps={(_, index) => ({ hits: view.items[index].reasons ?? [], total: keywords.length })}
+            items={rows.map((item) => item.product)}
+            getRowProps={(_, index) => ({ hits: rows[index].reasons ?? [], total: keywords.length })}
           />
         </ListWrap>
       </>

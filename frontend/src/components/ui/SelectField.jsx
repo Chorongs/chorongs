@@ -3,6 +3,7 @@ import styled from 'styled-components'
 
 // UI-11 드롭다운: 기본형 / 알약형(isPill, 랭킹 필터). 값은 부모가 관리
 // options: [{ value, label }] / label: 기본형은 위에 글자로 보임, 알약형은 화면 읽기용 이름
+// isLabelHidden: 기본형도 이름을 화면에 안 보이고 읽기용으로만 씀 (계산기 DSR 대출 줄 안 드롭다운)
 const Wrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -58,18 +59,18 @@ const Select = styled.select`
   }
 `
 
-function SelectField({ label, value, onChange, options, placeholder, isPill = false }) {
+function SelectField({ label, value, onChange, options, placeholder, isPill = false, isLabelHidden = false }) {
   const selectId = useId()
 
   return (
     <Wrap>
-      {label && !isPill && <Label htmlFor={selectId}>{label}</Label>}
+      {label && !isPill && !isLabelHidden && <Label htmlFor={selectId}>{label}</Label>}
       <Box $isPill={isPill}>
         <Select
           id={selectId}
           $isPill={isPill}
           value={value}
-          aria-label={isPill ? label : undefined}
+          aria-label={isPill || isLabelHidden ? label : undefined}
           onChange={(event) => onChange(event.target.value)}
         >
           {placeholder && (

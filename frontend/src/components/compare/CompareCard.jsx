@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { FEATURE_LABEL } from '../../constants/options'
 import useCompareStore, { getPurposes } from '../../store/useCompareStore'
+import useUiStore from '../../store/useUiStore'
 import { Button, EmptyBox, IconButton, SlotBadge, Tag } from '../../styles/common'
 import { formatMoney, formatPrepayFee, formatRange, formatRateRange, formatTagValues } from '../../utils/format'
 import { getMidRate, getRepayCode, getSupportedMethods } from '../../utils/loanMath'
@@ -10,8 +11,8 @@ import RateText from '../common/RateText'
 import Icon from '../ui/Icon'
 
 // CP-03 비교 카드: 상품 요약 카드 (A 또는 B 칸). 모양은 시안과 같게: A는 주황, B는 파랑 테두리
-// [이자 계산] → 계산기(/calc)에 금액(원), 기간, 금리 중간값, 고른 상환 방식 코드를 넘김 (상세 창 안 열고 바로 연결)
-// [다른 상품으로 비교] → 이 상품만 비교함에 두고 상품 찾기로 (반대 칸을 새로 고름) / X → 이 칸만 빈 칸
+// [이자 계산] → 벗어나기 확인 창을 거쳐 계산기(/calc)에 금액(원), 기간, 금리 중간값, 고른 상환 방식 코드를 넘김 (상세 창 안 열고 바로 연결)
+// [다른 상품으로 비교] → 이 칸의 상품을 바꾸러 항상 상품 찾기의 상세 검색(/search)으로 (반대 칸 상품은 그대로) / X → 이 칸만 빈 칸
 // 숨김 상품은 상세 없이 '지금은 볼 수 없는 상품' 안내. 한도, 기간을 넘으면 경고. 금리 기관 문의 상품은 [이자 계산] 대신 안내 글
 // isSummary: 상대 칸이 비어 있어 아직 비교 못 할 때 쓰는 간단한 카드 (자금 용도, 금리 한 줄 + [빼기])
 const Wrap = styled.article`
@@ -103,7 +104,8 @@ const Numbers = styled.div`
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  small {
+  /* 항목 이름(small)만 위 줄에. 값 안의 단위(만원, %)도 small이라 범위를 좁혀야 줄이 안 바뀜 */
+  & > div > small {
     display: block;
     color: var(--cocoa);
     font-size: var(--fs-xs);
@@ -166,11 +168,11 @@ function getLimitCell(product) {
 }
 
 
-function CompareCard({ slot, product, amountMan, months, method, isSummary = false }) {
+function CompareCard({ slot, product, otherProduct = null, amountMan, months, method, isSummary = false }) {
   const navigate = useNavigate()
   const clearSlot = useCompareStore((state) => state.clearSlot)
-  const startSwap = useCompareStore((state) => state.startSwap)
-  const otherSlot = slot === 'A' ? 'B' : 'A'
+  const setPickSlot = useCompareStore((state) => state.setPickSlot)
+  const openCompareLeave = useUiStore((state) => state.openCompareLeave)
   const sector = formatTagValues(product, 'SECTOR')
 
   const info = (
@@ -232,13 +234,14 @@ function CompareCard({ slot, product, amountMan, months, method, isSummary = fal
   // 계산기로 넘기는 상환 방식: 비교 화면에서 고른 방식 (이 상품이 지원 안 하면 그 상품의 첫 방식)
   const repayMethod = method && getSupportedMethods(product).includes(method) ? method : getRepayCode(product)
 
+  // 계산기로 가면 대출 비교를 벗어나므로 먼저 확인 창 ([예]를 누르면 값을 넘기며 이동)
   const handleCalc = () =>
-    navigate('/calc', {
-      state: { loanAmount: amountMan * 10000, loanMonths: months, interestRate: midRate, repayMethod },
-    })
+    openCompareLeave('/calc', { loanAmount: amountMan * 10000, loanMonths: months, interestRate: midRate, repayMethod })
 
+  // 이 칸의 상품을 바꾸러 감: 반대 칸 상품(otherProduct)은 제자리에 두고, 거기서 [+ 비교]를 누른 상품이 이 칸에 들어가 비교 화면으로 되돌아옴
+  // 반대 칸 상품은 용도, 상환 방식이 겹치는 상품만 보이게 거르는 기준 (숨김 상품이면 기준 없음)
   const handleSwap = () => {
-    startSwap(otherSlot, product)
+    setPickSlot(slot, otherProduct?.productStatus === 'HIDDEN' ? null : otherProduct)
     navigate('/search')
   }
 

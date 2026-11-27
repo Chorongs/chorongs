@@ -12,10 +12,10 @@ import {
   PRIORITY_OPTIONS,
 } from '../../constants/options'
 import useAuthStore from '../../store/useAuthStore'
-import useCompareStore, { getCompareBlock } from '../../store/useCompareStore'
+import useCompareStore, { getCompareBlock, getPinnedProduct, useCompareItems } from '../../store/useCompareStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
-import { Button, IconButton, Panel, Tag } from '../../styles/common'
+import { Button, EmptyBox, IconButton, Panel, Tag } from '../../styles/common'
 import { formatMoney } from '../../utils/format'
 import { buildSavePayload, formatMatchRate, getSaveKey } from '../../utils/recommend'
 import requireLogin from '../../utils/requireLogin'
@@ -225,8 +225,10 @@ const getConditionLabels = (input) => {
     - 회원이 이미 저장한 결과면 서버가 추천 응답에 saved: true를 줌 (API-06) → 처음부터 '저장했어요'로 잠금 (다른 탭, 다른 단말기에서 저장한 결과도)
     - 회원인데 saved를 모르는 결과(추천받은 뒤 로그인함, 다른 탭에서 저장한 뒤 이 화면을 다시 엶)는 서버에 한 번 물어봄 (API-38 check) → true면 잠금
     - 서버도 같은 결과를 막음 (API-38 409 '이미 저장한 추천 결과예요'): 결과 화면을 보는 동안 다른 탭이나 다른 단말기에서 같은 결과를 저장했으면 409 → 오류 알림 대신 안내 + 버튼을 '저장했어요'로 잠금
-    - 비교함 필터 (CM-10): 비교함에 상품이 있으면 첫 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
-      (getCompareBlock이 null이 아닌 상품을 숨김, 이미 비교함에 담긴 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
+    - 비교 필터 (CM-10, CHORONG-47, CHORONG-82): 비교할 상품을 고르는 중이면 남겨 둔 상품과 자금 용도와 상환 방식이 겹치는 상품만 보이고, 위에 띠 + 숨긴 개수를 보여 줌
+      (getCompareBlock이 null이 아닌 상품을 숨김, 남겨 둔 상품은 그대로 보임). 결과 저장은 필터와 상관없이 전체 순위대로
+    - 고르는 중에는 남겨 둔 상품을 띠 바로 아래에 한 줄로 고정 (추천 결과에 없어도, 카드와 다음 순위에서는 뺌, CHORONG-82).
+      겹치는 다른 상품이 하나도 없으면 그 아래에 안내. 추천 결과가 0건이면 띠, 고정 모두 없음
 */
 function RecommendResult() {
   const result = useRecommendStore((state) => state.result)
@@ -257,7 +259,8 @@ function RecommendResult() {
     }
   }, [isMember, saveKey, isSaved, markSaved])
 
-  const tray = useCompareStore((state) => state.tray)
+  const baseItems = useCompareItems() // 거르는 기준 상품 (비교 화면의 한 칸을 고르러 나온 중 남은 상품)
+  const pinned = useCompareStore(getPinnedProduct) // 남겨 둔 상품의 상세 (맨 위 고정용, 아직 못 받았거나 숨김이면 null)
   const [restPage, setRestPage] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   // 새 추천 결과가 오면 쪽 넘김을 1쪽으로 되돌림 (이전 결과의 3쪽이 남아 목록이 비는 것 방지)
@@ -275,15 +278,19 @@ function RecommendResult() {
   const items = result.items ?? []
   // 0건일 때 서버가 notes에 넣는 '찾지 못했어요' 글은 제목과 같아서 뺌 (연체, 기간 모름 같은 다른 안내는 0건에서도 보임)
   const noteLines = (result.notes ?? []).filter((note) => note !== EMPTY_NOTE)
-  // 비교함 필터: 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품은 숨김 (이미 비교함에 담긴 상품은 보임)
-  const isHiddenByTray = (item) =>
-    tray.length > 0 &&
-    !tray.some((trayItem) => trayItem.productId === item.product.productId) &&
-    getCompareBlock(tray[0], item.product) !== null
-  const shownItems = items.filter((item) => !isHiddenByTray(item))
+  // 고르는 중 거르기: 남겨 둔 상품과 용도나 상환 방식이 안 겹치는 상품은 숨김 (남겨 둔 상품은 보임)
+  const isHiddenByPick = (item) =>
+    baseItems.length > 0 &&
+    !baseItems.some((base) => base.productId === item.product.productId) &&
+    getCompareBlock(baseItems[0], item.product) !== null
+  const shownItems = items.filter((item) => !isHiddenByPick(item))
   const hiddenCount = items.length - shownItems.length
-  const topItems = shownItems.filter((item) => item.rankNo <= TOP_COUNT)
-  const restItems = shownItems.filter((item) => item.rankNo > TOP_COUNT)
+  // 남겨 둔 상품은 맨 위에 따로 고정하니 카드, 다음 순위에서는 빼서 두 번 안 보이게 함. 추천 결과에 있으면 그 순위, 추천도를 같이 보여 줌
+  const pinnedItem = pinned ? items.find((item) => item.product.productId === pinned.productId) : null
+  const rankedItems = pinned ? shownItems.filter((item) => item !== pinnedItem) : shownItems
+  const hasNoMatch = baseItems.length > 0 && shownItems.every((item) => item.product.productId === baseItems[0].productId)
+  const topItems = rankedItems.filter((item) => item.rankNo <= TOP_COUNT)
+  const restItems = rankedItems.filter((item) => item.rankNo > TOP_COUNT)
   const restPageCount = Math.ceil(restItems.length / PAGE_SIZE)
   const currentRestPage = Math.min(restPage, Math.max(0, restPageCount - 1))
   const visibleRest = restItems.slice(currentRestPage * PAGE_SIZE, (currentRestPage + 1) * PAGE_SIZE)
@@ -382,6 +389,16 @@ function RecommendResult() {
       ) : (
         <>
           <PurposeFilterBanner hiddenCount={hiddenCount} />
+          {pinned && (
+            <ProductList
+              items={[pinned]}
+              from={pinnedItem ? 'recommend' : null}
+              getRowProps={() =>
+                pinnedItem ? { rank: pinnedItem.rankNo, matchRate: formatMatchRate(pinnedItem.matchRate) } : {}
+              }
+            />
+          )}
+          {hasNoMatch && <EmptyBox>비교할 상품과 자금 용도, 상환 방식이 겹치는 상품이 없어요. 다른 조건으로 찾아 보세요.</EmptyBox>}
           <CardList>
             {topItems.map((item) => (
               <RecommendCard key={item.product.productId} item={item} />

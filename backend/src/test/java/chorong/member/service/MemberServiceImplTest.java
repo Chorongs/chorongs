@@ -4,6 +4,7 @@ import chorong.calculator.repository.CalcHistoryRepository;
 import chorong.calculator.repository.ChangeCalcHistoryRepository;
 import chorong.calculator.repository.DsrCalcHistoryRepository;
 import chorong.calculator.repository.DsrLoanRepository;
+import chorong.calculator.repository.HomeOtherLoanRepository;
 import chorong.calculator.repository.HomeLimitCalcHistoryRepository;
 import chorong.calculator.repository.ReverseCalcHistoryRepository;
 import chorong.common.exception.BusinessException;
@@ -106,6 +107,9 @@ class MemberServiceImplTest {
 
     @Mock
     private DsrLoanRepository dsrLoanRepository;
+
+    @Mock
+    private HomeOtherLoanRepository homeOtherLoanRepository;
 
     @InjectMocks
     private MemberServiceImpl memberService;
@@ -479,6 +483,21 @@ class MemberServiceImplTest {
         InOrder order = inOrder(dsrLoanRepository, dsrCalcHistoryRepository);
         order.verify(dsrLoanRepository).deleteByMemberId(MEMBER_ID);
         order.verify(dsrCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("집 살 때 대출한도의 다른 대출 행은 계산 기록보다 먼저 지운다 (fk_home_other_loan_calc)")
+    void withdrawDeletesHomeOtherLoansBeforeHomeCalcHistories() {
+        // Given
+        givenMember(activeMember());
+
+        // When
+        memberService.withdraw(MEMBER_ID);
+
+        // Then
+        InOrder order = inOrder(homeOtherLoanRepository, homeLimitCalcHistoryRepository);
+        order.verify(homeOtherLoanRepository).deleteByMemberId(MEMBER_ID);
+        order.verify(homeLimitCalcHistoryRepository).deleteByMemberId(MEMBER_ID);
     }
 
     @Test

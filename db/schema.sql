@@ -10,6 +10,7 @@
 --DROP TABLE loan_report            CASCADE CONSTRAINTS PURGE;
 --DROP TABLE recommend_result       CASCADE CONSTRAINTS PURGE;
 --DROP TABLE diagnosis_report       CASCADE CONSTRAINTS PURGE;
+--DROP TABLE home_other_loan        CASCADE CONSTRAINTS PURGE;
 --DROP TABLE home_limit_calc_history CASCADE CONSTRAINTS PURGE;
 --DROP TABLE reverse_calc_history   CASCADE CONSTRAINTS PURGE;
 --DROP TABLE dsr_loan               CASCADE CONSTRAINTS PURGE;
@@ -534,7 +535,7 @@ COMMENT ON TABLE  dsr_loan IS 'DSR 계산에 넣은 대출 목록. 대출 1건 =
 COMMENT ON COLUMN dsr_loan.dsr_loan_id   IS '자동 증가(IDENTITY)';
 COMMENT ON COLUMN dsr_loan.dsr_id        IS '어느 DSR 계산의 대출인지 (dsr_calc_history.dsr_id)';
 COMMENT ON COLUMN dsr_loan.sort_no       IS '입력한 순서 1부터 10. unique(dsr_id, sort_no)';
-COMMENT ON COLUMN dsr_loan.loan_kind     IS 'CREDIT 신용대출 / MORTGAGE 주택담보대출 / OTHER 그 밖 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN dsr_loan.loan_kind     IS 'CREDIT 신용대출 / MORTGAGE 주택담보대출 / OTHER 기타 (화면 글자는 프론트가 바꿈)';
 COMMENT ON COLUMN dsr_loan.repay_method  IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등 / BULLET 만기일시';
 COMMENT ON COLUMN dsr_loan.loan_amount   IS '대출금액. 원';
 COMMENT ON COLUMN dsr_loan.interest_rate IS '연 %';
@@ -580,11 +581,13 @@ CREATE TABLE home_limit_calc_history (
     max_loan        NUMBER(15)    NOT NULL,
     ltv_limit       NUMBER(15)    NOT NULL,
     dti_limit       NUMBER(15)    NOT NULL,
+    rate_type       VARCHAR2(20),
     calc_at         DATE          DEFAULT SYSDATE NOT NULL,
     CONSTRAINT pk_home_calc      PRIMARY KEY (home_id),
     CONSTRAINT ck_home_region    CHECK (home_region IN ('OTHER','REGULATED')),
     CONSTRAINT ck_home_first     CHECK (first_home IN ('Y','N')),
     CONSTRAINT ck_home_repay     CHECK (repay_method IN ('EQUAL_PI','EQUAL_P')),
+    CONSTRAINT ck_home_rate_type CHECK (rate_type IN ('VARIABLE','MIXED','FIXED')),
     CONSTRAINT ck_home_positive  CHECK (house_price > 0 AND annual_income > 0 AND other_interest >= 0
                                     AND interest_rate >= 0 AND loan_years > 0
                                     AND max_loan >= 0 AND ltv_limit >= 0 AND dti_limit >= 0),
@@ -592,21 +595,50 @@ CREATE TABLE home_limit_calc_history (
 );
 CREATE INDEX ix_home_calc_member ON home_limit_calc_history (member_id);
 
-COMMENT ON TABLE  home_limit_calc_history IS '내 집 대출한도 계산 이력 (회원당 최근 10개)';
+COMMENT ON TABLE  home_limit_calc_history IS '집 살 때 대출한도 계산 이력 (회원당 최근 10개). 넣은 다른 대출 목록은 home_other_loan. 지울 때 home_other_loan을 먼저 지울 것';
 COMMENT ON COLUMN home_limit_calc_history.home_id        IS '자동 증가(IDENTITY)';
 COMMENT ON COLUMN home_limit_calc_history.member_id      IS '누가 계산했는지';
 COMMENT ON COLUMN home_limit_calc_history.house_price    IS '집값. 원';
 COMMENT ON COLUMN home_limit_calc_history.home_region    IS 'OTHER 그 외 지역 / REGULATED 규제 지역 (화면 글자는 프론트가 바꿈)';
 COMMENT ON COLUMN home_limit_calc_history.first_home     IS 'Y 생애 최초 주택 구입 / N 아님. 기본 N';
 COMMENT ON COLUMN home_limit_calc_history.annual_income  IS '연소득. 원';
-COMMENT ON COLUMN home_limit_calc_history.other_interest IS '다른 대출의 1년 이자. 원. 기본 0';
+COMMENT ON COLUMN home_limit_calc_history.other_interest IS '다른 대출의 1년 이자 합계 (home_other_loan 건마다 잔액 x 금리의 합, 화면이 계산). 원. 기본 0';
 COMMENT ON COLUMN home_limit_calc_history.interest_rate  IS '연 %';
 COMMENT ON COLUMN home_limit_calc_history.loan_years     IS '대출기간. 년';
 COMMENT ON COLUMN home_limit_calc_history.repay_method   IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등';
 COMMENT ON COLUMN home_limit_calc_history.max_loan       IS '최대 대출 한도. 원. 화면이 계산한 값을 그대로 저장';
 COMMENT ON COLUMN home_limit_calc_history.ltv_limit      IS 'LTV 기준 한도. 원';
-COMMENT ON COLUMN home_limit_calc_history.dti_limit      IS 'DTI 기준 한도. 원. LTV, DTI 비율은 화면이 정한 예시 값이라 저장하지 않음';
+COMMENT ON COLUMN home_limit_calc_history.dti_limit      IS '소득 기준 한도 (DSR 40%와 스트레스 금리로 계산). 원. 칸 이름은 예전 DTI 기준 그대로. LTV, DSR 비율과 스트레스 금리는 화면이 정한 예시 값이라 저장하지 않음';
+COMMENT ON COLUMN home_limit_calc_history.rate_type      IS 'VARIABLE 변동형 / MIXED 혼합형 / FIXED 고정형 (화면 글자는 프론트가 바꿈). 2026-11-26 전에 저장한 기록은 NULL';
 COMMENT ON COLUMN home_limit_calc_history.calc_at        IS '계산일시 (SYSDATE)';
+
+CREATE TABLE home_other_loan (
+    home_other_loan_id  NUMBER GENERATED ALWAYS AS IDENTITY,
+    home_id             NUMBER        NOT NULL,
+    sort_no             NUMBER(2)     NOT NULL,
+    loan_kind           VARCHAR2(20)  NOT NULL,
+    repay_method        VARCHAR2(20)  NOT NULL,
+    loan_amount         NUMBER(10)    NOT NULL,
+    interest_rate       NUMBER(5,2)   NOT NULL,
+    loan_months         NUMBER(4)     NOT NULL,
+    CONSTRAINT pk_home_other_loan          PRIMARY KEY (home_other_loan_id),
+    CONSTRAINT uq_home_other_loan_sort     UNIQUE (home_id, sort_no),
+    CONSTRAINT ck_home_other_loan_sort     CHECK (sort_no BETWEEN 1 AND 10),
+    CONSTRAINT ck_home_other_loan_kind     CHECK (loan_kind IN ('CREDIT','MORTGAGE','OTHER')),
+    CONSTRAINT ck_home_other_loan_repay    CHECK (repay_method IN ('EQUAL_PI','EQUAL_P','BULLET')),
+    CONSTRAINT ck_home_other_loan_positive CHECK (loan_amount > 0 AND interest_rate >= 0 AND loan_months > 0),
+    CONSTRAINT fk_home_other_loan_calc     FOREIGN KEY (home_id) REFERENCES home_limit_calc_history (home_id)
+);
+
+COMMENT ON TABLE  home_other_loan IS '집 살 때 대출한도 계산에 넣은 다른 대출 목록. 대출 1건 = 1행, 계산 1번에 0건부터 10건. ON DELETE CASCADE를 쓰지 않으므로 home_limit_calc_history보다 먼저 지울 것';
+COMMENT ON COLUMN home_other_loan.home_other_loan_id IS '자동 증가(IDENTITY)';
+COMMENT ON COLUMN home_other_loan.home_id            IS '어느 계산의 대출인지 (home_limit_calc_history.home_id)';
+COMMENT ON COLUMN home_other_loan.sort_no            IS '입력한 순서 1부터 10. unique(home_id, sort_no)';
+COMMENT ON COLUMN home_other_loan.loan_kind          IS 'CREDIT 신용대출 / MORTGAGE 주택담보대출 / OTHER 기타 (화면 글자는 프론트가 바꿈)';
+COMMENT ON COLUMN home_other_loan.repay_method       IS 'EQUAL_PI 원리금균등 / EQUAL_P 원금균등 / BULLET 만기일시';
+COMMENT ON COLUMN home_other_loan.loan_amount        IS '잔액. 원';
+COMMENT ON COLUMN home_other_loan.interest_rate      IS '연 %';
+COMMENT ON COLUMN home_other_loan.loan_months        IS '남은 기간. 개월';
 
 CREATE TABLE diagnosis_report (
     report_id    NUMBER GENERATED ALWAYS AS IDENTITY,

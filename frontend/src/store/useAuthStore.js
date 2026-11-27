@@ -31,7 +31,7 @@ const useAuthStore = create((set) => ({
     }
   },
 
-  // API-16 로그아웃 + 이 탭의 임시 저장값(sessionStorage: 추천 입력, 신용 진단 답, 소비 습관 입력, 비교함 등) 비우기
+  // API-16 로그아웃 + 이 탭의 임시 저장값(sessionStorage: 추천 입력, 신용 진단 답, 소비 습관 입력, 비교 화면 상품 등) 비우기
   // 서버 로그아웃이 실패해도 화면 쪽 값은 비운다 (E6)
   // 메모리의 스토어 값은 부르는 쪽이 안내 창을 닫을 때 새로고침하며 메인(/)으로 가서 한꺼번에 비운다.
   logout: async () => {
@@ -40,9 +40,9 @@ const useAuthStore = create((set) => ({
     } catch {
       // 실패해도 아래에서 비움
     }
-    // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()'), 비교함, 비교 화면 두 상품 비우기 (ST-04) 뒤 이 탭의 임시 저장값 전부 비움
+    // 추천 입력, 결과 비우기 (ST-03 '로그아웃, 탈퇴 시 clear()'), 비교 화면 두 상품, 고르는 중 비우기 (ST-04) 뒤 이 탭의 임시 저장값 전부 비움
     useRecommendStore.getState().clear()
-    useCompareStore.getState().clearTray()
+    useCompareStore.getState().setPickSlot(null)
     useCompareStore.getState().setPair(null, null)
     sessionStorage.clear()
   },

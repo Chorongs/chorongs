@@ -103,6 +103,120 @@ export async function deleteCalcs() {
   await api.delete('/api/me/calcs')
 }
 
+// API-24 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+export async function checkCalc(body) {
+  const response = await api.post('/api/me/calcs/check', body)
+  return response.data.data
+}
+
+// API-56 갈아타기 계산 기록
+export async function getChangeCalcs() {
+  const response = await api.get('/api/me/change-calcs')
+  return response.data.data
+}
+
+// API-56 갈아타기 계산 기록 저장 (201): { currentRepayMethod, currentBalance 원, currentRate, currentMonths, newRepayMethod, newRate, newMonths, feeRate, etcCost 원, savingAmount 원, newFirstPayment 원, newTotalInterest 원 }
+export async function postChangeCalc(body) {
+  await api.post('/api/me/change-calcs', body)
+}
+
+// API-56 갈아타기 계산 기록 1건 삭제
+export async function deleteChangeCalc(changeId) {
+  await api.delete(`/api/me/change-calcs/${changeId}`)
+}
+
+// API-56 갈아타기 계산 기록 전체 삭제
+export async function deleteChangeCalcs() {
+  await api.delete('/api/me/change-calcs')
+}
+
+// API-56 갈아타기 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+export async function checkChangeCalc(body) {
+  const response = await api.post('/api/me/change-calcs/check', body)
+  return response.data.data
+}
+
+// API-59 내 집 대출한도 계산 기록
+export async function getHomeCalcs() {
+  const response = await api.get('/api/me/home-calcs')
+  return response.data.data
+}
+
+// API-59 내 집 대출한도 계산 기록 저장 (201): { housePrice 원, homeRegion (OTHER, REGULATED), firstHome (Y, N), annualIncome 원, otherInterest 원, interestRate, loanYears, repayMethod (EQUAL_PI, EQUAL_P), maxLoan 원, ltvLimit 원, dtiLimit 원 }
+export async function postHomeCalc(body) {
+  await api.post('/api/me/home-calcs', body)
+}
+
+// API-59 내 집 대출한도 계산 기록 1건 삭제
+export async function deleteHomeCalc(homeId) {
+  await api.delete(`/api/me/home-calcs/${homeId}`)
+}
+
+// API-59 내 집 대출한도 계산 기록 전체 삭제
+export async function deleteHomeCalcs() {
+  await api.delete('/api/me/home-calcs')
+}
+
+// API-59 내 집 대출한도 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+export async function checkHomeCalc(body) {
+  const response = await api.post('/api/me/home-calcs/check', body)
+  return response.data.data
+}
+
+// API-58 상환능력 기반 대출 계산 기록
+export async function getReverseCalcs() {
+  const response = await api.get('/api/me/reverse-calcs')
+  return response.data.data
+}
+
+// API-58 상환능력 기반 대출 계산 기록 저장 (201): { repayMethod, monthlyPayment 원, interestRate, loanMonths, maxLoan 원 }
+export async function postReverseCalc(body) {
+  await api.post('/api/me/reverse-calcs', body)
+}
+
+// API-58 상환능력 기반 대출 계산 기록 1건 삭제
+export async function deleteReverseCalc(reverseId) {
+  await api.delete(`/api/me/reverse-calcs/${reverseId}`)
+}
+
+// API-58 상환능력 기반 대출 계산 기록 전체 삭제
+export async function deleteReverseCalcs() {
+  await api.delete('/api/me/reverse-calcs')
+}
+
+// API-58 상환능력 기반 대출 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+export async function checkReverseCalc(body) {
+  const response = await api.post('/api/me/reverse-calcs/check', body)
+  return response.data.data
+}
+
+// API-57 DSR 계산 기록
+export async function getDsrCalcs() {
+  const response = await api.get('/api/me/dsr-calcs')
+  return response.data.data
+}
+
+// API-57 DSR 계산 기록 저장 (201): { annualIncome 원, dsrRate %, yearlyPayment 원, loans (1건부터 10건, 입력 순서대로): [{ loanKind (CREDIT, MORTGAGE, OTHER), repayMethod, loanAmount 원, interestRate, loanMonths }] }
+export async function postDsrCalc(body) {
+  await api.post('/api/me/dsr-calcs', body)
+}
+
+// API-57 DSR 계산 기록 1건 삭제
+export async function deleteDsrCalc(dsrId) {
+  await api.delete(`/api/me/dsr-calcs/${dsrId}`)
+}
+
+// API-57 DSR 계산 기록 전체 삭제
+export async function deleteDsrCalcs() {
+  await api.delete('/api/me/dsr-calcs')
+}
+
+// API-57 DSR 계산 기록 저장 여부 확인 (본문은 저장과 같음): 같은 입력의 기록이 이미 있으면 true (추천 결과 check와 같은 방식, 2026-11-26 사용자 결정)
+export async function checkDsrCalc(body) {
+  const response = await api.post('/api/me/dsr-calcs/check', body)
+  return response.data.data
+}
+
 // API-25 진단 리포트: { creditBand, createdAt } / 없으면 204 → null
 export async function getCreditReport() {
   const response = await api.get('/api/me/reports/credit')
