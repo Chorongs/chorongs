@@ -44,7 +44,7 @@ const buttonVariant = {
       background: var(--mist);
     }
   `,
-  // 소셜 로그인 버튼 (CHORONG-43): 글자 앞에 공식 심볼 <img alt="" />, 글자 --fs-lg (fe_design 카카오/네이버 버튼)
+  // 소셜 로그인 버튼: 글자 앞에 공식 심볼 <img alt="" />, 글자 --fs-lg, 글꼴은 가이드대로 OS 기본 서체 --f-system (fe_design 카카오/네이버 버튼)
   // 가이드가 정한 색 밖으로 바꾸지 않게 마우스 올림 색 변화 없음 / 모서리는 기본 --r-sm(12px) = 카카오 가이드 radius 12
   // 심볼 파일은 둥근 바탕이 버튼과 같은 색이라 바탕은 안 보이고 말풍선, N만 보임
   // 둥근 바탕의 안 보이는 여백만큼 음수 margin으로 당겨, 보이는 심볼 + 글자 묶음이 버튼 가운데에 오고 심볼과 글자 사이가 8px이 되게 함
@@ -54,6 +54,7 @@ const buttonVariant = {
     gap: 0;
     background: var(--kakao);
     color: var(--on-kakao);
+    font-family: var(--f-system);
     font-size: var(--fs-lg);
     font-weight: 600;
     & > img {
@@ -68,6 +69,7 @@ const buttonVariant = {
     gap: 0;
     background: var(--naver);
     color: var(--on-naver);
+    font-family: var(--f-system);
     font-size: var(--fs-lg);
     font-weight: 600;
     & > img {
@@ -153,6 +155,7 @@ export const Panel = styled.div`
 `
 
 // UI-06 칩: 높이 38 / 작은 32 ($size="sm"), 선택 상태는 aria-pressed
+// 글이 길어도 놓인 칸 폭을 넘지 않음 (넘는 부분은 잘림. 글을 ChipText로 감싸면 '…'로 줄임)
 export const Chip = styled.button.attrs((props) => ({
   type: props.type || 'button',
 }))`
@@ -160,6 +163,8 @@ export const Chip = styled.button.attrs((props) => ({
   align-items: center;
   justify-content: center;
   gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
   height: ${({ $size }) => ($size === 'sm' ? '32px' : '38px')};
   padding: 0 ${({ $size }) => ($size === 'sm' ? '12px' : '15px')};
   border: 1px solid var(--line-2);
@@ -183,6 +188,13 @@ export const Chip = styled.button.attrs((props) => ({
     font-weight: 800;
   }
   ${disabledStyle}
+`
+
+// 칩 안 글: 칩이 칸 폭에 닿으면 넘는 부분을 '…'로 줄임 (최근 검색 칩처럼 글 길이가 정해지지 않은 칩)
+export const ChipText = styled.span`
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 // UI-13 작은 딱지: $variant (default 회색 / acc 주황 강조 / good 충족 / warn 주의 / bad 위험)
@@ -465,4 +477,68 @@ export const ShortcutPanel = styled.div`
   @media (max-width: 899px) {
     padding: 28px 20px 20px;
   }
+`
+
+// 구역 자리에 띄우는 한 줄 상태 글 ('불러오는 중이에요', '확인하는 중이에요' 등, role="status"와 같이 씀)
+export const StatusText = styled.p`
+  padding: 36px 0;
+  color: var(--cocoa);
+  text-align: center;
+`
+
+// 화면에는 안 보이고 화면 낭독기만 읽는 글 (체크칸 이름, 빠진 필수 항목 안내 등)
+export const ScreenReaderText = styled.span`
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+`
+
+// 다시 받는 중 흐리게 ($isBusy): 흐려질 때만 0.3초 뒤에 시작 (LoadingText와 같은 기다림), 다시 밝게는 바로
+// 0.3초 안에 다 받으면 흐려지기 전에 끝나서 화면이 바뀌지 않음 / 누르기는 그 자리에 inert를 같이 줘서 막음
+export const busyStyle = css`
+  opacity: ${({ $isBusy }) => ($isBusy ? 0.45 : 1)};
+  transition: ${({ $isBusy }) => ($isBusy ? 'opacity 0.15s 0.3s' : 'none')};
+`
+
+// 글자 입력칸 하나: label 안에 칸 이름 글자 + input + 칸 아래 글 (닉네임, 생년월일 칸이 같이 씀)
+// input에 aria-invalid="true"면 테두리 빨간색 (틀린 칸 표시, NumberField와 같은 색)
+export const InputField = styled.label`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  input {
+    height: 52px;
+    padding: 0 16px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--paper);
+    color: var(--ink);
+    font-size: var(--fs-lg);
+    @media (max-width: 899px) {
+      height: 48px;
+    }
+  }
+  input[aria-invalid='true'] {
+    border-color: var(--bad);
+  }
+`
+
+// 개수 딱지: 높이 16 주황 알약 + --on-brand 색 숫자 (상단 찜 하트 LY-07, 계정 메뉴 '찜한 대출' LY-08이 같이 씀)
+export const CountBadge = styled.span`
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--r-pill);
+  background: var(--brand-strong);
+  color: var(--on-brand);
+  font-family: var(--f-num);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 `

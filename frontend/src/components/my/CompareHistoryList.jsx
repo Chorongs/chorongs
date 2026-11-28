@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import useCompareStore from '../../store/useCompareStore'
-import { Button, Tag } from '../../styles/common'
+import { Button } from '../../styles/common'
 import { formatDate } from '../../utils/format'
-import MySection from './MySection'
+import { toLoading } from '../../utils/loadingState'
+import MySection, { ProductStatusTag } from './MySection'
 
-// MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / 지우기
-// 줄 X → API-23 DELETE /{compareId} (404면 목록 다시 불러옴) / 지우기 → API-23 DELETE (전체) / 알림은 MySection (MY-03)
+// MY-07 비교 내역 (저장한 비교 10개): A vs B / '다시 비교' / 줄마다 X / [선택 삭제] [전체 삭제]
+// 줄 X → API-23 DELETE /{compareId} (404면 MySection이 '이미 삭제한' 알림 + 목록 다시 받음) / [전체 삭제] → API-23 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료, 숨긴 상품이 있으면 딱지 + 안내
 // '다시 비교' → useCompareStore.setPair(productA.productId, productB.productId) 후 /compare (ST-04)
-// TODO(API-23, CHORONG-42 BE): 비교 내역 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const Row = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -39,8 +39,9 @@ const Names = styled.p`
 
 const Versus = styled.span`
   color: var(--muted);
+  font-family: var(--f-num);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 900;
 `
 
 const Meta = styled.span`
@@ -58,8 +59,7 @@ function ProductName({ product }) {
   return (
     <>
       {product.companyName} {product.productName}
-      {product.productStatus === 'CLOSED' && <Tag $variant="warn">판매 종료</Tag>}
-      {product.productStatus === 'HIDDEN' && <Tag>지금은 볼 수 없는 상품</Tag>}
+      <ProductStatusTag product={product} />
     </>
   )
 }
@@ -83,28 +83,23 @@ function CompareHistoryList() {
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true
     }
   }, [attempt])
 
+  // 다시 받을 때 이전 목록을 남김 (보여 준 적이 있으면 받는 동안 MySection이 흐리게 둠)
   const reload = () => {
-    setResult({ status: 'loading', items: [] })
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
   const handleRemove = async (item) => {
-    try {
-      await myApi.deleteCompare(item.compareId)
-      setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.compareId !== item.compareId) }))
-    } catch (error) {
-      // 이미 지워진 기록이면 목록을 다시 받음 (API-23)
-      if (error.response?.status === 404) reload()
-      else throw error
-    }
+    await myApi.deleteCompare(item.compareId)
+    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.compareId !== item.compareId) }))
   }
 
   const handleClearAll = async () => {
@@ -135,9 +130,12 @@ function CompareHistoryList() {
   return (
     <MySection
       title="비교 내역"
+      itemName="비교 내역"
       description="저장한 비교를 최근 10개까지 보여 줘요."
       status={result.status}
+      hasShown={result.hasShown}
       onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.compareId}
       getItemLabel={(item) => `${item.productA.productName} vs ${item.productB.productName}`}

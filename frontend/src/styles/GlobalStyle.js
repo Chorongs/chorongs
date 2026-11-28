@@ -6,6 +6,7 @@ const GlobalStyle = createGlobalStyle`
     /* 글꼴 */
     --f-ui: Pretendard, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     --f-num: Nunito, Pretendard, 'Malgun Gothic', sans-serif;
+    --f-system: system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 
     /* 글자 크기 */
     --fs-d1: 48px;
@@ -49,6 +50,7 @@ const GlobalStyle = createGlobalStyle`
     --warn-soft: #FFF3D6;
     --bad: #D23B3B;
     --bad-soft: #FDECEC;
+    --on-bad: #FFFFFF;
 
     /* 그래프 */
     --viz-1: #3B78C2;
@@ -62,6 +64,8 @@ const GlobalStyle = createGlobalStyle`
     --bronze: #C47A3F;
     --hl: #FFEC99;
     --scrim: rgba(24, 19, 15, .42);
+    /* 바탕(--paper) 위에 막(--scrim)을 덮은 색 한 가지: 창이 열려 뒤 화면을 잠근 동안 비워 둔 스크롤바 자리를 칠함 (막이 그 자리는 못 덮어서) */
+    --scrim-on-paper: color-mix(in srgb, rgb(24, 19, 15) 42%, var(--paper));
 
     /* 그림자 */
     --shadow-1: 0 1px 2px rgba(33, 28, 24, .07), 0 0 0 1px rgba(33, 28, 24, .05);
@@ -74,7 +78,7 @@ const GlobalStyle = createGlobalStyle`
     --r-lg: 22px;
     --r-pill: 999px;
 
-    /* 소셜 로그인 버튼 (CHORONG-43, 각 회사 가이드 색 그대로. 다크 모드에서도 같은 색) */
+    /* 소셜 로그인 버튼 (각 회사 가이드 색 그대로. 다크 모드에서도 같은 색) */
     /* 카카오: 카카오 로그인 디자인 가이드 (컨테이너 #FEE500, 레이블 #000000 85%) */
     /* 네이버: 네이버 로그인 버튼 사용 가이드 지정 컬러 (배경 #03A94D, 로고, 레이블 #FFFFFF) */
     --kakao: #FEE500;
@@ -130,6 +134,7 @@ const GlobalStyle = createGlobalStyle`
 
       --hl: #5C4A0E;
       --scrim: rgba(0, 0, 0, .62);
+      --scrim-on-paper: color-mix(in srgb, rgb(0, 0, 0) 62%, var(--paper));
 
       --shadow-1: 0 0 0 1px #2E2824;
       --shadow-pop: 0 20px 60px rgba(0, 0, 0, .55), 0 0 0 1px #2E2824;
@@ -144,6 +149,16 @@ const GlobalStyle = createGlobalStyle`
 
   html {
     -webkit-text-size-adjust: 100%;
+    /* 화면 스크롤바 자리를 늘 비워 둠 (스크롤이 필요 없는 쪽에서는 틀을 그리지 않고 자리만): 쪽을 옮기거나 창이 열려 뒤 화면을 잠가도(utils/scrollLock.js) 화면이 옆으로 밀리지 않게 */
+    /* overflow-y를 auto로 따로 적어 둠: 비워 두면 잠글 때 body의 overflow가 화면 전체로 옮겨 가 잠금 방식이 달라짐 */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  /* 비워 둔 스크롤바 자리 색: 평소에는 body 바탕(--paper)이 그대로 칠해짐 (다크 모드도 같음)
+     창이 열려 잠긴 동안(scrollLock.js가 data-scroll-locked를 붙임)은 뒤 화면처럼 막을 덮은 색으로 */
+  html[data-scroll-locked] {
+    background-color: var(--scrim-on-paper);
   }
 
   body {

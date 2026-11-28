@@ -1,3 +1,7 @@
+import { CREDIT_BAND_LABEL } from '../constants/options'
+import { useRecommendStore } from '../store/useRecommendStore'
+import useUiStore from '../store/useUiStore'
+
 const MAN_WON = 10000 // 만원 → 원
 
 const isPositiveNumber = (value) => typeof value === 'number' && value > 0
@@ -52,3 +56,26 @@ export const buildSavePayload = (lastInput, items) => ({
 
 // 저장 내용이 같은지 비교하는 글: 같은 조건에 같은 순위의 결과면 같은 글 (중복 저장 막기용)
 export const getSaveKey = (payload) => JSON.stringify(payload)
+
+// 신용 구간으로 추천받기 (진단 결과 카드 CR-03, MY 진단 리포트 MY-09가 같이 씀)
+// 추천 입력의 신용 구간을 creditBand로 채움 → 추천받기 전이면 추천 창을 '잠깐' 창 없이 1단계부터 열고 알림 (나머지 입력은 이용자가 채움)
+// 받은 뒤면 그 구간으로 다시 추천 실행 → /recommend 이동 + 알림 / 실패하면 알림 (E3). 실행 중 버튼 잠금(E5)은 부르는 화면이 함
+// navigate: 부르는 화면의 useNavigate() 값 (이 함수는 컴포넌트가 아니라 훅을 직접 못 씀)
+export const recommendWithBand = async (creditBand, navigate) => {
+  const { result, setInput, run } = useRecommendStore.getState()
+  const { openRecommend, showToast } = useUiStore.getState()
+  const bandLabel = CREDIT_BAND_LABEL[creditBand] ?? creditBand
+  setInput({ creditBand })
+  if (result === null) {
+    openRecommend(true)
+    showToast(`${bandLabel} 구간을 3단계에 골라 뒀어요`)
+    return
+  }
+  try {
+    await run()
+    navigate('/recommend')
+    showToast(`${bandLabel} 구간으로 추천했어요`)
+  } catch {
+    showToast('추천을 불러오지 못했어요. 다시 시도해 주세요')
+  }
+}

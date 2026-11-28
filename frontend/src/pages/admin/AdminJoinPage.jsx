@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as adminApi from '../../api/adminApi'
+import AuthLayout from '../../components/layout/AuthLayout'
 import Icon from '../../components/ui/Icon'
 import useAdminStore from '../../store/useAdminStore'
 import { Button, InlineError } from '../../styles/common'
@@ -16,48 +17,6 @@ import { isBlank, isValidAdminName } from '../../utils/validate'
 // 토큰 원문은 화면 상태(useState)에만 (E14) / 연타 방지 (E5) / 일반 화면에 링크 없음 (관리자 로그인 화면에서만 이동)
 const COOLDOWN_SECONDS = 60
 const NAME_ERROR = '이름은 2~20자로 적어 주세요'
-
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 440px;
-  margin: 8px auto 0;
-`
-
-const Head = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  text-align: center;
-`
-
-const Mark = styled.span`
-  display: grid;
-  place-items: center;
-  width: 64px;
-  height: 64px;
-  border-radius: var(--r-lg);
-  background: var(--ink);
-  color: var(--paper);
-`
-
-const Tagline = styled.span`
-  color: var(--cocoa);
-  font-size: var(--fs-base);
-  font-weight: 700;
-`
-
-const Title = styled.h1`
-  font-size: var(--fs-h2);
-  font-weight: 800;
-`
-
-const Guide = styled.p`
-  color: var(--cocoa);
-`
 
 const Form = styled.form`
   display: flex;
@@ -294,15 +253,12 @@ function AdminJoinPage() {
   }
 
   return (
-    <Wrap>
-      <Head>
-        <Mark aria-hidden="true">
-          <Icon name="shield" size={30} />
-        </Mark>
-        <Tagline>캐링 관리자</Tagline>
-        <Title>관리자 가입 신청</Title>
-        <Guide>이메일을 인증하고 신청하면, 승인권자가 승인한 뒤 로그인할 수 있어요.</Guide>
-      </Head>
+    <AuthLayout
+      mark="shield"
+      tagline="캐링 관리자"
+      title="관리자 가입 신청"
+      description="이메일을 인증하고 신청하면, 승인권자가 승인한 뒤 로그인할 수 있어요."
+    >
       {step === 'done' ? (
         <Done role="status">
           <Icon name="check" size={24} />
@@ -392,7 +348,7 @@ function AdminJoinPage() {
         <br />
         <Link to="/admin/login">관리자 로그인</Link>
       </LoginLink>
-    </Wrap>
+    </AuthLayout>
   )
 }
 

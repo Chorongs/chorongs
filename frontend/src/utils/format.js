@@ -94,13 +94,6 @@ export function formatTagValues(product, tagType) {
   return values.length > 0 ? values.join(', ') : '정보 없음'
 }
 
-// 오늘 날짜 'YYYY-MM-DD' (달력에서 미래 날짜를 못 고르게, 가입 단계와 MY 회원 정보) / today: 테스트에서 고정할 때만 넘김
-export function getTodayText(today = new Date()) {
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${today.getFullYear()}-${month}-${day}`
-}
-
 // 시각: '2026-11-19T14:32:10' → '14:32' (관리자 끝나는 시각 '14:32까지', AD-03)
 export function formatTime(value) {
   const matched = typeof value === 'string' ? value.match(/^\d{4}-\d{2}-\d{2}[T ](\d{2}):(\d{2})/) : null
@@ -121,4 +114,13 @@ export function approvedByText(admin) {
   if (admin.approvedByName) return admin.approvedByName
   if (admin.approvedBy !== null && admin.approvedBy !== undefined) return '탈퇴한 관리자'
   return '첫 관리자 자동 승인'
+}
+
+// 생년월일 칸 값: 숫자만 8자리까지 남겨 'YYYY-MM-DD' 모양으로 이음 (예: '199001' → '1990-01', '19900101' → '1990-01-01')
+// 칸에는 숫자만 보이고, 검사와 서버로 보낼 때 이 모양을 씀 (BirthDateField). 붙여 넣은 '1990.01.01'도 같은 모양으로
+// (월, 일을 0을 채운 두 자리로 붙여 넣을 때만 맞음. '1990.1.1'은 숫자 '199011'이 되어 칸에 보이는 숫자로 고치게 됨)
+// 맞는 날짜인지(만 19세 이상 포함)는 validate.js isAdultBirthDate, 치는 동안 상태는 getBirthInputState
+export function formatBirthInput(text) {
+  const digits = String(text ?? '').replace(/\D/g, '').slice(0, 8)
+  return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-')
 }

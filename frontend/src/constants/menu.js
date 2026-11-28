@@ -101,3 +101,36 @@ export const FULL_MENU = [
   },
   { title: '도움말', items: HELP_MENU },
 ]
+
+// MY 계산 기록의 계산기 종류 (계산기 탭 순서, 처음은 대출 이자): MY-10 칩과 MY 왼쪽 메뉴 '계산 기록' 아래 하위 메뉴가 같이 씀
+// key: 주소 /my/calcs?kind={key}
+export const CALC_RECORD_KINDS = [
+  { key: 'interest', label: '대출 이자' },
+  { key: 'change', label: '대출 갈아타기' },
+  { key: 'dsr', label: 'DSR' },
+  { key: 'home', label: '집 살 때 대출한도' },
+  { key: 'reverse', label: '상환능력 기반 대출' },
+]
+
+// MY 메뉴 (MY-01 왼쪽 메뉴, LY-08 계정 메뉴가 같이 씀)
+// title이 없는 묶음: 묶음 제목 없이 맨 위에 따로 보이는 메뉴 (한눈에 보기) / key: 주소 /my/{key} (null이면 /my)
+// children: MY 왼쪽 메뉴에서 그 메뉴 아래에 늘 펼쳐 두는 하위 메뉴 (계정 메뉴에는 안 보임)
+export const MY_MENU_GROUPS = [
+  { title: null, items: [{ key: null, label: '한눈에 보기' }] },
+  {
+    title: '내 기록',
+    items: [
+      { key: 'liked', label: '찜한 대출' },
+      { key: 'recent', label: '최근 본 대출' },
+      { key: 'searches', label: '최근 검색' },
+      { key: 'compares', label: '비교 내역' },
+      { key: 'recommendations', label: '저장한 추천 결과' },
+      { key: 'report', label: '내 진단 리포트' },
+      { key: 'calcs', label: '계산 기록', children: CALC_RECORD_KINDS },
+    ],
+  },
+  { title: '계정', items: [{ key: 'profile', label: '회원 정보' }] },
+]
+
+// MY 메뉴 key → 주소
+export const getMyMenuPath = (key) => (key ? `/my/${key}` : '/my')

@@ -3,37 +3,44 @@ import { useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import * as authApi from '../../api/authApi'
 import useUiStore from '../../store/useUiStore'
-import { Button, InlineError, Panel } from '../../styles/common'
-import { getTodayText } from '../../utils/format'
-import { BIRTH_ERROR, isValidBirthDate } from '../../utils/validate'
+import { Button, InlineError, ScreenReaderText } from '../../styles/common'
+import { ADMIN_LOGIN_GUIDE_TEXT } from '../../utils/requireLogin'
+import { RECHECK_INPUT_TEXT, isAdultBirthDate } from '../../utils/validate'
 import TermsDialog from '../common/TermsDialog'
+import AuthLayout from '../layout/AuthLayout'
 import Checkbox from '../ui/Checkbox'
+import BirthDateField from './BirthDateField'
 
 // AU-03 약관 동의, 생년월일 입력: 가입 단계 (OAuthCallbackPage의 result=SIGNUP)
 // needBirth: true면 생년월일 입력칸 (카카오는 항상, 네이버는 비어 왔을 때만) / false면 생년월일은 안 보냄 (API-50)
 // [시작하기] → API-50 → onDone(회원 정보) / [취소] → /login (서버 요청 없음, 가입 대기는 10분 뒤 사라짐)
-// 누르는 중 잠금 (E5) / 생년월일 형식, 미래 날짜, 1900년 이전은 보내기 전에 검사 (E2)
+// 누르는 중 잠금 (E5) / 생년월일 형식, 미래 날짜, 1900년 이전, 만 19세 미만은 보내기 전에 검사 (E2)
 // 검사 규칙 (회원 관리 기획서 4-2, 4-7, 5-1):
 //   - 필수 약관 2개(이용약관, 개인정보 수집/이용)를 모두 체크해야 함 → 아니면 맨 아래 '필수 약관에 동의해 주세요.' (문구 1)
-//   - 생년월일(needBirth일 때만, 필수): 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전 (isValidBirthDate)
-//   - 생년월일 안내는 칸 바로 아래에 입력하는 동안 바로 바뀜: 비어 있음 '생년월일을 입력해 주세요'(6-1)
-//     / 덜 입력, 범위 밖, [시작하기]를 눌렀는데 비어 있음, 서버 400 INVALID_INPUT '입력한 생년월일을 확인해주세요'(6-2)
-//     / 정상 '생년월일 입력 완료'(6-3)
-//   - 덜 입력한 날짜는 브라우저가 값을 빈 글자로 넘기므로 validity.badInput으로 따로 구분
-//   - 오류 문구 BIRTH_ERROR, 오늘 날짜 getTodayText는 MY 회원 정보와 같이 씀 (utils/validate.js, utils/format.js)
+//   - 생년월일(needBirth일 때만, 필수): 'YYYY-MM-DD', 실제 있는 날짜, 1900-01-01 이후, 오늘 이전, 만 19세 이상 (isAdultBirthDate)
+//   - 생년월일 칸은 숫자 8자리 입력, 칸 아래 안내는 치는 동안 바로 바뀜 (BirthDateField, MY 회원 정보와 같이 씀):
+//     비었거나 치는 중 → 회색 안내(6-1) / 틀림 → '입력한 생년월일을 확인해 주세요'(6-2) / 정상 → '생년월일 입력 완료'(6-3)
+//   - [시작하기]를 눌렀는데 비었거나 덜 침, 서버 400 INVALID_INPUT도 6-2 (다시 치기 시작하면 실시간 안내로 돌아감)
+//   - [시작하기]가 막히면(약관 빠짐, 생년월일 틀림) 보내지 않고 알림 RECHECK_INPUT_TEXT + 틀린 곳 표시:
+//     체크 안 한 [필수] 약관 글 빨간색 (체크하면 바로 돌아옴), 생년월일 칸 테두리 빨간색 (InputField aria-invalid)
 
-const Wrap = styled(Panel)`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-width: 520px;
-  margin: 0 auto;
+// [필수] 약관 글: [시작하기]를 눌렀는데 체크 안 했으면 빨간색 (화면 낭독기에는 '동의가 필요해요'를 같이 읽힘)
+const RequiredLabel = styled.span`
+  ${({ $isMissing }) => $isMissing && 'color: var(--bad);'}
 `
 
-const Title = styled.h1`
-  font-size: var(--fs-h3);
-  font-weight: 800;
-`
+const TERMS_REQUIRED_TEXT = '필수 약관에 동의해 주세요.'
+const SIGNUP_FAIL_TEXT = '가입하지 못했어요.\n다시 시도해 주세요'
+
+// [필수] 약관 체크칸 이름 (빠졌으면 화면 낭독기용 안내를 붙임)
+function RequiredTermLabel({ text, isMissing }) {
+  return (
+    <RequiredLabel $isMissing={isMissing}>
+      {text}
+      {isMissing && <ScreenReaderText> 동의가 필요해요</ScreenReaderText>}
+    </RequiredLabel>
+  )
+}
 
 const AgreeList = styled.div`
   display: flex;
@@ -62,33 +69,7 @@ const ViewButton = styled.button.attrs({ type: 'button' })`
   cursor: pointer;
 `
 
-const BirthField = styled.label`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  input {
-    height: 52px;
-    padding: 0 16px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--paper);
-    color: var(--ink);
-    font-size: var(--fs-lg);
-  }
-`
-
-// $tone: info 안내 / bad 오류 / good 입력 완료
-const HINT_COLOR = { info: 'var(--cocoa)', bad: 'var(--bad)', good: 'var(--good)' }
-
-const BirthHint = styled.span`
-  color: ${({ $tone }) => HINT_COLOR[$tone]};
-  font-size: var(--fs-sm);
-  font-weight: 600;
-`
-
-// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line. 2026-11-17 사용자 요청)
+// 안내와 해야 할 행동이 두 문장이면 두 줄로 나눔 (글 안의 \n, white-space: pre-line)
 const ErrorText = styled(InlineError)`
   white-space: pre-line;
 `
@@ -108,23 +89,22 @@ function TermsAgreement({ needBirth, onDone }) {
   const [termsKind, setTermsKind] = useState(null)
   const [error, setError] = useState('')
   const [isPending, setIsPending] = useState(false)
-  // 덜 입력한 날짜인지 (validity.badInput) / [시작하기]를 눌러 봤는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
-  const [isBirthBadInput, setIsBirthBadInput] = useState(false)
+  // 생년월일을 다시 치기 전에 [시작하기]를 눌렀는지 / 서버가 생년월일을 거절했는지(400 INVALID_INPUT)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isServerBirthError, setIsServerBirthError] = useState(false)
+  // [시작하기]를 한 번이라도 눌렀는지 (체크 안 한 [필수] 약관 글을 빨간색으로)
+  const [isStartTried, setIsStartTried] = useState(false)
 
   const isAllAgreed = agreeService && agreePrivacy
-  const isBirthDone = isValidBirthDate(birth) && !isBirthBadInput && !isServerBirthError
-  // 칸 아래 안내: 정상 → 6-3 / 덜 입력, 형식·범위 오류, 눌렀는데 비어 있음, 서버 거절 → 6-2 / 그 밖(아직 안 씀) → 6-1
-  const isBirthError = !isBirthDone && (isBirthBadInput || birth !== '' || isSubmitted || isServerBirthError)
-  let birthHint = { tone: 'info', text: '생년월일을 입력해 주세요' }
-  if (isBirthDone) birthHint = { tone: 'good', text: '생년월일 입력 완료' }
-  else if (isBirthError) birthHint = { tone: 'bad', text: BIRTH_ERROR }
+  // 약관 안내는 두 칸을 다 체크하면 바로 지움 ([시작하기]를 다시 누르기 전에도)
+  const shownError = error === TERMS_REQUIRED_TEXT && isAllAgreed ? '' : error
+  const isBirthDone = isAdultBirthDate(birth) && !isServerBirthError
+  // 눌렀는데 아직 맞는 날짜가 아님, 서버가 거절함 → 칸 아래를 오류로 (그 밖은 BirthDateField가 치는 동안 정함)
+  const isBirthForcedError = isServerBirthError || (isSubmitted && !isAdultBirthDate(birth))
 
-  // 달력 값이 바뀌거나 칸을 떠날 때 덜 입력했는지 다시 봄
-  const handleBirthInput = (event) => {
-    setBirth(event.target.value)
-    setIsBirthBadInput(event.target.validity.badInput)
+  const handleBirthChange = (text) => {
+    setBirth(text)
+    setIsSubmitted(false)
     setIsServerBirthError(false)
   }
 
@@ -135,14 +115,17 @@ function TermsAgreement({ needBirth, onDone }) {
 
   const handleSubmit = async () => {
     setIsSubmitted(true)
+    setIsStartTried(true)
     // 필수 약관 2개 모두 체크 (문구 1)
     if (!isAllAgreed) {
-      setError('필수 약관에 동의해 주세요.')
+      setError(TERMS_REQUIRED_TEXT)
+      showToast(RECHECK_INPUT_TEXT)
       return
     }
     // 생년월일이 정상이 아니면 보내지 않음 (오류 문구는 칸 아래에 이미 보임, 6-2)
     if (needBirth && !isBirthDone) {
       setError('')
+      showToast(RECHECK_INPUT_TEXT)
       return
     }
     setError('')
@@ -156,7 +139,7 @@ function TermsAgreement({ needBirth, onDone }) {
       const user = await authApi.postSignup(body)
       // 성공인데 회원 정보가 없으면 가입 실패로 안내 (화면이 멈추지 않게)
       if (!user?.memberNickname) {
-        setError('가입하지 못했어요.\n다시 시도해 주세요')
+        setError(SIGNUP_FAIL_TEXT)
         setIsPending(false)
         return
       }
@@ -164,33 +147,40 @@ function TermsAgreement({ needBirth, onDone }) {
     } catch (err) {
       const code = err.response?.data?.code
       if (code === 'SIGNUP_EXPIRED') {
-        showToast('시간이 만료되었어요. 다시 진행 해주세요.')
-        navigate('/login', { replace: true })
+        // 안내는 로그인 화면 안내 줄에 두 줄로 (알림은 금방 사라지고 한 줄이라)
+        navigate('/login?error=SIGNUP_EXPIRED', { replace: true })
         return
       }
-      if (code === 'INVALID_INPUT') {
+      // 400 INVALID_INPUT은 생년월일 칸 아래 오류로 (생년월일 칸이 없으면 가입 실패 안내)
+      if (code === 'INVALID_INPUT' && needBirth) {
         setError('')
         setIsServerBirthError(true)
-      } else if (code === 'ADMIN_LOGGED_IN') setError('관리자로 로그인 중이에요.\n관리자에서 로그아웃한 뒤 로그인해 주세요')
-      else setError('가입하지 못했어요.\n다시 시도해 주세요')
+      } else if (code === 'ADMIN_LOGGED_IN') setError(ADMIN_LOGIN_GUIDE_TEXT)
+      else setError(SIGNUP_FAIL_TEXT)
       setIsPending(false)
     }
   }
 
   return (
-    <Wrap>
-      <Title>캐링 가입하기</Title>
-
+    <AuthLayout mark="logo" title="캐링 가입하기">
       <Checkbox checked={isAllAgreed} onChange={handleAll} label="전체 동의" />
       <AgreeList>
         <AgreeRow>
-          <Checkbox checked={agreeService} onChange={setAgreeService} label="[필수] 이용약관" />
+          <Checkbox
+            checked={agreeService}
+            onChange={setAgreeService}
+            label={<RequiredTermLabel text="[필수] 이용약관" isMissing={isStartTried && !agreeService} />}
+          />
           <ViewButton aria-label="이용약관 보기" onClick={() => setTermsKind('service')}>
             보기
           </ViewButton>
         </AgreeRow>
         <AgreeRow>
-          <Checkbox checked={agreePrivacy} onChange={setAgreePrivacy} label="[필수] 개인정보 수집/이용" />
+          <Checkbox
+            checked={agreePrivacy}
+            onChange={setAgreePrivacy}
+            label={<RequiredTermLabel text="[필수] 개인정보 수집/이용" isMissing={isStartTried && !agreePrivacy} />}
+          />
           <ViewButton aria-label="개인정보 수집/이용 보기" onClick={() => setTermsKind('privacy')}>
             보기
           </ViewButton>
@@ -198,24 +188,15 @@ function TermsAgreement({ needBirth, onDone }) {
       </AgreeList>
 
       {needBirth && (
-        <BirthField>
-          생년월일
-          <input
-            type="date"
-            value={birth}
-            min="1900-01-01"
-            max={getTodayText()}
-            aria-invalid={birthHint.tone === 'bad'}
-            onChange={handleBirthInput}
-            onBlur={handleBirthInput}
-          />
-          <BirthHint $tone={birthHint.tone} role={birthHint.tone === 'bad' ? 'alert' : undefined}>
-            {birthHint.text}
-          </BirthHint>
-        </BirthField>
+        <BirthDateField
+          value={birth}
+          onChange={handleBirthChange}
+          forceError={isBirthForcedError}
+          doneText="생년월일 입력 완료"
+        />
       )}
 
-      <ErrorText>{error}</ErrorText>
+      <ErrorText>{shownError}</ErrorText>
 
       <Actions>
         <Button $variant="outline" onClick={() => navigate('/login')}>
@@ -227,7 +208,7 @@ function TermsAgreement({ needBirth, onDone }) {
       </Actions>
 
       <TermsDialog kind={termsKind} onClose={() => setTermsKind(null)} />
-    </Wrap>
+    </AuthLayout>
   )
 }
 

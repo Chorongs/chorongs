@@ -1,81 +1,80 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import { PREPARING_TEXT } from '../../api/axiosInstance'
 import useUiStore from '../../store/useUiStore'
-import { Button, EmptyBox, IconButton } from '../../styles/common'
+import { Button, EmptyBox, IconButton, ScreenReaderText, Tag, busyStyle } from '../../styles/common'
+import { getGoneText, isGoneError, REMOVE_FAIL_TEXT, withObjectParticle } from '../../utils/removeText'
+import ConfirmDialog from '../common/ConfirmDialog'
+import SectionHeader from '../common/SectionHeader'
+import Checkbox from '../ui/Checkbox'
 import Icon from '../ui/Icon'
-import Modal from '../ui/Modal'
+import LoadingText from '../ui/LoadingText'
 
-// MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 '지우기'(전체) / 목록(줄마다 X) 또는 빈 상태
-// 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 지웠어요' / '지우기' → 확인 창 → onClearAll() + '{구역 이름}을(를) 지웠어요'
-// (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7. 2026-11-17 사용자 결정)
-// TODO(MY-03, CHORONG-43 Tong B): 11-18 이후 개선: 여러 개 골라 지우기 등 지우기 편의 기능 (중간 시연 뒤)
-// title이 구역 이름 (최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록)
-// onRemove, onClearAll을 안 넘기면 X, '지우기'를 안 그림 (찜한 대출) / isInline: 줄 대신 칩처럼 옆으로 (최근 검색)
-// status: 'loading' 불러오는 중 / 'error' 실패 문구 + [다시 시도] (E3) / 'preparing' 서버 API가 아직 없음 → '아직 준비 중인 서비스예요' (Q5) / 'done' 목록 또는 빈 상태 (E11)
+// MY-03 MY 구역 틀: 제목 / 설명 / 오른쪽 [선택 삭제] [전체 삭제] / 목록(줄마다 X) 또는 빈 상태
+// 줄 X → 확인 창 → onRemove(item) + '{구역 이름}에서 삭제했어요' / [전체 삭제] → 확인 창 → onClearAll() + '{구역 이름}을(를) 삭제했어요'
+// (줄 X도 실수로 지우지 않게 항상 확인 창, 회원 관리 기획서 3-7)
+// [선택 삭제] → 줄마다 체크칸 → [N개 삭제] → 확인 창 → 고른 기록을 한 건씩 차례로 onRemove (서버는 한 건 지우기만 있음)
+//   + '{구역 이름}에서 N개를 삭제했어요' / 하나라도 실패하면 거기서 멈추고 알림 (지운 것까지는 목록에서 빠짐) / [취소] → 선택 끝
+// 이미 지워진 기록(다른 탭, 다른 단말기에서 먼저 지움, 서버 404): 실패로 보지 않음
+//   줄 X → 알림 '이미 {removeWord}한 {itemName}이에요' + 창 닫기 / 선택 삭제 → 다음 기록으로 계속, 다 지운 뒤 같은 알림
+//   (섞이면 '{N}개를 삭제했어요. {M}개는 이미 삭제한 {itemName}이에요') / 둘 다 끝나면 onReload()로 목록을 다시 받음
+// 다른 탭, 창에 갔다가 이 탭으로 돌아오면 (visibilitychange) onReload()로 목록을 다시 받음: 다른 탭에서 저장, 삭제한 것을 반영
+// title이 구역 이름 (찜한 대출, 최근 본 대출, 최근 검색, 비교 내역, 저장한 추천 결과, 계산 기록. MY 계산 기록 칩 안에서는 '{칩 이름} 계산 기록')
+// onRemove를 안 넘기면 X, [선택 삭제]를, onClearAll을 안 넘기면 [전체 삭제]를 안 그림
+// hasRowRemove가 false면 줄 X만 안 그리고 [선택 삭제]는 둠 (찜한 대출: 줄마다 하트가 있어 X가 겹침)
+// itemName: 기록 하나를 부르는 말 (기본 '기록'. 최근 본 대출 '상품', 최근 검색 '검색 기록', 비교 내역 '비교 내역', 저장한 추천 결과 '추천 결과', 계산 기록 '계산 기록', 찜한 대출 '찜')
+//   → '이 {itemName}을(를) 삭제할까요?', '선택한 {itemName} N개를 삭제할까요?'
+// removeWord: 지우는 동작 말 (기본 '삭제'. 찜한 대출은 '취소' → [선택해서 찜 취소], [N개 찜 취소], '선택한 찜 N개를 취소할까요?' [닫기] [찜 취소], '찜 N개를 취소했어요')
+// status: 'loading' 불러오는 중 (LoadingText) / 'error' 실패 문구 + [다시 시도] (E3) / 'done' 목록 또는 빈 상태 (E11)
+//   'loading'이고 hasShown(다 받은 결과를 한 번이라도 보여 줌, utils/loadingState의 toLoading)이면 다시 받는 중:
+//   이전 목록(빈 목록 포함)과 제목 줄 버튼을 그대로 두고 누르기, 키보드만 막음 (목록이 사라졌다 다시 나오는 깜빡임을 막음)
+//   흐리게는 0.3초가 넘게 걸릴 때만 (busyStyle, 응답이 빠르면 흐려졌다 바로 밝아지는 것도 깜빡임으로 보여서)
 // 많으면 [더 보기] (E7): hasMore, onMore, isMoreLoading
-const Wrap = styled.section`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-`
 
-const Head = styled.div`
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-`
-
-const Title = styled.h2`
-  font-size: var(--fs-h4);
-  font-weight: 800;
-`
-
-const Desc = styled.p`
-  margin-top: 4px;
-  color: var(--cocoa);
-  font-size: var(--fs-md);
+// 목록 자리 (다시 받는 중이면 흐리게)
+const Body = styled.div`
+  ${busyStyle}
 `
 
 // 상품 줄(ProductRow)이 목록 폭에 맞춰 바뀌도록 ProductList와 같은 이름(plist)으로 폭을 잼
 const List = styled.ul`
   display: flex;
-  flex-direction: ${({ $isInline }) => ($isInline ? 'row' : 'column')};
-  flex-wrap: wrap;
-  gap: ${({ $isInline }) => ($isInline ? '8px' : '0')};
-  border-top: ${({ $isInline }) => ($isInline ? '0' : '1px solid var(--line)')};
+  flex-direction: column;
+  border-top: 1px solid var(--line);
   container-type: inline-size;
   container-name: plist;
 `
 
-const Item = styled.li`
-  display: flex;
-  align-items: ${({ $isInline }) => ($isInline ? 'center' : 'flex-start')};
-  gap: ${({ $isInline }) => ($isInline ? '0' : '8px')};
-  ${({ $isInline }) => !$isInline && 'padding-top: 8px;'}
+// 고르는 중 줄 앞 체크칸 자리 (체크칸은 공통 Checkbox(UI-12), 칸 이름은 화면 낭독기용으로만)
+const SelectSpot = styled.div`
+  flex: none;
+  margin-top: 10px;
 `
 
+// 제목 줄 오른쪽 버튼 묶음
+const HeadActions = styled.div`
+  display: flex;
+  gap: 4px;
+  ${busyStyle}
+`
+
+const Item = styled.li`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 8px;
+`
+
+// 고르는 중에는 줄을 눌러도 체크만 바뀜 (손가락 모양)
 const ItemBody = styled.div`
   flex: 1;
   min-width: 0;
-`
-
-const Status = styled.p`
-  padding: 36px 0;
-  color: var(--cocoa);
-  text-align: center;
+  ${({ $isSelecting }) => $isSelecting && 'cursor: pointer;'}
 `
 
 const More = styled.div`
   display: flex;
   justify-content: center;
-`
-
-const DialogText = styled.p`
-  margin-bottom: 20px;
-  font-size: var(--fs-lg);
-  font-weight: 700;
+  margin-top: 20px;
 `
 
 // 지울 기록 이름 (확인 창 안, 길면 2줄에서 자름)
@@ -89,32 +88,93 @@ const DialogTarget = styled.p`
   -webkit-box-orient: vertical;
 `
 
-const DialogActions = styled.div`
+// 기록 한 줄 (RecordRow) 모양
+const RecordLine = styled.div`
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 `
 
-// 받침이 있으면 '을', 없으면 '를' (한글이 아닌 글자로 끝나면 '을(를)')
-function withObjectParticle(word) {
-  const code = word.charCodeAt(word.length - 1) - 0xac00
-  if (code < 0 || code > 11171) return `${word}을(를)`
-  return `${word}${code % 28 === 0 ? '를' : '을'}`
+const RecordInfo = styled.span`
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+`
+
+// 왼쪽 글 부분이 버튼일 때 (글은 왼쪽 정렬, 마우스를 올리면 위 글 주황)
+const RecordButton = styled.button.attrs({ type: 'button' })`
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  &:hover b {
+    color: var(--brand-text);
+  }
+`
+
+const RecordMain = styled.b`
+  overflow: hidden;
+  font-size: var(--fs-base);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`
+
+const RecordSub = styled.span`
+  color: var(--cocoa);
+  font-size: var(--fs-sm);
+`
+
+// 기록 한 줄 (계산 기록, 최근 검색이 같이 씀): 왼쪽 위 굵은 글 main(한 줄, 넘치면 말줄임) + 아래 작은 글 sub / 오른쪽 action
+// onClick이 있으면 왼쪽 글 부분 전체가 버튼 (최근 검색: 누르면 다시 검색)
+export function RecordRow({ main, sub, onClick, action }) {
+  const info = (
+    <RecordInfo>
+      <RecordMain>{main}</RecordMain>
+      <RecordSub>{sub}</RecordSub>
+    </RecordInfo>
+  )
+  return (
+    <RecordLine>
+      {onClick ? <RecordButton onClick={onClick}>{info}</RecordButton> : info}
+      {action}
+    </RecordLine>
+  )
+}
+
+// 상품 상태 딱지 (MY 상품 목록이 같이 씀): 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품', 게시 중이면 없음
+export function ProductStatusTag({ product }) {
+  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
+  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
+  return null
 }
 
 function MySection({
   title,
   description,
   status,
+  hasShown = false,
   onRetry,
+  onReload,
   items = [],
   getKey,
   getItemLabel,
   renderItem,
   onRemove,
   onClearAll,
+  hasRowRemove = true,
+  itemName = '기록',
+  removeWord = '삭제',
   emptyContent,
-  isInline = false,
   hasMore = false,
   onMore,
   isMoreLoading = false,
@@ -124,15 +184,89 @@ function MySection({
   // 줄 X로 지울 기록 (null이면 확인 창 닫힘)
   const [removeTarget, setRemoveTarget] = useState(null)
   const [isPending, setIsPending] = useState(false)
+  // 선택 삭제: 고르는 중인지 / 고른 기록의 getKey 값 / 확인 창
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectedKeys, setSelectedKeys] = useState([])
+  const [isSelectConfirmOpen, setIsSelectConfirmOpen] = useState(false)
+  // 지금 목록에 남아 있는 것만 (지운 기록, 다시 불러온 목록에 없는 기록은 빠짐)
+  const selectedItems = items.filter((item) => selectedKeys.includes(getKey(item)))
+
+  // 이 탭으로 돌아오면 목록을 다시 받음 (다 받은 목록을 보여 주는 중일 때만: 받는 중, 실패 화면에서는 안 함)
+  useEffect(() => {
+    if (!onReload || status !== 'done') return undefined
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') onReload()
+    }
+    document.addEventListener('visibilitychange', handleVisible)
+    return () => document.removeEventListener('visibilitychange', handleVisible)
+  }, [onReload, status])
+
+  // 버튼, 확인 창, 알림 글 (메뉴마다 itemName, removeWord로 맞춤)
+  const isDelete = removeWord === '삭제'
+  const actionLabel = isDelete ? '삭제' : `${itemName} ${removeWord}`
+  const selectLabel = isDelete ? '선택 삭제' : `선택해서 ${actionLabel}`
+  const failText = isDelete ? REMOVE_FAIL_TEXT : `${withObjectParticle(itemName)} ${removeWord}하지 못했어요. 다시 시도해 주세요`
+
+  const stopSelecting = () => {
+    setIsSelecting(false)
+    setSelectedKeys([])
+  }
+
+  const toggleSelect = (key) => {
+    setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((one) => one !== key) : [...prev, key]))
+  }
+
+  // 고르는 중 줄 안을 누르면 원래 동작(상세 창, 이동, 찜 등)을 막고 체크만 바꿈 (잡는 단계에서 막아 안쪽 버튼까지 안 감)
+  const handleSelectClick = (event, key) => {
+    event.preventDefault()
+    event.stopPropagation()
+    toggleSelect(key)
+  }
+
+  const handleRemoveSelected = async () => {
+    setIsPending(true)
+    let removedCount = 0
+    let goneCount = 0
+    try {
+      for (const item of selectedItems) {
+        try {
+          await onRemove(item)
+          removedCount += 1
+        } catch (error) {
+          // 이미 지워진 기록은 실패로 보지 않고 다음 기록으로
+          if (!isGoneError(error)) throw error
+          goneCount += 1
+        }
+      }
+      // 알림: 지운 것만 '{N}개를 삭제했어요' / 이미 지워진 것만 줄 X와 같은 '이미 삭제한 {itemName}이에요' / 섞이면 둘을 이어서
+      const doneText = isDelete ? `${title}에서 ${removedCount}개를 삭제했어요` : `${itemName} ${removedCount}개를 ${removeWord}했어요`
+      const goneText = getGoneText(itemName, removeWord)
+      if (goneCount === 0) showToast(doneText)
+      else if (removedCount === 0) showToast(goneText)
+      else showToast(`${doneText}. ${goneCount}개는 ${goneText}`)
+      stopSelecting()
+      if (goneCount > 0) onReload?.()
+    } catch (error) {
+      if (error.response?.status !== 401) showToast(failText)
+      if (goneCount > 0) onReload?.()
+    } finally {
+      setIsSelectConfirmOpen(false)
+      setIsPending(false)
+    }
+  }
 
   const handleRemove = async (item) => {
     setIsPending(true)
     try {
       await onRemove(item)
-      showToast(`${title}에서 지웠어요`)
+      showToast(`${title}에서 삭제했어요`)
       setRemoveTarget(null)
     } catch (error) {
-      if (error.response?.status !== 401) showToast('지우지 못했어요. 다시 시도해 주세요')
+      if (isGoneError(error)) {
+        showToast(getGoneText(itemName, removeWord))
+        setRemoveTarget(null)
+        onReload?.()
+      } else if (error.response?.status !== 401) showToast(failText)
     } finally {
       setIsPending(false)
     }
@@ -142,20 +276,21 @@ function MySection({
     setIsPending(true)
     try {
       await onClearAll()
-      showToast(`${withObjectParticle(title)} 지웠어요`)
+      showToast(`${withObjectParticle(title)} 삭제했어요`)
       setIsConfirmOpen(false)
     } catch (error) {
-      if (error.response?.status !== 401) showToast('지우지 못했어요. 다시 시도해 주세요')
+      if (error.response?.status !== 401) showToast(REMOVE_FAIL_TEXT)
     } finally {
       setIsPending(false)
     }
   }
 
+  // 다시 받는 중 (이전 목록이 남아 있음). 보여 준 결과가 없으면(처음 열 때, 실패 뒤 다시 시도) LoadingText
+  const isBusy = status === 'loading' && hasShown
+
   let body
-  if (status === 'loading') {
-    body = <Status role="status">불러오는 중이에요</Status>
-  } else if (status === 'preparing') {
-    body = <EmptyBox>{PREPARING_TEXT}</EmptyBox>
+  if (status === 'loading' && !isBusy) {
+    body = <LoadingText />
   } else if (status === 'error') {
     body = (
       <EmptyBox>
@@ -169,12 +304,26 @@ function MySection({
     body = <EmptyBox>{emptyContent}</EmptyBox>
   } else {
     body = (
-      <List $isInline={isInline}>
+      <List>
         {items.map((item) => (
-          <Item key={getKey(item)} $isInline={isInline}>
-            <ItemBody>{renderItem(item)}</ItemBody>
-            {onRemove && (
-              <IconButton aria-label={`${getItemLabel(item)} 지우기`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
+          <Item key={getKey(item)}>
+            {isSelecting && (
+              <SelectSpot>
+                <Checkbox
+                  checked={selectedKeys.includes(getKey(item))}
+                  onChange={() => toggleSelect(getKey(item))}
+                  label={<ScreenReaderText>{`${getItemLabel(item)} 선택`}</ScreenReaderText>}
+                />
+              </SelectSpot>
+            )}
+            <ItemBody
+              $isSelecting={isSelecting}
+              onClickCapture={isSelecting ? (event) => handleSelectClick(event, getKey(item)) : undefined}
+            >
+              {renderItem(item)}
+            </ItemBody>
+            {onRemove && hasRowRemove && !isSelecting && (
+              <IconButton aria-label={`${getItemLabel(item)} ${actionLabel}`} onClick={() => setRemoveTarget(item)} disabled={isPending}>
                 <Icon name="close" size={16} />
               </IconButton>
             )}
@@ -185,20 +334,40 @@ function MySection({
   }
 
   return (
-    <Wrap>
-      <Head>
-        <div>
-          <Title>{title}</Title>
-          {description && <Desc>{description}</Desc>}
-        </div>
-        {onClearAll && status === 'done' && items.length > 0 && (
-          <Button $size="sm" $variant="ghost" onClick={() => setIsConfirmOpen(true)}>
-            지우기
-          </Button>
+    <section>
+      <SectionHeader title={title} description={description} size="md">
+        {(onRemove || onClearAll) && (status === 'done' || isBusy) && items.length > 0 && (
+          <HeadActions $isBusy={isBusy} inert={isBusy}>
+            {isSelecting ? (
+              <>
+                <Button $size="sm" $variant="ghost" onClick={stopSelecting}>
+                  취소
+                </Button>
+                <Button $size="sm" onClick={() => setIsSelectConfirmOpen(true)} disabled={selectedItems.length === 0}>
+                  {selectedItems.length}개 {actionLabel}
+                </Button>
+              </>
+            ) : (
+              <>
+                {onRemove && (
+                  <Button $size="sm" $variant="ghost" onClick={() => setIsSelecting(true)}>
+                    {selectLabel}
+                  </Button>
+                )}
+                {onClearAll && (
+                  <Button $size="sm" $variant="ghost" onClick={() => setIsConfirmOpen(true)}>
+                    전체 삭제
+                  </Button>
+                )}
+              </>
+            )}
+          </HeadActions>
         )}
-      </Head>
+      </SectionHeader>
 
-      {body}
+      <Body $isBusy={isBusy} inert={isBusy} aria-busy={isBusy}>
+        {body}
+      </Body>
 
       {hasMore && status === 'done' && (
         <More>
@@ -208,31 +377,37 @@ function MySection({
         </More>
       )}
 
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label={`${title} 지우기`} width={380} showClose={false}>
-        <DialogText>{withObjectParticle(title)} 모두 지울까요?</DialogText>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setIsConfirmOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={handleClearAll} disabled={isPending}>
-            지우기
-          </Button>
-        </DialogActions>
-      </Modal>
-
-      <Modal isOpen={removeTarget !== null} onClose={() => setRemoveTarget(null)} label={`${title}에서 지우기`} width={380} showClose={false}>
-        <DialogText>이 기록을 지울까요?</DialogText>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        label={`${title} 전체 삭제`}
+        title={`${withObjectParticle(title)} 모두 삭제할까요?`}
+        confirmLabel="삭제"
+        onConfirm={handleClearAll}
+        isConfirmDisabled={isPending}
+      />
+      <ConfirmDialog
+        isOpen={isSelectConfirmOpen}
+        onClose={() => setIsSelectConfirmOpen(false)}
+        label={`${title} ${selectLabel}`}
+        title={`선택한 ${itemName} ${selectedItems.length}개를 ${removeWord}할까요?`}
+        confirmLabel={actionLabel}
+        onConfirm={handleRemoveSelected}
+        isConfirmDisabled={isPending || selectedItems.length === 0}
+        cancelLabel={isDelete ? '취소' : '닫기'}
+      />
+      <ConfirmDialog
+        isOpen={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        label={`${title}에서 삭제`}
+        title={`이 ${withObjectParticle(itemName)} 삭제할까요?`}
+        confirmLabel="삭제"
+        onConfirm={() => handleRemove(removeTarget)}
+        isConfirmDisabled={isPending}
+      >
         {removeTarget !== null && <DialogTarget>{getItemLabel(removeTarget)}</DialogTarget>}
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setRemoveTarget(null)}>
-            취소
-          </Button>
-          <Button onClick={() => handleRemove(removeTarget)} disabled={isPending}>
-            지우기
-          </Button>
-        </DialogActions>
-      </Modal>
-    </Wrap>
+      </ConfirmDialog>
+    </section>
   )
 }
 

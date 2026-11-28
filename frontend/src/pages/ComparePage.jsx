@@ -13,6 +13,7 @@ import CompareVerdict from '../components/compare/CompareVerdict'
 import PageHeader from '../components/common/PageHeader'
 import Icon from '../components/ui/Icon'
 import { getTermOptions, MONTHS_DEFAULT } from '../constants/options'
+import useAuthStore from '../store/useAuthStore'
 import useCompareStore, { getPurposes, hasSamePurpose } from '../store/useCompareStore'
 import { useRecommendStore } from '../store/useRecommendStore'
 import useUiStore from '../store/useUiStore'
@@ -312,6 +313,28 @@ function ComparePage() {
   // 지금 조합을 이미 저장했는지 (RC-07 [결과 저장]과 같은 방식)
   const saveKey = isComparable ? `${productA.productId}-${productB.productId}` : null
   const isSaved = saveKey !== null && saveKey === savedKey
+
+  // 회원이면 이 조합을 이미 저장했는지 비교 내역(API-23 목록, 최근 10개)에서 확인: 저장 여부만 묻는 API가 없어 목록으로, A, B 순서는 상관없음
+  // 있으면 처음부터 '저장했어요' (다른 탭, 새로고침, 다시 담은 조합도). 묻지 못하면 버튼을 그대로 둠 (누르면 서버가 409로 막음)
+  const isMember = useAuthStore((state) => state.status === 'member')
+  useEffect(() => {
+    if (!isMember || saveKey === null || saveKey === savedKey) return undefined
+    const pairIds = saveKey.split('-').map(Number)
+    let isCancelled = false
+    myApi
+      .getCompares()
+      .then((data) => {
+        const isSavedPair = (data?.items ?? []).some((item) => {
+          const ids = [item.productA?.productId, item.productB?.productId]
+          return pairIds.every((id) => ids.includes(id))
+        })
+        if (!isCancelled && isSavedPair) markSaved(saveKey)
+      })
+      .catch(() => {})
+    return () => {
+      isCancelled = true
+    }
+  }, [isMember, saveKey, savedKey, markSaved])
 
   // [결과 저장] (API-23): 같은 조합은 409
   const saveResult = async () => {

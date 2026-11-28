@@ -12,6 +12,7 @@ import ReasonList from '../recommend/ReasonList'
 import { Button, CompareButton, EmptyBox, IconButton, Tag } from '../../styles/common'
 import { formatMoney, formatRate } from '../../utils/format'
 import { FALLBACK_AMOUNT_MAN } from '../../utils/loanMath'
+import { lockScroll, unlockScroll } from '../../utils/scrollLock'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import BaseDateBadge from './BaseDateBadge'
@@ -513,11 +514,8 @@ function ProductDetailSheet() {
   // 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
     if (productId === null) return undefined
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prevOverflow
-    }
+    lockScroll()
+    return unlockScroll
   }, [productId])
 
   if (productId === null) return null

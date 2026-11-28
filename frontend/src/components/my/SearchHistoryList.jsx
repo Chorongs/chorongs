@@ -1,17 +1,77 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as myApi from '../../api/myApi'
-import { Chip } from '../../styles/common'
-import MySection from './MySection'
+import { SEARCH_FILTERS, getKeywordLabel } from '../../constants/options'
+import useUiStore from '../../store/useUiStore'
+import { formatDate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
+import MySection, { RecordRow } from './MySection'
 
-// MY-06 최근 검색 (검색 기록 10개): 칩 (칩마다 X) / 지우기
-// 칩 X → API-22 DELETE /{searchId} (404면 목록 다시 불러옴) / 지우기 → API-22 DELETE (전체) / 알림은 MySection (MY-03)
+// MY-06 최근 검색 (검색 기록 10개): 기록 줄 (줄마다 X) / [선택 삭제] [전체 삭제]
+// 줄 위 글: 저장된 조건(searchCondition)을 쉼표로 이음. 앞 SHOWN_CONDITIONS개만 보이고 나머지는 '외 N개', 한 줄 넘으면 말줄임
+//   (저장된 글 searchLabel은 조건을 읽지 못할 때만 씀) / 줄 아래 글: '상세 검색' 또는 '간편 검색', 검색 날짜
+// 줄 → 그 조건으로 다시 검색: 상세 검색 /search?{조건}, 간편 검색 /search/simple?kw= (API-22 searchCondition으로 주소를 만듦)
+// 줄 X → API-22 DELETE /{searchId} (404면 MySection이 '이미 삭제한' 알림 + 목록 다시 받음) / [전체 삭제] → API-22 DELETE (전체) / 알림은 MySection (MY-03)
 // 맞춤 추천 입력은 기록 안 함 (기록 저장은 상품 찾기 화면이 함)
-// TODO(MY-06, SR, CHORONG-64 조빌립): 칩 누르면 상세 검색 /search?{조건}, 간편 검색 /search/simple?kw= 로 다시 검색.
-//   searchCondition(조건 JSON 글) 모양은 상품 찾기가 postSearch로 저장할 때 정해짐 → 정해지면 주소 값을 붙인다. (지금은 그 화면으로 이동만)
-// TODO(API-22, CHORONG-42 BE): 최근 검색 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
+const SHOWN_CONDITIONS = 3
+
+// 저장된 조건(JSON 글) → 값 (읽지 못하면 null)
+// 상세 검색 조건: { q, target, purpose, … } (여러 값은 쉼표로 이은 글) / 간편 검색 조건: 키워드 목록
+function parseCondition(item) {
+  try {
+    return typeof item.searchCondition === 'string' ? JSON.parse(item.searchCondition) : item.searchCondition
+  } catch {
+    return null
+  }
+}
+
+// 저장된 조건 → 줄에 보일 조건 글 목록 (상세 검색: “검색어”, 칩 값 / 간편 검색: 키워드 이름). 읽지 못하면 빈 목록
+function getConditionTexts(item) {
+  const condition = parseCondition(item)
+  if (item.searchType === 'SIMPLE') return Array.isArray(condition) ? condition.map(getKeywordLabel) : []
+  if (!condition || typeof condition !== 'object') return []
+  const texts = condition.q ? [`“${condition.q}”`] : []
+  SEARCH_FILTERS.forEach(({ key }) => {
+    const value = condition[key]
+    const values = Array.isArray(value) ? value : String(value ?? '').split(',')
+    texts.push(...values.filter(Boolean))
+  })
+  return texts
+}
+
+// 줄 위 글: 앞 SHOWN_CONDITIONS개를 쉼표로 잇고 나머지는 '외 N개' (조건을 읽지 못하면 저장된 글, 그것도 없으면 '검색 기록')
+function getConditionSummary(item) {
+  const texts = getConditionTexts(item)
+  if (texts.length === 0) return item.searchLabel || '검색 기록'
+  const shown = texts.slice(0, SHOWN_CONDITIONS).join(', ')
+  return texts.length > SHOWN_CONDITIONS ? `${shown} 외 ${texts.length - SHOWN_CONDITIONS}개` : shown
+}
+
+// 저장된 조건 → 다시 검색할 주소 (모양이 틀리면 null)
+// 주소 값 검사(정해진 칩, 개수)는 상품 찾기 화면이 주소를 읽을 때 함
+function getSearchPath(item) {
+  const condition = parseCondition(item)
+  const params = new URLSearchParams()
+  let base = '/search'
+  if (item.searchType === 'SIMPLE') {
+    if (!Array.isArray(condition)) return null
+    base = '/search/simple'
+    if (condition.length > 0) params.set('kw', condition.join(','))
+  } else {
+    if (!condition || typeof condition !== 'object') return null
+    if (condition.q) params.set('q', String(condition.q))
+    SEARCH_FILTERS.forEach(({ key }) => {
+      const value = Array.isArray(condition[key]) ? condition[key].join(',') : condition[key]
+      if (value) params.set(key, String(value))
+    })
+  }
+  const query = params.toString()
+  return query ? `${base}?${query}` : base
+}
+
 function SearchHistoryList() {
   const navigate = useNavigate()
+  const showToast = useUiStore((state) => state.showToast)
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState({ status: 'loading', items: [] })
 
@@ -22,28 +82,23 @@ function SearchHistoryList() {
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true
     }
   }, [attempt])
 
+  // 다시 받을 때 이전 목록을 남김 (보여 준 적이 있으면 받는 동안 MySection이 흐리게 둠)
   const reload = () => {
-    setResult({ status: 'loading', items: [] })
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
   const handleRemove = async (item) => {
-    try {
-      await myApi.deleteSearch(item.searchId)
-      setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.searchId !== item.searchId) }))
-    } catch (error) {
-      // 이미 지워진 기록이면 목록을 다시 받음 (API-22)
-      if (error.response?.status === 404) reload()
-      else throw error
-    }
+    await myApi.deleteSearch(item.searchId)
+    setResult((prev) => ({ ...prev, items: prev.items.filter((one) => one.searchId !== item.searchId) }))
   }
 
   const handleClearAll = async () => {
@@ -51,26 +106,34 @@ function SearchHistoryList() {
     setResult({ status: 'done', items: [] })
   }
 
-  const handleSearch = (item) => navigate(item.searchType === 'SIMPLE' ? '/search/simple' : '/search')
+  const handleSearch = (item) => {
+    const path = getSearchPath(item)
+    if (path) navigate(path)
+    else showToast('검색 조건을 불러오지 못했어요')
+  }
 
   return (
     <MySection
       title="최근 검색"
+      itemName="검색 기록"
       description="상품 찾기에서 검색한 조건을 최근 10개까지 보여 줘요."
       status={result.status}
+      hasShown={result.hasShown}
       onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.searchId}
-      getItemLabel={(item) => item.searchLabel}
+      getItemLabel={getConditionSummary}
       renderItem={(item) => (
-        <Chip $size="sm" onClick={() => handleSearch(item)}>
-          {item.searchLabel}
-        </Chip>
+        <RecordRow
+          main={getConditionSummary(item)}
+          sub={`${item.searchType === 'SIMPLE' ? '간편 검색' : '상세 검색'}, ${formatDate(item.searchedAt)}`}
+          onClick={() => handleSearch(item)}
+        />
       )}
       onRemove={handleRemove}
       onClearAll={handleClearAll}
       emptyContent="최근 검색이 없어요"
-      isInline
     />
   )
 }

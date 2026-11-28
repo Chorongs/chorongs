@@ -7,7 +7,7 @@ import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError } from '../../styles/common'
 import { approvedByText, formatDateTime, formatTime } from '../../utils/format'
-import Modal from '../ui/Modal'
+import ConfirmDialog from '../common/ConfirmDialog'
 
 // AD-10 내 계정: 이름, 이메일, 역할, 로그인 끝나는 시각, 승인 일시 · 승인한 사람, 마지막 로그인 (API-47 GET) / [관리자 탈퇴]
 // [관리자 탈퇴] → 확인 창 (되돌릴 수 없음, 내 이메일 다시 입력. 다르면 버튼 잠금) → API-47 DELETE → 스토어 guest → /admin/login
@@ -102,12 +102,6 @@ const LockNote = styled.strong`
   font-weight: 700;
 `
 
-const DialogTitle = styled.h2`
-  margin-bottom: 16px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
-`
-
 const DialogBody = styled.div`
   display: flex;
   flex-direction: column;
@@ -148,12 +142,6 @@ const Field = styled.label`
       height: 48px;
     }
   }
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 const LAST_APPROVER_TEXT = '마지막 승인권자라 탈퇴할 수 없어요. 관리자 계정에서 다른 승인권자를 먼저 지정해 주세요'
@@ -281,8 +269,17 @@ function AdminMyAccount() {
       </SecHead>
       {body}
 
-      <Modal isOpen={isConfirmOpen} onClose={() => setIsConfirmOpen(false)} label="관리자 탈퇴" width={460} showClose={false}>
-        <DialogTitle>관리자에서 탈퇴할까요?</DialogTitle>
+      <ConfirmDialog
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        label="관리자 탈퇴"
+        title="관리자에서 탈퇴할까요?"
+        titleSize="lg"
+        confirmLabel="탈퇴하기"
+        onConfirm={handleRemove}
+        isConfirmDisabled={!isEmailMatched || isRemoving}
+        width={460}
+      >
         <DialogBody>
           <Mine>되돌릴 수 없어요. 확인을 위해 내 이메일을 다시 입력해 주세요.</Mine>
           <Field>
@@ -297,15 +294,7 @@ function AdminMyAccount() {
           </Field>
           <InlineError>{error}</InlineError>
         </DialogBody>
-        <DialogActions>
-          <Button $variant="outline" onClick={() => setIsConfirmOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={handleRemove} disabled={!isEmailMatched || isRemoving}>
-            탈퇴하기
-          </Button>
-        </DialogActions>
-      </Modal>
+      </ConfirmDialog>
     </Wrap>
   )
 }

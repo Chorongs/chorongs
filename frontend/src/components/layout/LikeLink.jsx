@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import styled, { css } from 'styled-components'
 import useAuthStore from '../../store/useAuthStore'
 import useMyStore from '../../store/useMyStore'
-import requireLogin from '../../utils/requireLogin'
+import { CountBadge } from '../../styles/common'
+import requireLogin, { LIKE_LOGIN_TEXT } from '../../utils/requireLogin'
 import Icon from '../ui/Icon'
 
 // LY-07 찜 바로가기: 하트 + 개수 딱지 (useMyStore likedIds 개수)
@@ -35,21 +36,11 @@ const ButtonBox = styled.button.attrs({ type: 'button' })`
   ${boxStyle}
 `
 
-const Badge = styled.span`
+// 하트 오른쪽 위에 얹는 개수 딱지 (모양은 공통 CountBadge)
+const Badge = styled(CountBadge)`
   position: absolute;
   top: 2px;
   right: 0;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: var(--r-pill);
-  background: var(--brand-strong);
-  color: var(--on-brand);
-  font-family: var(--f-num);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
 `
 
 function LikeLink() {
@@ -66,7 +57,7 @@ function LikeLink() {
   }
 
   return (
-    <ButtonBox aria-label="찜한 대출" onClick={() => requireLogin(() => {}, '찜하기는 회원 전용이에요.')}>
+    <ButtonBox aria-label="찜한 대출" onClick={() => requireLogin(() => {}, LIKE_LOGIN_TEXT)}>
       <Icon name="heart" />
     </ButtonBox>
   )

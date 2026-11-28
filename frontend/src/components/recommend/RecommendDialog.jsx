@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { IconButton } from '../../styles/common'
+import { lockScroll, unlockScroll } from '../../utils/scrollLock'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 import RecommendStepper from './RecommendStepper'
@@ -46,11 +47,8 @@ function RecommendDialogBody() {
 
   // 열려 있는 동안 뒤 화면 스크롤 잠금
   useEffect(() => {
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
-    }
+    lockScroll()
+    return unlockScroll
   }, [])
 
   // 서버 대답을 기다리는 동안은 닫지 못하게 함 (닫으면 대답이 온 뒤 다른 화면에서 갑자기 이동함)

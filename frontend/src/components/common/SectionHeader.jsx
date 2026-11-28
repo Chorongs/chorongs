@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 
 // CM-02 구역 제목줄: 제목(24) / 설명 / 오른쪽 링크, 버튼 (children). 제목과 내용 간격 20
+// size: 'md'면 제목 20 (MY 구역처럼 한 화면에 구역이 하나인 곳)
 const Wrap = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -11,7 +12,7 @@ const Wrap = styled.div`
 `
 
 const Title = styled.h2`
-  font-size: var(--fs-h3);
+  font-size: ${({ $size }) => ($size === 'md' ? 'var(--fs-h4)' : 'var(--fs-h3)')};
   font-weight: 800;
 `
 
@@ -21,11 +22,11 @@ const Description = styled.p`
   font-size: var(--fs-md);
 `
 
-function SectionHeader({ title, description, children }) {
+function SectionHeader({ title, description, size, children }) {
   return (
     <Wrap>
       <div>
-        <Title>{title}</Title>
+        <Title $size={size}>{title}</Title>
         {description && <Description>{description}</Description>}
       </div>
       {children}

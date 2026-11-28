@@ -16,9 +16,9 @@ import RateText from './RateText'
 // rank, matchRate (선택): 맞춤 추천 4위부터 쓰는 줄. rank → 금융사 앞에 'N위', matchRate → 태그 맨 앞에 '추천도 N%' 주황 딱지 (CHORONG-45, 시안 prodRow의 opt.rank)
 // 태그: (추천도) → 상품 소분류(SECTOR 태그, 예: 인터넷은행) → 상품 특징 앞 2개 (CM-04)
 // 오른쪽 끝 하트: 찜 버튼 LikeButton (CM-06, CHORONG-43에서 연결. 클릭이 줄까지 안 퍼지게 LikeButton이 e.stopPropagation)
-//   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음
+//   720 이하에서는 3열(1fr 1fr auto)로 바뀌어 1행 오른쪽에 있음 ([+ 비교]가 있으면 4열, 하트는 3번째 칸)
 // [+ 비교] (CM-09 비교함): 맞춤 추천, 상품 찾기, 찜한 대출(MY) 화면에서만 보인다. (랭킹 등 다른 화면에서는 비교 안 함) 폭 480 이하에서는 숨김
-//   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 3열(1fr 1fr auto)의 1행 오른쪽으로 보낸다. (시안과 같게)
+//   찜 칸 옆에 맞춤 칸(auto)을 하나 더 두고, 720 이하에서는 4열(1fr 1fr auto auto)의 1행 4번째 칸(찜 하트 오른쪽)으로 보낸다.
 //   담긴 상품: 줄에 연주황 바탕 + '비교 A에 담음' 딱지, 버튼은 'A 담음' / 비교함 첫 상품과 용도나 상환 방식이 안 겹치는 상품: 줄을 흐리게 + '비교 불가'
 // 상품 찾기 props (선택, CHORONG-64): keyword → 금융사, 상품명에서 검색어 강조 (Highlight, E1) / hits (충족한 키워드 이유 문구 목록), total (고른 키워드 수) → 간편 검색 줄: 태그 맨 앞에 'N/M 일치' 글 + 이유마다 초록 충족 태그 (체크 아이콘). 상세 검색, 맞춤 추천은 안 넘겨서 그대로
 // 줄 전체는 마우스 클릭용이라 role, tabIndex가 없고, 키보드와 화면 낭독기는 '상품명 버튼'으로 연다. (줄을 버튼으로 두면 안의 하트, [+ 비교]가 '버튼 안의 버튼'이 됨)
@@ -174,7 +174,7 @@ const MetricValue = styled.b`
 const CompareCell = styled.div`
   @container plist (max-width: 720px) {
     grid-row: 1;
-    grid-column: 3;
+    grid-column: 4;
   }
   @container plist (max-width: 480px) {
     display: none;

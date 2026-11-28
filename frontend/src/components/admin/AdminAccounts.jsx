@@ -7,8 +7,8 @@ import useAdminStore from '../../store/useAdminStore'
 import useUiStore from '../../store/useUiStore'
 import { Button, InlineError, Tag } from '../../styles/common'
 import { approvedByText, formatDateTime } from '../../utils/format'
+import ConfirmDialog from '../common/ConfirmDialog'
 import ChipGroup from '../ui/ChipGroup'
-import Modal from '../ui/Modal'
 import SelectField from '../ui/SelectField'
 
 // AD-09 관리자 계정 (승인권자만): 칩 (승인 대기 / 정상) / 줄: 이름(+나), 이메일 / 상태, 역할 딱지 / 신청 시각 또는 마지막 로그인 · 승인한 사람 / 처리 버튼
@@ -143,12 +143,6 @@ const Status = styled.p`
   text-align: center;
 `
 
-const DialogTitle = styled.h2`
-  margin-bottom: 16px;
-  font-size: var(--fs-h3);
-  font-weight: 800;
-`
-
 const DialogBody = styled.div`
   display: flex;
   flex-direction: column;
@@ -168,12 +162,6 @@ const Mine = styled.p`
   border-radius: var(--r-sm);
   background: var(--brand-soft);
   line-height: 1.6;
-`
-
-const DialogActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
 `
 
 // 승인한 사람: 이름 / 승인한 번호는 있는데 이름이 없으면 탈퇴한 관리자 / 번호도 없으면 첫 관리자
@@ -356,37 +344,34 @@ function AdminAccounts({ onChanged }) {
       {body}
       <Note>탈퇴하거나 해제한 관리자는 목록에 나오지 않아요. 그 사람이 남긴 기록은 ‘탈퇴한 관리자’로 보여요. 처리하지 않은 가입 신청은 14일 뒤 자동으로 지워져요.</Note>
 
-      <Modal isOpen={dialog !== null} onClose={() => setDialog(null)} label={dialogText?.title ?? ''} width={480} showClose={false}>
+      <ConfirmDialog
+        isOpen={dialog !== null}
+        onClose={() => setDialog(null)}
+        label={dialogText?.title ?? ''}
+        title={dialog !== null ? `${dialog.item.adminName} ${dialogText.title}` : ''}
+        titleSize="lg"
+        confirmLabel={dialogText?.button}
+        onConfirm={handleConfirm}
+        isConfirmDisabled={isPending}
+        width={480}
+      >
         {dialog !== null && (
-          <>
-            <DialogTitle>
-              {dialog.item.adminName} {dialogText.title}
-            </DialogTitle>
-            <DialogBody>
-              <Hint>
-                {dialog.item.adminEmail}
-                {dialog.type === 'approve' && ` · 신청 ${formatDateTime(dialog.item.requestedAt)}`}
-              </Hint>
-              {hasRoleSelect && (
-                <>
-                  <SelectField label="역할" value={role} onChange={setRole} options={ROLE_OPTIONS} />
-                  <Hint>{ROLE_DESC[role]}</Hint>
-                </>
-              )}
-              {dialogText.body && <Mine>{dialogText.body}</Mine>}
-              <InlineError>{error}</InlineError>
-            </DialogBody>
-            <DialogActions>
-              <Button $variant="outline" onClick={() => setDialog(null)}>
-                취소
-              </Button>
-              <Button onClick={handleConfirm} disabled={isPending}>
-                {dialogText.button}
-              </Button>
-            </DialogActions>
-          </>
+          <DialogBody>
+            <Hint>
+              {dialog.item.adminEmail}
+              {dialog.type === 'approve' && ` · 신청 ${formatDateTime(dialog.item.requestedAt)}`}
+            </Hint>
+            {hasRoleSelect && (
+              <>
+                <SelectField label="역할" value={role} onChange={setRole} options={ROLE_OPTIONS} />
+                <Hint>{ROLE_DESC[role]}</Hint>
+              </>
+            )}
+            {dialogText.body && <Mine>{dialogText.body}</Mine>}
+            <InlineError>{error}</InlineError>
+          </DialogBody>
         )}
-      </Modal>
+      </ConfirmDialog>
     </Wrap>
   )
 }

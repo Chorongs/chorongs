@@ -9,6 +9,7 @@ import useAuthStore from '../../store/useAuthStore'
 import { useRecommendStore } from '../../store/useRecommendStore'
 import useUiStore from '../../store/useUiStore'
 import { IconButton } from '../../styles/common'
+import { lockScroll, unlockScroll } from '../../utils/scrollLock'
 import Icon from '../ui/Icon'
 import Modal from '../ui/Modal'
 
@@ -100,11 +101,8 @@ function MobileMenu() {
 
   useEffect(() => {
     if (!menuOpen) return undefined
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prevOverflow
-    }
+    lockScroll()
+    return unlockScroll
   }, [menuOpen])
 
   return (

@@ -1,24 +1,17 @@
 import { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
-import { Tag } from '../../styles/common'
+import { toLoading } from '../../utils/loadingState'
 import ProductRow from '../common/ProductRow'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
-// MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / 지우기
-// 줄 X → API-21 DELETE /{productId} / 지우기 → API-21 DELETE (전체) / 알림은 MySection (MY-03)
+// MY-05 최근 본 대출 (최근 상세 연 상품 10개): 상품 목록 (줄마다 X) / [선택 삭제] [전체 삭제]
+// 줄 X → API-21 DELETE /{productId} / [전체 삭제] → API-21 DELETE (전체) / 알림은 MySection (MY-03)
 // 판매 종료 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' 딱지 (목록에서 빼지 않음)
-// TODO(API-21, CHORONG-42 BE): 최근 본 대출 API가 아직 서버에 없어 지금은 '준비 중' 안내 (axiosInstance PREPARING_APIS 목록). 서버가 올라오면 그 목록 줄만 지우면 그대로 동작
 const StatusLine = styled.div`
   display: flex;
   gap: 6px;
 `
-
-function ProductStatusTag({ product }) {
-  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
-  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
-  return null
-}
 
 function RecentList() {
   const [attempt, setAttempt] = useState(0)
@@ -31,16 +24,17 @@ function RecentList() {
       .then((data) => {
         if (!isCancelled) setResult({ status: 'done', items: data?.items ?? [] })
       })
-      .catch((error) => {
-        if (!isCancelled) setResult({ status: error.isPreparing ? 'preparing' : 'error', items: [] })
+      .catch(() => {
+        if (!isCancelled) setResult({ status: 'error', items: [] })
       })
     return () => {
       isCancelled = true
     }
   }, [attempt])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [] })
+  // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때): 보여 준 목록이 있으면 받는 동안 흐리게 남김
+  const reload = () => {
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -57,9 +51,12 @@ function RecentList() {
   return (
     <MySection
       title="최근 본 대출"
+      itemName="상품"
       description="상세 창을 연 상품을 최근 10개까지 보여 줘요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(item) => item.product.productId}
       getItemLabel={(item) => item.product.productName}

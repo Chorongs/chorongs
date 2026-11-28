@@ -5,14 +5,11 @@ import Icon from '../components/ui/Icon'
 import { Button } from '../styles/common'
 
 // LY-16 없는 주소 화면: 안내 문구 + [홈으로]
-// '준비 중' (문서_반영_목록 Q5, CHORONG-43): 아직 화면이 올라오지 않은 주소면 '찾을 수 없음' 대신 준비 중 안내
-//   각 화면이 올라와 App.jsx에 Route가 생기면 그 화면이 먼저 잡히므로 여기 목록은 그대로 둬도 됨 (화면이 다 올라오면 지움)
+// 아직 화면이 올라오지 않은 주소면 '찾을 수 없음' 대신 준비 중 안내
+//   그 화면 Route가 App.jsx(LY-01)에 생기면 목록에서 그 줄을 지움 (LY-16)
 const PREPARING_PATHS = [
-  '/calc', // 대출 계산기 (CHORONG-49, 56)
-  '/search', // 상품 찾기 (CHORONG-64)
-  '/ranking', // 대출 랭킹 (CHORONG-60)
-  '/diagnosis/habit', // 소비 습관 분석 (CHORONG-59)
-  '/help', // 도움말 (CHORONG-63)
+  '/diagnosis/habit', // 소비 습관 분석
+  '/help', // 도움말
 ]
 
 const isPreparingPath = (pathname) =>

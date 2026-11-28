@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   getAboutMeError,
+  getBirthInputState,
   getCreditError,
   getMoneyError,
   getMonthsOptions,
   isBlank,
   isLengthInRange,
   isNumberInRange,
+  isAdultBirthDate,
   isSafeReturnPath,
   isValidAdminName,
   isValidBirthDate,
@@ -578,5 +580,194 @@ describe('isValidAdminName', () => {
     const result = isValidAdminName(name)
     // Then
     expect(result).toBe(false)
+  })
+})
+
+describe('getBirthInputState', () => {
+  const today = new Date(2026, 10, 17)
+
+  it('아무것도 안 쳤으면 empty', () => {
+    // Given
+    const text = ''
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('empty')
+  })
+
+  it('치는 중이고 틀린 곳이 없으면 typing', () => {
+    // Given
+    const text = '199001'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('typing')
+  })
+
+  it('맞는 날짜 8자리는 ok', () => {
+    // Given
+    const text = '19900101'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('ok')
+  })
+
+  it('붙임표가 있어도 숫자만 보고 ok', () => {
+    // Given
+    const text = '1990-01-01'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('ok')
+  })
+
+  it('첫 자리가 3이면 연도가 될 수 없어 bad', () => {
+    // Given
+    const text = '3'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('1900년 전 연도는 bad', () => {
+    // Given
+    const text = '1899'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('올해 뒤 연도는 bad', () => {
+    // Given
+    const text = '2027'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('월 첫 자리가 2 이상이면 bad', () => {
+    // Given
+    const text = '19902'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('13월은 bad', () => {
+    // Given
+    const text = '199013'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('만 19세가 되는 해(2007년)의 아직 안 온 달은 bad', () => {
+    // Given
+    const text = '200712'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('일 첫 자리가 4 이상이면 bad', () => {
+    // Given
+    const text = '1990014'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('없는 날짜(2월 30일)는 bad', () => {
+    // Given
+    const text = '20010230'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('오늘보다 미래 날짜는 bad', () => {
+    // Given
+    const text = '20261118'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('만 19세가 안 되는 해(2008년)는 연도만 쳐도 bad', () => {
+    // Given
+    const text = '2008'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+
+  it('만 19세가 되는 해(2007년)는 연도만으로는 typing', () => {
+    // Given
+    const text = '2007'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('typing')
+  })
+
+  it('8자리를 다 쳤는데 만 19세 생일 전이면 bad', () => {
+    // Given
+    const text = '20071118'
+    // When
+    const result = getBirthInputState(text, today)
+    // Then
+    expect(result).toBe('bad')
+  })
+})
+
+describe('isAdultBirthDate', () => {
+  const today = new Date(2026, 10, 17)
+
+  it('만 19세 생일 당일은 통과한다', () => {
+    // Given
+    const text = '2007-11-17'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(true)
+  })
+
+  it('만 19세 생일 하루 전은 실패한다', () => {
+    // Given
+    const text = '2007-11-18'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('맞지 않는 날짜(2월 30일)는 실패한다', () => {
+    // Given
+    const text = '2001-02-30'
+    // When
+    const result = isAdultBirthDate(text, today)
+    // Then
+    expect(result).toBe(false)
+  })
+
+  it('2월 29일생은 평년 2월 28일에 생일이 지난 것으로 본다', () => {
+    // Given
+    const text = '2008-02-29'
+    const nonLeapDay = new Date(2027, 1, 28)
+    // When
+    const result = isAdultBirthDate(text, nonLeapDay)
+    // Then
+    expect(result).toBe(true)
   })
 })

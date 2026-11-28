@@ -3,12 +3,13 @@ import styled from 'styled-components'
 import * as myApi from '../../api/myApi'
 import { Button, Tag } from '../../styles/common'
 import { formatDate } from '../../utils/format'
+import { toLoading } from '../../utils/loadingState'
 import ProductRow from '../common/ProductRow'
-import MySection from './MySection'
+import MySection, { ProductStatusTag } from './MySection'
 
 // MY-08 저장한 추천 결과 (10개): 저장 시점, 조건 라벨, 상품 / '결과 다시 보기' / 삭제
 // '결과 다시 보기' → 그때 상품을 최신 정보로 펼쳐 보임 (서버가 지금 상품 정보를 줌, API-38 GET)
-// 삭제 → 줄 X 그 저장 1건, 지우기 전체 (API-38 DELETE) / 알림은 MySection (MY-03)
+// 삭제 → 줄 X 그 저장 1건, [전체 삭제] 전체 (API-38 DELETE) / 알림은 MySection (MY-03)
 // 판매 끝난 상품 → '판매 종료', 숨긴 상품 → '지금은 볼 수 없는 상품' / 예상 금리, 월 상환 같은 개인 수치는 다시 안 보여줌
 // 저장 1건 줄 (공통 Card(UI-04)와 다른 모양: 아래 구분선)
 const SaveRow = styled.div`
@@ -48,12 +49,6 @@ const StatusLine = styled.div`
   padding-top: 8px;
 `
 
-function ProductStatusTag({ product }) {
-  if (product.productStatus === 'CLOSED') return <Tag $variant="warn">판매 종료</Tag>
-  if (product.productStatus === 'HIDDEN') return <Tag>지금은 볼 수 없는 상품</Tag>
-  return null
-}
-
 function SavedRecList() {
   const [attempt, setAttempt] = useState(0)
   const [result, setResult] = useState({ status: 'loading', items: [] })
@@ -74,8 +69,9 @@ function SavedRecList() {
     }
   }, [attempt])
 
-  const handleRetry = () => {
-    setResult({ status: 'loading', items: [] })
+  // 다시 받기 ([다시 시도], 이미 지워진 기록을 지우려 했을 때): 보여 준 목록이 있으면 받는 동안 흐리게 남김
+  const reload = () => {
+    setResult(toLoading)
     setAttempt((count) => count + 1)
   }
 
@@ -98,7 +94,7 @@ function SavedRecList() {
           <div>
             <Label>{save.conditionLabel}</Label>
             <Meta>
-              {formatDate(save.createdAt)} 저장 · 상품 {products.length}개
+              {formatDate(save.createdAt)} 저장, 상품 {products.length}개
             </Meta>
           </div>
           <Button $size="sm" $variant="outline" aria-expanded={isOpen} onClick={() => setOpenId(isOpen ? null : save.saveId)}>
@@ -125,9 +121,12 @@ function SavedRecList() {
   return (
     <MySection
       title="저장한 추천 결과"
+      itemName="추천 결과"
       description="저장한 추천 결과를 10개까지 보관해요. 상품은 지금 정보로 보여 줘요."
       status={result.status}
-      onRetry={handleRetry}
+      hasShown={result.hasShown}
+      onRetry={reload}
+      onReload={reload}
       items={result.items}
       getKey={(save) => save.saveId}
       getItemLabel={(save) => save.conditionLabel}
